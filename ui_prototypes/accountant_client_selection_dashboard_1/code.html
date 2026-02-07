@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Simplified Client Selection Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --background-light: #F9FAFB;
+            --surface-light: #FFFFFF;
+            --status-red: #EF4444;
+            --status-orange: #F97316;
+            --status-yellow: #F59E0B;
+            --status-gray: #9CA3AF;
+            --status-green: #10B981;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-light);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .client-card {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .client-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+        .collapsible-trigger:hover .trigger-icon {
+            transform: translateY(1px);
+        }::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; 
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex overflow-hidden">
+<aside class="w-20 lg:w-24 flex-shrink-0 flex flex-col items-center py-8 bg-white border-r border-gray-100 z-20">
+<div class="mb-10 p-3 bg-[var(--primary)] rounded-2xl shadow-lg shadow-emerald-200">
+<span class="material-symbols-outlined text-white text-3xl">account_balance_wallet</span>
+</div>
+<nav class="flex flex-col gap-8 w-full items-center">
+<button class="p-3 rounded-2xl bg-emerald-50 text-[var(--primary)] transition-all">
+<span class="material-symbols-outlined">dashboard</span>
+</button>
+<button class="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
+<span class="material-symbols-outlined">group</span>
+</button>
+<button class="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
+<span class="material-symbols-outlined">task</span>
+</button>
+<button class="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</nav>
+<div class="mt-auto flex flex-col gap-6 items-center">
+<button class="p-1 rounded-full border-2 border-gray-100 shadow-sm overflow-hidden">
+<img alt="User Profile" class="w-8 h-8 object-cover rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoq2IKYmRyLPT3phz2xODI3a6JBvMia5k4aBw_5Kf52BtFTC5jqPXRCK-yFhW3W4AFIqhvJEgNoI158ZXGwgdrJ8yrujxDgZ-7kHv9BG91cT3UwwBX-JqS5k8rSmYkynpX_Rib2DjyHdDK2eLjMteoDwqg-JAu5UPfZFyvSZ7iK1p5VlagAFw_ngyWtPTFCflb9w9FDCJyFXS5gVIMSWgyVneMqLFMofnP-MpoWfkzqRZSW1Fp37ejoTbEYcOmojQeLA8-kJ1v1r4"/>
+</button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-screen overflow-hidden">
+<header class="bg-white border-b border-gray-100 z-10">
+<div class="h-20 flex items-center justify-between px-10">
+<div class="flex items-center gap-6">
+<h1 class="text-xl font-semibold tracking-tight text-gray-900">Dashboard de Clientes</h1>
+<div class="h-6 w-px bg-gray-200"></div>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm font-medium hover:border-[var(--primary)] transition-colors">
+<span class="material-symbols-outlined text-[var(--primary)] text-lg">calendar_month</span>
+<span>Enero 2026</span>
+<span class="material-symbols-outlined text-gray-400 text-lg">expand_more</span>
+</button>
+<div class="relative group">
+<button class="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-100 rounded-full text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors shadow-sm">
+<span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            SAT Sync: hace 2h
+                        </button>
+<div class="absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 p-4 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all z-50">
+<div class="flex items-center justify-between mb-2">
+<span class="text-xs font-semibold text-gray-900">Sincronización SAT</span>
+<span class="text-[10px] text-gray-400">ID: #8821</span>
+</div>
+<div class="space-y-2 mb-3">
+<div class="flex justify-between text-xs text-gray-500">
+<span>Última exitosa:</span>
+<span>10:30 AM</span>
+</div>
+<div class="flex justify-between text-xs text-gray-500">
+<span>Estado:</span>
+<span class="text-emerald-600 font-medium">Completado</span>
+</div>
+</div>
+<button class="w-full py-1.5 bg-emerald-50 text-[var(--primary)] text-xs font-medium rounded-lg hover:bg-emerald-100 transition-colors">
+                                Sincronizar ahora
+                            </button>
+</div>
+</div>
+</div>
+<div class="flex-1 max-w-xl mx-12 relative">
+<div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-gray-400 text-xl">search</span>
+</div>
+<input class="block w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[var(--primary)] transition-all" placeholder="Buscar por Alias, Nombre o RFC..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+</div>
+</div>
+<div class="px-10 py-3 bg-white border-b border-gray-100 flex items-center gap-4 overflow-x-auto">
+<span class="text-[10px] font-medium text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                    Última actualización: hace 12 min | Fuente: SAT
+                </span>
+<div class="h-4 w-px bg-gray-200"></div>
+<div class="flex gap-2">
+<button class="px-2.5 py-1 rounded-full bg-gray-50 border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-100 transition-colors whitespace-nowrap">
+                        Todas
+                    </button>
+<button class="px-2.5 py-1 rounded-full bg-blue-50 border border-blue-100 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors flex items-center gap-1 whitespace-nowrap">
+<span class="h-1.5 w-1.5 rounded-full bg-blue-500"></span>
+                        Nuevas desde última sync
+                    </button>
+<button class="px-2.5 py-1 rounded-full bg-purple-50 border border-purple-100 text-xs font-medium text-purple-700 hover:bg-purple-100 transition-colors flex items-center gap-1 whitespace-nowrap">
+<span class="h-1.5 w-1.5 rounded-full bg-purple-500"></span>
+                        Cambió estatus
+                    </button>
+</div>
+</div>
+<div class="px-10 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-center">
+<p class="text-xs text-gray-500 font-medium flex items-center gap-2">
+                    Continuar trabajando con 
+                    <span class="text-gray-900 font-bold">Tech Solutions SA</span>
+<span class="text-gray-400 font-normal ml-1">Enero 2026</span>
+<a class="ml-2 text-[var(--primary)] hover:underline flex items-center gap-0.5" href="#">
+                        Entrar <span class="material-symbols-outlined text-xs">arrow_right_alt</span>
+</a>
+</p>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto px-10 py-10 space-y-12">
+<section class="max-w-7xl">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[var(--status-red)] text-2xl">shield</span>
+<h2 class="text-lg font-bold text-gray-900">Radar de Riesgos Fiscales</h2>
+<span class="px-2.5 py-0.5 rounded-full bg-red-50 text-[var(--status-red)] text-xs font-bold uppercase tracking-wider">3 Críticos</span>
+</div>
+<a class="text-sm font-semibold text-[var(--primary)] hover:text-[var(--primary-dark)] flex items-center gap-1 group" href="#">
+                        Ver todos los errores (12)
+                        <span class="material-symbols-outlined text-sm group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+</a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex flex-col h-full">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg text-gray-900 group-hover:text-[var(--primary)] transition-colors">Tech Solutions SA</h3>
+<span class="text-[var(--status-red)] material-symbols-outlined">shield</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-xs font-mono text-gray-400 uppercase tracking-wider">TSO010101KH2</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                    SYNC OK
+                                    <span class="text-green-400">2h</span>
+</span>
+</div>
+<div class="mt-auto">
+<span class="text-sm font-medium text-red-600">Factura global fuera de mes</span>
+</div>
+</div>
+</div>
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex flex-col h-full">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg text-gray-900 group-hover:text-[var(--primary)] transition-colors">Consultoría Pérez</h3>
+<span class="text-[var(--status-red)] material-symbols-outlined">shield</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-xs font-mono text-gray-400 uppercase tracking-wider">CPE120304PX1</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                    SYNC OK
+                                    <span class="text-green-400">12m</span>
+</span>
+</div>
+<div class="mt-auto">
+<span class="text-sm font-medium text-red-600">Declaración IVA rechazada</span>
+</div>
+</div>
+</div>
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex flex-col h-full">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-bold text-lg text-gray-900 group-hover:text-[var(--primary)] transition-colors">Constructora Norte</h3>
+<span class="text-[var(--status-red)] material-symbols-outlined">shield</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-xs font-mono text-gray-400 uppercase tracking-wider">CNO051010NM2</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                                    SYNC LENTO
+                                    <span class="text-amber-500">6h</span>
+</span>
+</div>
+<div class="mt-auto">
+<span class="text-sm font-medium text-red-600">Proveedor en lista negra (69-B)</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<div class="max-w-7xl space-y-4">
+<section>
+<button class="collapsible-trigger w-full flex items-center gap-4 mb-4 py-2 text-left group">
+<h3 class="text-base font-bold text-gray-900">Con Problemas Operativos (3)</h3>
+<span class="h-px bg-gray-100 flex-1"></span>
+<span class="material-symbols-outlined trigger-icon text-gray-400 transition-transform">expand_less</span>
+</button>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<h4 class="text-base font-bold text-gray-900 group-hover:text-[var(--primary)] transition-colors">Transportes Sol</h4>
+<span class="material-symbols-outlined text-[var(--status-orange)] text-xl">description</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-[11px] text-gray-400 font-mono uppercase tracking-wider">TSO010101KH2</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                    SYNC OK
+                                </span>
+</div>
+<div class="text-xs font-medium text-orange-600">Buzón sin revisar</div>
+</div>
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<h4 class="text-base font-bold text-gray-900 group-hover:text-[var(--primary)] transition-colors">Moda Global</h4>
+<span class="material-symbols-outlined text-[var(--status-orange)] text-xl">description</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-[11px] text-gray-400 font-mono uppercase tracking-wider">MGL220315RT2</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-red-50 text-red-700 border border-red-100">
+                                    SYNC ERROR
+                                </span>
+</div>
+<div class="text-xs font-medium text-orange-600">Descarga incompleta</div>
+</div>
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<h4 class="text-base font-bold text-gray-900 group-hover:text-[var(--primary)] transition-colors">Innova Soft</h4>
+<span class="material-symbols-outlined text-[var(--status-orange)] text-xl">description</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-[11px] text-gray-400 font-mono uppercase tracking-wider">ISO150808JV1</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                    SYNC OK
+                                </span>
+</div>
+<div class="text-xs font-medium text-orange-600">Error de sincronización</div>
+</div>
+</div>
+</section>
+<section>
+<button class="collapsible-trigger w-full flex items-center gap-4 mb-4 py-2 text-left group">
+<h3 class="text-base font-bold text-gray-900">Requieren Atención (2)</h3>
+<span class="h-px bg-gray-100 flex-1"></span>
+<span class="material-symbols-outlined trigger-icon text-gray-400 transition-transform">expand_less</span>
+</button>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<h4 class="text-base font-bold text-gray-900 group-hover:text-[var(--primary)] transition-colors">Diseños Digitales</h4>
+<span class="material-symbols-outlined text-[var(--status-yellow)] text-xl">notification_important</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-[11px] text-gray-400 font-mono uppercase tracking-wider">DDI050505UV8</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                    SYNC OK
+                                </span>
+</div>
+<div class="text-xs font-medium text-amber-600">Falta estado de cuenta</div>
+</div>
+<div class="client-card group relative bg-white p-6 rounded-2xl border border-gray-100 shadow-sm cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<h4 class="text-base font-bold text-gray-900 group-hover:text-[var(--primary)] transition-colors">Mini Market S.A.</h4>
+<span class="material-symbols-outlined text-[var(--status-yellow)] text-xl">notification_important</span>
+</div>
+<div class="flex items-center gap-2 mb-4">
+<p class="text-[11px] text-gray-400 font-mono uppercase tracking-wider">MMA121212RT5</p>
+<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-50 text-green-700 border border-green-100">
+                                    SYNC OK
+                                </span>
+</div>
+<div class="text-xs font-medium text-amber-600">Pago provisional pendiente</div>
+</div>
+</div>
+</section>
+<section class="mt-8">
+<button class="w-full bg-white border border-gray-100 rounded-2xl p-5 hover:bg-gray-50 transition-colors cursor-pointer group flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-4">
+<div class="p-2 bg-emerald-50 rounded-lg">
+<span class="material-symbols-outlined text-[var(--status-green)]">check_circle</span>
+</div>
+<div>
+<h3 class="text-sm font-bold text-gray-900">Bajo Control (24)</h3>
+<p class="text-xs text-gray-500 mt-1 flex gap-2">
+<span>24 clientes al día</span>
+<span class="text-gray-300">•</span>
+<span class="text-amber-600">2 atrasados</span>
+<span class="text-gray-300">•</span>
+<span class="text-red-500">1 error</span>
+</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-gray-400 group-hover:text-gray-600 transition-colors">expand_more</span>
+</button>
+</section>
+</div>
+<div class="h-20"></div>
+</div>
+</main>
+
+</body></html>

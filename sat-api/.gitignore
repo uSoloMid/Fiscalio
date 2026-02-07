@@ -1,0 +1,20 @@
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+.env
+.env.backup
+.phpunit.result.cache
+docker-compose.override.yml
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+
+# Custom ignores
+/database/database.sqlite
+/storage/app/sat
+/storage/logs/*.log
+/public/debug_simulation.php
+/reset_sync.php

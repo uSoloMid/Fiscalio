@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Refined Client Control Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --background-light: #F9FAFB;
+            --surface-light: #FFFFFF;
+            --status-green: #10B981;
+            --status-red: #EF4444;
+            --status-orange: #F97316;
+            --status-yellow: #F59E0B;
+            --status-gray: #9CA3AF;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-light);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .nav-item {
+            transition: all 0.2s;
+        }
+        .nav-item:hover {
+            background-color: #F3F4F6;
+            color: #111827;
+        }
+        .nav-item.active {
+            background-color: #ECFDF5;
+            color: var(--primary);
+            font-weight: 500;
+        }
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }.popover-container:focus-within .popover-content {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex overflow-hidden">
+<aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 z-20">
+<div class="h-20 flex items-center px-6 border-b border-gray-100">
+<div class="flex items-center gap-2 text-[var(--primary)] font-bold text-xl tracking-tight">
+<span class="material-symbols-outlined text-3xl">account_balance_wallet</span>
+<span>Contalink</span>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
+<a class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+            Dashboard
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">receipt_long</span>
+            Facturas
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">error</span>
+            Errores
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">sync_alt</span>
+            Conciliación
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">account_balance</span>
+            Contabilidad
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">description</span>
+            Constancias
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">bar_chart</span>
+            Reportes
+        </a>
+</nav>
+<div class="p-4 border-t border-gray-100">
+<button class="flex items-center gap-3 px-3 py-2 w-full rounded-xl hover:bg-gray-50 text-left transition-colors">
+<img alt="User Profile" class="w-8 h-8 object-cover rounded-full bg-gray-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoq2IKYmRyLPT3phz2xODI3a6JBvMia5k4aBw_5Kf52BtFTC5jqPXRCK-yFhW3W4AFIqhvJEgNoI158ZXGwgdrJ8yrujxDgZ-7kHv9BG91cT3UwwBX-JqS5k8rSmYkynpX_Rib2DjyHdDK2eLjMteoDwqg-JAu5UPfZFyvSZ7iK1p5VlagAFw_ngyWtPTFCflb9w9FDCJyFXS5gVIMSWgyVneMqLFMofnP-MpoWfkzqRZSW1Fp37ejoTbEYcOmojQeLA8-kJ1v1r4"/>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-gray-900 truncate">Contador Admin</p>
+<p class="text-xs text-gray-500 truncate">admin@firm.com</p>
+</div>
+<span class="material-symbols-outlined text-gray-400 text-lg">expand_more</span>
+</button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-screen overflow-hidden bg-[var(--background-light)]">
+<header class="bg-white border-b border-gray-200 z-10 flex-shrink-0 h-20 px-8 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors text-sm font-medium group">
+<span class="material-symbols-outlined text-lg group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+                Cambiar cliente
+            </button>
+<div class="w-px h-10 bg-gray-200"></div>
+<div>
+<h1 class="text-2xl font-bold text-gray-900 leading-tight">Tech Solutions SA</h1>
+<p class="text-xs font-mono text-gray-500 tracking-wide mt-0.5">TSO123456ABC</p>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-xs font-semibold uppercase tracking-wide">Bajo control</span>
+</div>
+<div class="relative popover-container group">
+<button class="flex items-center gap-2 pl-3 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-medium text-gray-600 hover:bg-gray-100 hover:border-gray-300 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-500/20">
+<span class="w-2 h-2 rounded-full bg-green-500"></span>
+<span>SAT Sync: hace 2h</span>
+</button>
+<div class="popover-content absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-100 p-4 z-50 opacity-0 invisible transform -translate-y-2 transition-all duration-200 origin-top-right">
+<div class="flex items-start gap-3 mb-3">
+<div class="p-2 bg-gray-50 rounded-lg text-gray-500">
+<span class="material-symbols-outlined text-xl">cloud_sync</span>
+</div>
+<div>
+<p class="text-xs font-semibold text-gray-900">Última sincronización</p>
+<p class="text-[10px] text-gray-500 mt-0.5">Hoy, 09:42 AM</p>
+<p class="text-[10px] text-gray-400 mt-0.5">Fuente: SAT</p>
+</div>
+</div>
+<button class="w-full py-1.5 bg-indigo-50 text-indigo-700 text-xs font-medium rounded-lg hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5">
+<span class="material-symbols-outlined text-sm">refresh</span>
+                        Sincronizar ahora
+                    </button>
+</div>
+</div>
+<button class="flex items-center gap-3 pl-4 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:border-[var(--primary)] hover:ring-1 hover:ring-emerald-500/20 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[var(--primary)]">calendar_month</span>
+<span class="text-gray-900">Enero 2026</span>
+<span class="material-symbols-outlined text-gray-400">expand_more</span>
+</button>
+<div class="w-px h-6 bg-gray-200 mx-2"></div>
+<button class="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-50">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto p-8">
+<div class="max-w-7xl mx-auto space-y-8">
+<div class="flex items-center justify-between">
+<h2 class="text-xl font-semibold text-gray-800">Dashboard del cliente</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm col-span-2">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-bold text-gray-900">Resumen del Periodo</h3>
+<span class="text-xs text-gray-400 font-medium">Actualizado hace 5 min</span>
+</div>
+<div class="grid grid-cols-3 gap-4">
+<div class="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col h-full justify-between">
+<div>
+<div class="flex items-center justify-between mb-1">
+<p class="text-sm text-gray-500">Ingresos</p>
+<div class="flex items-center gap-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+<span class="material-symbols-outlined text-[10px]">check_circle</span>
+                                        Cifras validadas
+                                    </div>
+</div>
+<p class="text-2xl font-bold text-gray-900">$124,500</p>
+</div>
+<div class="mt-2 text-xs text-emerald-600 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">trending_up</span>
+                                +12% vs mes anterior
+                            </div>
+</div>
+<div class="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col h-full justify-between">
+<div>
+<div class="flex items-center justify-between mb-1">
+<p class="text-sm text-gray-500">Gastos</p>
+<div class="flex items-center gap-1 text-[10px] font-medium text-yellow-700 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100">
+<span class="material-symbols-outlined text-[10px]">warning</span>
+                                        Cifras preliminares
+                                    </div>
+</div>
+<p class="text-2xl font-bold text-gray-900">$82,300</p>
+</div>
+<div class="mt-2 text-xs text-gray-500 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">trending_flat</span>
+                                Estable
+                            </div>
+</div>
+<div class="p-4 bg-gray-50 rounded-xl border border-gray-100 flex flex-col h-full justify-between">
+<div>
+<div class="flex items-center justify-between mb-1">
+<p class="text-sm text-gray-500">IVA por Pagar</p>
+<div class="flex items-center gap-1 text-[10px] font-medium text-yellow-700 bg-yellow-50 px-1.5 py-0.5 rounded border border-yellow-100">
+<span class="material-symbols-outlined text-[10px]">warning</span>
+                                        Cifras preliminares
+                                    </div>
+</div>
+<p class="text-2xl font-bold text-gray-900">$6,752</p>
+</div>
+<div class="mt-2 text-xs text-blue-600 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">info</span>
+                                Vence en 3 días
+                            </div>
+</div>
+</div>
+<div class="mt-6 h-32 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center border-dashed">
+<span class="text-gray-400 text-sm flex items-center gap-2">
+<span class="material-symbols-outlined">show_chart</span>
+                             Gráfico de tendencias
+                        </span>
+</div>
+</div>
+<div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+<h3 class="font-bold text-gray-900 mb-6">Accesos Rápidos</h3>
+<div class="space-y-3">
+<button class="w-full flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-[var(--primary)] hover:bg-emerald-50/30 transition-all group">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-lg">cloud_download</span>
+</div>
+<span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Descargar XMLs</span>
+</div>
+<span class="material-symbols-outlined text-gray-300 group-hover:text-[var(--primary)]">chevron_right</span>
+</button>
+<button class="w-full flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:border-[var(--primary)] hover:bg-emerald-50/30 transition-all group">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center">
+<span class="material-symbols-outlined text-lg">folder_open</span>
+</div>
+<span class="text-sm font-medium text-gray-700 group-hover:text-gray-900">Expediente Digital</span>
+</div>
+<span class="material-symbols-outlined text-gray-300 group-hover:text-[var(--primary)]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<div class="bg-white rounded-2xl border border-gray-100 border-dashed p-12 text-center">
+<div class="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+<span class="material-symbols-outlined text-3xl text-emerald-500">check_circle</span>
+</div>
+<h3 class="text-lg font-medium text-gray-900">Bajo control</h3>
+<p class="text-gray-500 mt-1 max-w-lg mx-auto">Este cliente está al día en el periodo seleccionado. Puedes generar reportes o revisar historial.</p>
+</div>
+</div>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,17 @@
+# Root Gitignore
+/agent
+/desktop
+/vault
+/legacy
+.DS_Store
+Thumbs.db
+
+# Ignorar archivos locales de VS Code
+.vscode/
+
+# Ignorar dependencias pesadas si no se usara el gitignore interno
+**/node_modules
+**/vendor
+**/.env
+**/storage/app/sat
+**/database/*.sqlite

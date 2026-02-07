@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Client Invoice Review Center</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --background-light: #F9FAFB;
+            --surface-light: #FFFFFF;
+            --status-green: #10B981;
+            --status-red: #EF4444;
+            --status-orange: #F97316;
+            --status-yellow: #F59E0B;
+            --status-gray: #9CA3AF;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-light);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .nav-item {
+            transition: all 0.2s;
+        }
+        .nav-item:hover {
+            background-color: #F3F4F6;
+            color: #111827;
+        }
+        .nav-item.active {
+            background-color: #ECFDF5;
+            color: var(--primary);
+            font-weight: 500;
+        }
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; 
+        }
+        .table-row-hover:hover .row-actions {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex overflow-hidden">
+<aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 z-20">
+<div class="h-20 flex items-center px-6 border-b border-gray-100">
+<div class="flex items-center gap-2 text-[var(--primary)] font-bold text-xl tracking-tight">
+<span class="material-symbols-outlined text-3xl">account_balance_wallet</span>
+<span>Contalink</span>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+                Dashboard
+            </a>
+<a class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm" href="#">
+<span class="material-symbols-outlined text-xl">receipt_long</span>
+                Facturas
+            </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">error</span>
+                Errores
+            </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">sync_alt</span>
+                Conciliación
+            </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">account_balance</span>
+                Contabilidad
+            </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">description</span>
+                Constancias
+            </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">bar_chart</span>
+                Reportes
+            </a>
+</nav>
+<div class="p-4 border-t border-gray-100">
+<button class="flex items-center gap-3 px-3 py-2 w-full rounded-xl hover:bg-gray-50 text-left transition-colors">
+<img alt="User Profile" class="w-8 h-8 object-cover rounded-full bg-gray-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoq2IKYmRyLPT3phz2xODI3a6JBvMia5k4aBw_5Kf52BtFTC5jqPXRCK-yFhW3W4AFIqhvJEgNoI158ZXGwgdrJ8yrujxDgZ-7kHv9BG91cT3UwwBX-JqS5k8rSmYkynpX_Rib2DjyHdDK2eLjMteoDwqg-JAu5UPfZFyvSZ7iK1p5VlagAFw_ngyWtPTFCflb9w9FDCJyFXS5gVIMSWgyVneMqLFMofnP-MpoWfkzqRZSW1Fp37ejoTbEYcOmojQeLA8-kJ1v1r4"/>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-gray-900 truncate">Contador Admin</p>
+<p class="text-xs text-gray-500 truncate">admin@firm.com</p>
+</div>
+<span class="material-symbols-outlined text-gray-400 text-lg">expand_more</span>
+</button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-screen overflow-hidden bg-[var(--background-light)] relative">
+<header class="bg-white border-b border-gray-200 z-10 flex-shrink-0 h-20 px-8 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors text-sm font-medium group">
+<span class="material-symbols-outlined text-lg group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+                    Cambiar cliente
+                </button>
+<div class="w-px h-10 bg-gray-200"></div>
+<div>
+<h1 class="text-2xl font-bold text-gray-900 leading-tight">Tech Solutions SA</h1>
+<p class="text-xs font-mono text-gray-500 tracking-wide mt-0.5">TSO123456ABC</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-xs font-semibold uppercase tracking-wide">Bajo control</span>
+</div>
+<button class="flex items-center gap-3 pl-4 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:border-[var(--primary)] hover:ring-1 hover:ring-emerald-500/20 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[var(--primary)]">calendar_month</span>
+<span class="text-gray-900">Enero 2026</span>
+<span class="material-symbols-outlined text-gray-400">expand_more</span>
+</button>
+<div class="w-px h-6 bg-gray-200 mx-2"></div>
+<button class="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-50">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<div class="bg-white border-b border-gray-200 px-6 py-3 flex flex-col gap-3 sticky top-0 z-30 shadow-sm">
+<div class="flex items-center justify-between text-xs text-gray-500 border-b border-gray-100 pb-2 mb-1">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">sync</span>
+                Última actualización: hace 12 min | Fuente: SAT
+            </span>
+</div>
+<div class="flex items-center gap-4 overflow-x-auto no-scrollbar">
+<div class="relative min-w-[240px]">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+<input class="w-full pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-md focus:border-[var(--primary)] focus:ring-[var(--primary)] shadow-sm" placeholder="Buscar UUID, RFC, concepto..." type="text"/>
+</div>
+<div class="h-6 w-px bg-gray-200 mx-2 flex-shrink-0"></div>
+<div class="flex items-center gap-2 flex-1">
+<button class="px-3 py-1 text-xs font-medium bg-gray-900 text-white rounded-full transition-colors border border-gray-900 flex-shrink-0">Todas</button>
+<button class="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-full transition-colors flex items-center gap-1.5 flex-shrink-0">
+                    Nuevas desde última sync
+                </button>
+<button class="px-3 py-1 text-xs font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-full transition-colors flex items-center gap-1.5 flex-shrink-0">
+                    Cambió estatus
+                </button>
+<div class="h-4 w-px bg-gray-200 mx-1 flex-shrink-0"></div>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full transition-colors flex-shrink-0">Emitidas</button>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full transition-colors flex-shrink-0">Recibidas</button>
+<div class="h-4 w-px bg-gray-200 mx-1 flex-shrink-0"></div>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full transition-colors flex-shrink-0">Ingresos</button>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full transition-colors flex-shrink-0">Gastos</button>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full transition-colors flex-shrink-0">Nómina</button>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full transition-colors flex-shrink-0">Pagos</button>
+<div class="h-4 w-px bg-gray-200 mx-1 flex-shrink-0"></div>
+<button class="relative px-3 py-1 text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-full transition-colors flex items-center gap-1.5 flex-shrink-0">
+                    Con errores
+                    <span class="flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+</button>
+<button class="relative px-3 py-1 text-xs font-medium bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200 rounded-full transition-colors flex items-center gap-1.5 flex-shrink-0">
+                    Sin clasificar
+                    <span class="flex h-1.5 w-1.5 rounded-full bg-yellow-500"></span>
+</button>
+</div>
+<button class="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors border border-transparent hover:border-gray-200 flex-shrink-0">
+<span class="material-symbols-outlined text-lg">tune</span>
+                Filtros avanzados
+            </button>
+</div>
+</div>
+<div class="flex-1 flex overflow-hidden">
+<div class="flex-1 overflow-auto bg-white">
+<table class="min-w-full divide-y divide-gray-200">
+<thead class="bg-gray-50 sticky top-0 z-20">
+<tr>
+<th class="px-4 py-3 text-left w-10" scope="col">
+<input checked="" class="rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]" type="checkbox"/>
+</th>
+<th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-10" scope="col">
+<span class="material-symbols-outlined text-base" title="Estado">info</span>
+</th>
+<th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:text-gray-700" scope="col">
+                                Fecha <span class="material-symbols-outlined text-xs align-bottom">arrow_drop_down</span>
+</th>
+<th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                                Proveedor/Emisor
+                            </th>
+<th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                                Concepto
+                            </th>
+<th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                                Total
+                            </th>
+<th class="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" scope="col">
+                                IVA
+                            </th>
+<th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16" scope="col">
+                                Tipo
+                            </th>
+<th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16" scope="col">
+                                Método
+                            </th>
+<th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48" scope="col">
+                                Clasificación
+                            </th>
+<th class="w-8 px-1" scope="col"></th>
+</tr>
+</thead>
+<tbody class="bg-white divide-y divide-gray-200">
+<tr class="table-row-hover hover:bg-gray-50 bg-blue-50/30">
+<td class="px-4 py-3 whitespace-nowrap">
+<input checked="" class="rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]" type="checkbox"/>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="material-symbols-outlined text-emerald-500 text-lg" title="Validado">check_circle</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900">12 Ene 2026</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium">Servicios Digitales S.A.</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 max-w-[200px] truncate">Hosting Mensual Servidores</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900">$2,450.00</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-500">$392.00</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">I</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 font-medium">PUE</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap">
+<div class="flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:border-gray-400">
+<span>Gastos Generales</span>
+<span class="material-symbols-outlined text-sm ml-auto">expand_more</span>
+</div>
+</td>
+<td class="px-1 py-3 whitespace-nowrap text-right">
+<button class="row-actions opacity-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+<tr class="table-row-hover hover:bg-gray-50 bg-blue-50/30">
+<td class="px-4 py-3 whitespace-nowrap">
+<input checked="" class="rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]" type="checkbox"/>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="material-symbols-outlined text-amber-400 text-lg" title="Sin clasificar">warning</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900">10 Ene 2026</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium">Papelería Express</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 max-w-[200px] truncate">Insumos de oficina - Lote A</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900">$845.50</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-500">$135.28</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">I</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 font-medium">PUE</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap">
+<div class="flex items-center gap-1 text-xs text-amber-700 bg-amber-50 px-2 py-1 rounded border border-amber-200 cursor-pointer hover:border-amber-400">
+<span>Seleccionar...</span>
+<span class="material-symbols-outlined text-sm ml-auto">expand_more</span>
+</div>
+</td>
+<td class="px-1 py-3 whitespace-nowrap text-right">
+<button class="row-actions opacity-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+<tr class="table-row-hover hover:bg-gray-50 bg-blue-50/30 border-l-4 border-l-red-500">
+<td class="px-4 py-3 whitespace-nowrap">
+<input checked="" class="rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]" type="checkbox"/>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="material-symbols-outlined text-red-500 text-lg" title="Error en complemento">hexagon</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900">08 Ene 2026</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium">Constructora Norte</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 max-w-[200px] truncate">Mantenimiento Edificio A</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900">$15,000.00</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-500">$2,400.00</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">I</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 font-medium">PPD</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap">
+<div class="flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:border-gray-400">
+<span>Mantenimiento</span>
+<span class="material-symbols-outlined text-sm ml-auto">expand_more</span>
+</div>
+</td>
+<td class="px-1 py-3 whitespace-nowrap text-right">
+<button class="row-actions opacity-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+<tr class="table-row-hover hover:bg-gray-50">
+<td class="px-4 py-3 whitespace-nowrap">
+<input class="rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]" type="checkbox"/>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900">05 Ene 2026</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium">CFE Suministrador</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 max-w-[200px] truncate">Servicio de Energía Eléctrica</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900">$3,210.50</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-500">$513.68</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">I</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 font-medium">PUE</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap">
+<div class="flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:border-gray-400">
+<span>Servicios Básicos</span>
+<span class="material-symbols-outlined text-sm ml-auto">expand_more</span>
+</div>
+</td>
+<td class="px-1 py-3 whitespace-nowrap text-right">
+<button class="row-actions opacity-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+<tr class="table-row-hover hover:bg-gray-50">
+<td class="px-4 py-3 whitespace-nowrap">
+<input class="rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]" type="checkbox"/>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900">02 Ene 2026</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium">Microsoft Ireland</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-gray-500 max-w-[200px] truncate">Office 365 Subscription</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900">$250.00</td>
+<td class="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-500">$40.00</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">I</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap text-center">
+<span class="px-2 py-0.5 rounded text-[10px] bg-blue-50 text-blue-700 font-medium">PUE</span>
+</td>
+<td class="px-3 py-3 whitespace-nowrap">
+<div class="flex items-center gap-1 text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-200 cursor-pointer hover:border-gray-400">
+<span>Licencias Software</span>
+<span class="material-symbols-outlined text-sm ml-auto">expand_more</span>
+</div>
+</td>
+<td class="px-1 py-3 whitespace-nowrap text-right">
+<button class="row-actions opacity-0 text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100">
+<span class="material-symbols-outlined text-lg">more_horiz</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="w-[360px] bg-white border-l border-gray-200 flex flex-col shadow-xl z-20">
+<div class="h-14 flex items-center justify-between px-5 border-b border-gray-100">
+<h3 class="font-semibold text-gray-800">Detalle de Factura</h3>
+<button class="text-gray-400 hover:text-gray-600">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<div class="flex-1 overflow-y-auto p-5 space-y-6">
+<div class="flex gap-4">
+<div class="w-20 h-24 bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center relative group cursor-pointer">
+<span class="material-symbols-outlined text-gray-400 text-3xl">picture_as_pdf</span>
+<div class="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-gray-700">visibility</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<h4 class="font-bold text-gray-900 truncate">Constructora Norte</h4>
+<p class="text-xs text-gray-500 font-mono mt-1 break-all">550e8400-e29b-41d4-a716-446655440000</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="px-2 py-0.5 rounded text-[10px] bg-red-50 text-red-700 font-medium border border-red-100">Con errores</span>
+<span class="text-xs text-gray-400">Hace 3 días</span>
+</div>
+</div>
+</div>
+<div class="border-t border-gray-100 pt-4">
+<div class="flex justify-between items-center text-sm mb-2">
+<span class="text-gray-500">Subtotal</span>
+<span class="text-gray-900 font-medium">$12,600.00</span>
+</div>
+<div class="flex justify-between items-center text-sm mb-2">
+<span class="text-gray-500">IVA (16%)</span>
+<span class="text-gray-900 font-medium">$2,400.00</span>
+</div>
+<div class="flex justify-between items-center text-base pt-2 border-t border-dashed border-gray-200">
+<span class="font-bold text-gray-900">Total</span>
+<span class="font-bold text-gray-900">$15,000.00</span>
+</div>
+</div>
+<div class="space-y-4">
+<h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Clasificación Contable</h4>
+<div>
+<label class="block text-xs font-medium text-gray-700 mb-1">Categoría de Gasto</label>
+<div class="relative">
+<select class="block w-full text-sm rounded-lg border-gray-300 shadow-sm focus:border-[var(--primary)] focus:ring focus:ring-[var(--primary)] focus:ring-opacity-50">
+<option>Mantenimiento y Reparaciones</option>
+<option>Arrendamientos</option>
+<option>Servicios Profesionales</option>
+</select>
+</div>
+</div>
+<div>
+<label class="block text-xs font-medium text-gray-700 mb-1">Cuenta Contable</label>
+<div class="relative">
+<select class="block w-full text-sm rounded-lg border-gray-300 shadow-sm focus:border-[var(--primary)] focus:ring focus:ring-[var(--primary)] focus:ring-opacity-50">
+<option>602-05-01 Mtto Edificios</option>
+<option>602-05-02 Mtto Eq. Transporte</option>
+</select>
+</div>
+</div>
+<div class="flex items-center gap-2 pt-2">
+<input class="rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]" id="auto_class" type="checkbox"/>
+<label class="text-xs text-gray-600" for="auto_class">Recordar para futuras facturas de este proveedor</label>
+</div>
+</div>
+<div class="bg-red-50 rounded-lg p-3 border border-red-100">
+<h4 class="flex items-center gap-2 text-xs font-bold text-red-800 mb-2">
+<span class="material-symbols-outlined text-sm">warning</span>
+                            Errores detectados
+                        </h4>
+<ul class="text-xs text-red-700 space-y-1 list-disc pl-4">
+<li>Factura PPD sin complemento de pago asociado en el mes corriente.</li>
+<li>RFC del receptor no coincide con constancia fiscal (aviso).</li>
+</ul>
+</div>
+</div>
+<div class="p-4 border-t border-gray-200 bg-gray-50">
+<button class="w-full py-2 bg-gray-900 hover:bg-black text-white rounded-lg text-sm font-medium transition-colors">
+                        Guardar cambios
+                    </button>
+</div>
+</div>
+</div>
+<div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-6 z-40 animate-in fade-in slide-in-from-bottom-4 duration-300">
+<div class="flex items-center gap-2 pr-4 border-r border-gray-700">
+<span class="bg-white text-gray-900 text-xs font-bold px-1.5 py-0.5 rounded">3</span>
+<span class="text-sm font-medium">seleccionadas</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-800 rounded-lg transition-colors text-sm">
+<span class="material-symbols-outlined text-lg">category</span>
+                    Clasificar lote
+                </button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-800 rounded-lg transition-colors text-sm">
+<span class="material-symbols-outlined text-lg">check_circle</span>
+                    Marcar revisadas
+                </button>
+<button class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-800 rounded-lg transition-colors text-sm">
+<span class="material-symbols-outlined text-lg">download</span>
+                    Exportar
+                </button>
+</div>
+<button class="ml-2 text-gray-400 hover:text-white">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+</main>
+</body></html>
