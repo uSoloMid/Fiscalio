@@ -59,6 +59,14 @@ export interface Account {
     naturaleza: string;
     parent_code?: string;
     is_selectable: boolean;
+    is_postable: boolean;
+    generate_auxiliaries: boolean;
+    currency: string;
+    is_cash_flow: boolean;
+    is_active: boolean;
+    description?: string;
     created_at?: string;
     updated_at?: string;
+    // UI fields
+    children?: Account[];
 }

@@ -17,11 +17,21 @@ class Account extends Model
         'type',
         'naturaleza',
         'parent_code',
-        'is_selectable'
+        'is_selectable',
+        'is_postable',
+        'generate_auxiliaries',
+        'currency',
+        'is_cash_flow',
+        'is_active',
+        'description'
     ];
 
     protected $casts = [
         'is_selectable' => 'boolean',
+        'is_postable' => 'boolean',
+        'generate_auxiliaries' => 'boolean',
+        'is_cash_flow' => 'boolean',
+        'is_active' => 'boolean',
         'level' => 'integer',
     ];
 }
