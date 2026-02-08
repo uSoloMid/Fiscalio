@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d0d175cd213b68bd936a67d106d18cb7",
+    "content-hash": "7dfb8f678ff0054706e17185b7b989d5",
     "packages": [
         {
             "name": "asm89/stack-cors",
@@ -2320,6 +2320,59 @@
             "time": "2025-07-08T20:30:08+00:00"
         },
         {
+            "name": "phpcfdi/cfdi-expresiones",
+            "version": "v3.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpcfdi/cfdi-expresiones.git",
+                "reference": "db116bcff94ba16c03a805e1a5c5ca3d3c867534"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpcfdi/cfdi-expresiones/zipball/db116bcff94ba16c03a805e1a5c5ca3d3c867534",
+                "reference": "db116bcff94ba16c03a805e1a5c5ca3d3c867534",
+                "shasum": ""
+            },
+            "require": {
+                "ext-dom": "*",
+                "ext-mbstring": "*",
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "ext-json": "*",
+                "phpunit/phpunit": "^10.5.45"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "PhpCfdi\\CfdiExpresiones\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carlos C Soto",
+                    "email": "eclipxe13@gmail.com",
+                    "homepage": "https://eclipxe.com.mx/"
+                }
+            ],
+            "description": "Genera expresiones de CFDI 4.0, CFDI 3.3, CFDI 3.2, RET 1.0 y RET 2.0",
+            "homepage": "https://github.com/phpcfdi/cfdi-expresiones",
+            "keywords": [
+                "cfdi",
+                "phpcfdi",
+                "sat"
+            ],
+            "support": {
+                "issues": "https://github.com/phpcfdi/cfdi-expresiones/issues",
+                "source": "https://github.com/phpcfdi/cfdi-expresiones"
+            },
+            "time": "2025-04-14T05:00:52+00:00"
+        },
+        {
             "name": "phpcfdi/credentials",
             "version": "v1.3.0",
             "source": {
@@ -2427,6 +2480,73 @@
                 "source": "https://github.com/phpcfdi/rfc"
             },
             "time": "2025-04-12T20:09:29+00:00"
+        },
+        {
+            "name": "phpcfdi/sat-estado-cfdi",
+            "version": "v2.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/phpcfdi/sat-estado-cfdi.git",
+                "reference": "c2146e035a5923569fc9b1981d13956c5d08c558"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpcfdi/sat-estado-cfdi/zipball/c2146e035a5923569fc9b1981d13956c5d08c558",
+                "reference": "c2146e035a5923569fc9b1981d13956c5d08c558",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2"
+            },
+            "require-dev": {
+                "ext-curl": "*",
+                "ext-dom": "*",
+                "ext-soap": "*",
+                "guzzlehttp/guzzle": "^7.8",
+                "guzzlehttp/psr7": "^2.6",
+                "phpcfdi/cfdi-expresiones": "^3.0",
+                "phpunit/phpunit": "^11.0.3",
+                "psr/http-client": "^1.0|^2.0",
+                "psr/http-factory": "^1.0|^2.0",
+                "psr/http-message": "^1.0|^2.0"
+            },
+            "suggest": {
+                "ext-dom": "Extensión para poder usar el cliente HTTP PSR",
+                "ext-soap": "Extensión para poder usar el cliente SOAP",
+                "phpcfdi/cfdi-expresiones": "Genera expresiones de CFDI 4.0, CFDI 3.3, CFDI 3.2, RET 1.0 y RET 2.0",
+                "psr/http-client": "Requerimiento del cliente HTTP PSR",
+                "psr/http-factory": "Requerimiento del cliente HTTP PSR",
+                "psr/http-message": "Requerimiento del cliente HTTP PSR"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "PhpCfdi\\SatEstadoCfdi\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Carlos C Soto",
+                    "email": "eclipxe13@gmail.com"
+                }
+            ],
+            "description": "Consulta el estado de un cfdi en el webservice del SAT",
+            "homepage": "https://github.com/phpcfdi/sat-estado-cfdi",
+            "keywords": [
+                "ConsultaCFDIService.svc",
+                "cfdi",
+                "phpcfdi",
+                "sat"
+            ],
+            "support": {
+                "issues": "https://github.com/phpcfdi/sat-estado-cfdi/issues",
+                "source": "https://github.com/phpcfdi/sat-estado-cfdi"
+            },
+            "time": "2024-03-07T16:48:35+00:00"
         },
         {
             "name": "phpcfdi/sat-ws-descarga-masiva",

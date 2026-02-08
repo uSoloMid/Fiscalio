@@ -109,21 +109,38 @@ class BusinessSyncService
     /**
      * Verify status of all active invoices.
      */
-    public function verifyInvoices(Business $business)
+    public function verifyInvoices(Business $business, array $filters = [])
     {
         // Limit to invoices not checked in last 24h and that are NOT canceled
         $query = Cfdi::where(function ($q) use ($business) {
             $q->where('rfc_emisor', $business->rfc)
                 ->orWhere('rfc_receptor', $business->rfc);
         })
-            ->where('es_cancelado', false)
-            ->where(function ($q) {
+            ->where('es_cancelado', false);
+
+        // Apply filters
+        if (!empty($filters['year'])) {
+            $query->whereYear('fecha', $filters['year']);
+        }
+        if (!empty($filters['month'])) {
+            $query->whereMonth('fecha', $filters['month']);
+        }
+        if (!empty($filters['tipo']) && in_array($filters['tipo'], ['emitidas', 'recibidas'])) {
+            if ($filters['tipo'] === 'emitidas') {
+                $query->where('rfc_emisor', $business->rfc);
+            }
+            else {
+                $query->where('rfc_receptor', $business->rfc);
+            }
+        }
+
+        $query->where(function ($q) {
             $q->whereNull('estado_sat_updated_at')
                 ->orWhere('estado_sat_updated_at', '<', now()->subHours(24));
         });
 
         $totalToVerify = $query->count();
-        $invoices = $query->limit(100)->get(); // Chunking to avoid timeout
+        $invoices = $query->limit(500)->get(); // Aumentado a 500 para mayor efectividad en lotes grandes
 
         $changes = [];
         $verifiedCount = 0;
@@ -154,7 +171,10 @@ class BusinessSyncService
                 $cfdi->update([
                     'estado_sat' => $newStatus,
                     'estado_sat_updated_at' => now(),
-                    'es_cancelado' => ($newStatus === 'Cancelado' ? 1 : 0)
+                    'es_cancelado' => ($newStatus === 'Cancelado' ? 1 : 0),
+                    'es_cancelable' => $result['es_cancelable'],
+                    'estatus_cancelacion' => $result['estatus_cancelacion'],
+                    'validacion_efos' => $result['validacion_efos'],
                 ]);
             }
             $verifiedCount++;

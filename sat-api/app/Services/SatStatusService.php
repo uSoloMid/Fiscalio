@@ -2,37 +2,51 @@
 
 namespace App\Services;
 
-use GuzzleHttp\Client;
-use DOMDocument;
+use PhpCfdi\SatEstadoCfdi\Consumer;
+use PhpCfdi\SatEstadoCfdi\Clients\Http\HttpConsumerClient;
+use PhpCfdi\SatEstadoCfdi\Clients\Http\HttpConsumerFactory;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\Psr7\HttpFactory;
 
 class SatStatusService
 {
-    protected $client;
-    protected $url = 'https://consultaqr.facturaelectronica.sat.gob.mx/ConsultaCFDIService.svc';
+    protected $consumer;
 
     public function __construct()
     {
-        $this->client = new Client([
-            'timeout' => 10,
-            'verify' => false, // Ojo en prod
+        $guzzleClient = new GuzzleClient([
+            'timeout' => 15,
+            'verify' => false, // Ojo en prod, para pruebas locales/certificados SAT suele ser necesario
         ]);
+
+        $guzzleFactory = new HttpFactory();
+
+        $factory = new HttpConsumerFactory($guzzleClient, $guzzleFactory, $guzzleFactory);
+        $client = new HttpConsumerClient($factory);
+        $this->consumer = new Consumer($client);
     }
 
     public function checkStatus(string $uuid, string $rfcEmisor, string $rfcReceptor, string $total): array
     {
-        $soapBody = $this->buildSoapEnvelope($uuid, $rfcEmisor, $rfcReceptor, $total);
+        // El SAT requiere que el total sea un string formateado con el número de decimales que tiene el CFDI
+        // pero la expresión estándar suele usar el total tal cual. 
+        // Generamos la expresión (id=UUID&re=RFC_EMISOR&rr=RFC_RECEPTOR&tt=TOTAL&fe=ULTIMOS_8_CARACTERES_SELLO)
+        // Pero la librería phpcfdi/sat-estado-cfdi prefiere la expresión completa o los parámetros.
+
+        // Usaremos la expresión básica: ?re=...&rr=...&tt=...&id=...
+        $expression = sprintf("?re=%s&rr=%s&tt=%s&id=%s", $rfcEmisor, $rfcReceptor, $total, $uuid);
 
         try {
-            $response = $this->client->post($this->url, [
-                'headers' => [
-                    'Content-Type' => 'text/xml; charset=utf-8',
-                    'SOAPAction' => 'http://tempuri.org/IConsultaCFDIService/Consulta',
-                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-                ],
-                'body' => $soapBody
-            ]);
+            $response = $this->consumer->execute($expression);
 
-            return $this->parseResponse($response->getBody()->getContents());
+            return [
+                'codigo_estatus' => $response->query->name,
+                'estado' => $this->mapDocumentStatus($response->document->name),
+                'es_cancelable' => $response->cancellable->name,
+                'estatus_cancelacion' => $response->cancellation->name,
+                'validacion_efos' => $response->efos->name,
+                'raw_status' => $response->document->name,
+            ];
 
         }
         catch (\Exception $e) {
@@ -47,63 +61,19 @@ class SatStatusService
         }
     }
 
-    protected function buildSoapEnvelope($uuid, $re, $rr, $tt)
+    protected function mapDocumentStatus(string $status): string
     {
-        // Formatear total a 6 decimales a veces ayuda, o standard
-        // El formato exigido suele ser ?re=...&rr=...&tt=...&id=...
+        // Mapear los estados de la librería a los que espera nuestra app
+        // La librería usa 'Active', 'Cancelled', 'NotFound'
+        // Nuestra app parece usar 'Vigente', 'Cancelado', 'No Encontrado'
 
-        // Ajuste de total: debe ser string con formato. El SAT a veces es quisquilloso.
-        // Usaremos el valor directo si viene bien, o number_format.
-        // El servicio espera una cadena: ?re=...
-
-        $expression = sprintf("?re=%s&rr=%s&tt=%s&id=%s", $re, $rr, $tt, $uuid);
-        $expression = htmlspecialchars($expression);
-
-        return <<<XML
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
-   <soapenv:Header/>
-   <soapenv:Body>
-      <tem:Consulta>
-         <tem:expresionImpresa><![CDATA[$expression]]></tem:expresionImpresa>
-      </tem:Consulta>
-   </soapenv:Body>
-</soapenv:Envelope>
-XML;
-    }
-
-    protected function parseResponse($xmlString)
-    {
-        $dom = new DOMDocument();
-        @$dom->loadXML($xmlString);
-
-        $xpath = new \DOMXPath($dom);
-        $xpath->registerNamespace('s', 'http://schemas.xmlsoap.org/soap/envelope/');
-        $xpath->registerNamespace('tem', 'http://tempuri.org/');
-        $xpath->registerNamespace('a', 'http://schemas.datacontract.org/2004/07/Sat.Cfdi.Negocio.ConsultaCfdi.Servicio'); // Namespace variable a veces
-
-        // Buscar nodo Resultado
-        // A veces el namespace cambia o es default. Buscamos por nombre local.
-        $codigoEstatus = $this->getNodeValue($dom, 'CodigoEstatus');
-        $estado = $this->getNodeValue($dom, 'Estado');
-        $esCancelable = $this->getNodeValue($dom, 'EsCancelable');
-        $estatusCancelacion = $this->getNodeValue($dom, 'EstatusCancelacion');
-        $validacionEfos = $this->getNodeValue($dom, 'ValidacionEFOS');
-
-        return [
-            'codigo_estatus' => $codigoEstatus,
-            'estado' => $estado, // Vigente, Cancelado, No Encontrado
-            'es_cancelable' => $esCancelable,
-            'estatus_cancelacion' => $estatusCancelacion,
-            'validacion_efos' => $validacionEfos,
-        ];
-    }
-
-    protected function getNodeValue($dom, $tagName)
-    {
-        $list = $dom->getElementsByTagName($tagName);
-        if ($list->length > 0) {
-            return $list->item(0)->nodeValue;
+        switch ($status) {
+            case 'Active':
+                return 'Vigente';
+            case 'Cancelled':
+                return 'Cancelado';
+            default:
+                return 'No Encontrado';
         }
-        return null;
     }
 }

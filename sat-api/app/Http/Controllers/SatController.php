@@ -61,6 +61,20 @@ class SatController extends Controller
             });
         }
 
+        // CFDI Type filter (I, E, P, N, T)
+        if ($request->has('cfdi_tipo') && !empty($request->input('cfdi_tipo'))) {
+            $query->where('tipo', $request->input('cfdi_tipo'));
+        }
+
+        // Status filter
+        if ($request->input('status') === 'cancelados') {
+            $query->where('es_cancelado', true);
+        }
+        else {
+            // "Todas", "Emitidas" y "Recibidas" solo muestran vigentes por defecto
+            $query->where('es_cancelado', false);
+        }
+
         $query->orderBy('fecha', 'desc');
 
         $perPage = $request->input('pageSize', 20);
@@ -82,12 +96,10 @@ class SatController extends Controller
         if ($result['estado'] !== 'Error') {
             $cfdi->estado_sat = $result['estado'];
             $cfdi->estado_sat_updated_at = now();
-            if ($result['estado'] === 'Cancelado') {
-                $cfdi->es_cancelado = 1;
-            }
-            else {
-                $cfdi->es_cancelado = 0;
-            }
+            $cfdi->es_cancelado = ($result['estado'] === 'Cancelado' ? 1 : 0);
+            $cfdi->es_cancelable = $result['es_cancelable'];
+            $cfdi->estatus_cancelacion = $result['estatus_cancelacion'];
+            $cfdi->validacion_efos = $result['validacion_efos'];
             $cfdi->save();
         }
 
@@ -163,7 +175,7 @@ class SatController extends Controller
             return response()->json(['error' => 'RFC required'], 400);
 
         $business = \App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail();
-        $result = $service->verifyInvoices($business);
+        $result = $service->verifyInvoices($business, $request->all());
 
         return response()->json($result);
     }

@@ -16,7 +16,9 @@
         "laravel/framework": "^8.62.0",
         "laravel/sanctum": "^2.11.2",
         "laravel/tinker": "^2.5.0",
+        "phpcfdi/cfdi-expresiones": "^3.3",
         "phpcfdi/rfc": "^1.1.0",
+        "phpcfdi/sat-estado-cfdi": "^2.0",
         "phpcfdi/sat-ws-descarga-masiva": "^0.5"
     },
     "require-dev": {

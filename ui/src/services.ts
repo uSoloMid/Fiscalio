@@ -10,6 +10,8 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
     if (params.tipo && params.tipo !== 'all') query.append('tipo', params.tipo); // Explicitly exclude 'all' just in case
     if (params.page) query.append('page', params.page.toString());
     if (params.q) query.append('q', params.q);
+    if (params.status) query.append('status', params.status);
+    if (params.cfdi_tipo) query.append('cfdi_tipo', params.cfdi_tipo);
 
     const response = await fetch('/api/cfdis?' + query.toString());
     if (!response.ok) {
@@ -85,11 +87,11 @@ export async function startSync(rfc: string): Promise<any> {
     return response.json();
 }
 
-export async function verifyStatus(rfc: string): Promise<any> {
+export async function verifyStatus(params: any): Promise<any> {
     const response = await fetch('/api/sat/verify-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rfc })
+        body: JSON.stringify(params)
     });
     if (!response.ok) throw new Error('Error verifying statuses');
     return response.json();
@@ -99,4 +101,43 @@ export async function getActiveRequests(rfc: string): Promise<any[]> {
     const response = await fetch('/api/sat/active-requests?rfc=' + rfc);
     if (!response.ok) throw new Error('Error fetching active requests');
     return response.json();
+}
+
+export async function listAccounts(): Promise<any[]> {
+    const response = await fetch('/api/accounts');
+    if (!response.ok) throw new Error('Error fetching accounts');
+    return response.json();
+}
+
+export async function getAccount(id: number): Promise<any> {
+    const response = await fetch('/api/accounts/' + id);
+    if (!response.ok) throw new Error('Error fetching account');
+    return response.json();
+}
+
+export async function createAccount(data: any): Promise<any> {
+    const response = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error creating account');
+    return response.json();
+}
+
+export async function updateAccount(id: number, data: any): Promise<any> {
+    const response = await fetch('/api/accounts/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error updating account');
+    return response.json();
+}
+
+export async function deleteAccount(id: number): Promise<void> {
+    const response = await fetch('/api/accounts/' + id, {
+        method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Error deleting account');
 }

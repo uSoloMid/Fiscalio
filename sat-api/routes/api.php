@@ -62,3 +62,6 @@ Route::post('/groups', [GroupController::class , 'store']);
 // Tag routes
 Route::get('/tags', [TagController::class , 'index']);
 Route::post('/tags', [TagController::class , 'store']);
+
+// Account routes
+Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);

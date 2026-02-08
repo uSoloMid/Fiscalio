@@ -1,6 +1,7 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1)
+;
 
 namespace App\Console;
 
@@ -14,6 +15,12 @@ class Kernel extends ConsoleKernel
      * @var array<string>
      */
     protected $commands = [];
+
+    protected function schedule($schedule)
+    {
+        // Verificar facturas antiguas cada 15 minutos en segundo plano
+        $schedule->command('sat:verify-past --limit=200')->everyFifteenMinutes();
+    }
 
     /**
      * Register the commands for the application.

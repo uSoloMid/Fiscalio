@@ -119,14 +119,24 @@ class XmlProcessorService
         $comprobante = $dom->documentElement;
         $fechaStr = $comprobante->getAttribute('Fecha');
         $total = $comprobante->getAttribute('Total');
+        $subtotal = $comprobante->getAttribute('SubTotal');
+        $descuento = $comprobante->getAttribute('Descuento') ?: 0;
+        $moneda = $comprobante->getAttribute('Moneda');
+        $tipoCambio = $comprobante->getAttribute('TipoCambio') ?: 1;
+        $formaPago = $comprobante->getAttribute('FormaPago');
+        $metodoPago = $comprobante->getAttribute('MetodoPago');
         $tipo = $comprobante->getAttribute('TipoDeComprobante');
+        $exportacion = $comprobante->getAttribute('Exportacion');
+        $serie = $comprobante->getAttribute('Serie');
+        $folio = $comprobante->getAttribute('Folio');
 
-        // Emisor
+        // Emisor ...
         $emisorNode = $dom->getElementsByTagName('Emisor')->item(0)
             ?? $dom->getElementsByTagNameNS('http://www.sat.gob.mx/cfd/4', 'Emisor')->item(0);
 
         $rfcEmisor = $emisorNode ? $emisorNode->getAttribute('Rfc') : '';
         $nombreEmisor = $emisorNode ? $emisorNode->getAttribute('Nombre') : '';
+        $regimenEmisor = $emisorNode ? $emisorNode->getAttribute('RegimenFiscal') : '';
 
         // Receptor
         $receptorNode = $dom->getElementsByTagName('Receptor')->item(0)
@@ -134,13 +144,15 @@ class XmlProcessorService
 
         $rfcReceptor = $receptorNode ? $receptorNode->getAttribute('Rfc') : '';
         $nombreReceptor = $receptorNode ? $receptorNode->getAttribute('Nombre') : '';
+        $usoCfdi = $receptorNode ? $receptorNode->getAttribute('UsoCFDI') : '';
+        $regimenReceptor = $receptorNode ? $receptorNode->getAttribute('RegimenFiscalReceptor') : '';
+        $domicilioReceptor = $receptorNode ? $receptorNode->getAttribute('DomicilioFiscalReceptor') : '';
 
         // Concepto (Primer concepto)
         $conceptoNode = $xpath->query('//cfdi:Conceptos/cfdi:Concepto')->item(0);
         $concepto = $conceptoNode ? $conceptoNode->getAttribute('Descripcion') : '';
 
         // Impuestos Globales
-        // Nota: En CFDI 4.0/3.3, los impuestos globales están en /Comprobante        // Impuestos Globales
         $nodosImpuestos = $xpath->query('/*[local-name()="Comprobante"]/*[local-name()="Impuestos"]');
         $impuestosNode = $nodosImpuestos->item($nodosImpuestos->length - 1);
 
@@ -161,22 +173,34 @@ class XmlProcessorService
             $fecha = new DateTimeImmutable($fechaStr);
         }
         catch (Exception $e) {
-            $fecha = new DateTimeImmutable(); // Fallback warning
+            $fecha = new DateTimeImmutable();
         }
 
         return [
             'uuid' => strtoupper($uuid),
+            'serie' => $serie,
+            'folio' => $folio,
             'fecha' => $fecha,
             'rfc_emisor' => $rfcEmisor,
             'name_emisor' => $nombreEmisor,
+            'regimen_fiscal_emisor' => $regimenEmisor,
             'rfc_receptor' => $rfcReceptor,
             'name_receptor' => $nombreReceptor,
+            'regimen_fiscal_receptor' => $regimenReceptor,
+            'domicilio_fiscal_receptor' => $domicilioReceptor,
             'total' => $total ?: 0,
-            'subtotal' => 0, // Placeholder
+            'subtotal' => $subtotal ?: 0,
+            'descuento' => $descuento,
+            'moneda' => $moneda,
+            'tipo_cambio' => $tipoCambio,
+            'forma_pago' => $formaPago,
+            'metodo_pago' => $metodoPago,
+            'uso_cfdi' => $usoCfdi,
+            'tipo' => $tipo,
+            'exportacion' => $exportacion,
             'concepto' => $concepto,
             'iva' => $iva,
             'retenciones' => $retenciones,
-            'tipo' => $tipo,
         ];
     }
 
@@ -192,12 +216,25 @@ class XmlProcessorService
 
         Cfdi::create([
             'uuid' => $data['uuid'],
+            'serie' => $data['serie'],
+            'folio' => $data['folio'],
             'rfc_emisor' => $data['rfc_emisor'],
+            'regimen_fiscal_emisor' => $data['regimen_fiscal_emisor'],
             'rfc_receptor' => $data['rfc_receptor'],
+            'regimen_fiscal_receptor' => $data['regimen_fiscal_receptor'],
+            'domicilio_fiscal_receptor' => $data['domicilio_fiscal_receptor'],
             'name_emisor' => $data['name_emisor'],
             'name_receptor' => $data['name_receptor'],
             'fecha' => $data['fecha'],
             'tipo' => $data['tipo'],
+            'exportacion' => $data['exportacion'],
+            'subtotal' => $data['subtotal'],
+            'descuento' => $data['descuento'],
+            'moneda' => $data['moneda'],
+            'tipo_cambio' => $data['tipo_cambio'],
+            'forma_pago' => $data['forma_pago'],
+            'metodo_pago' => $data['metodo_pago'],
+            'uso_cfdi' => $data['uso_cfdi'],
             'total' => $data['total'],
             'concepto' => $data['concepto'],
             'iva' => $data['iva'],

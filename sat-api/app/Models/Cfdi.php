@@ -13,20 +13,38 @@ class Cfdi extends Model
 
     protected $fillable = [
         'uuid',
+        'serie',
+        'folio',
         'rfc_emisor',
+        'regimen_fiscal_emisor',
         'rfc_receptor',
+        'regimen_fiscal_receptor',
+        'domicilio_fiscal_receptor',
         'name_emisor',
         'name_receptor',
         'fecha',
         'tipo',
+        'exportacion',
+        'subtotal',
+        'descuento',
+        'metodo_pago',
+        'forma_pago',
+        'uso_cfdi',
         'total',
-        'subtotal', // Assuming we might want this later, but for now user asked for Concept, IVA, Retenciones. Wait, user didn't ask for subtotal. Keep strictly what requested + standard.
-        // User asked: Concepto, Total, iva, impuestos ret, uuid.
+        'moneda',
+        'tipo_cambio',
         'concepto',
         'iva',
         'retenciones',
         'path_xml',
         'request_id',
+        'estado_sat',
+        'es_cancelado',
+        'fecha_cancelacion',
+        'estado_sat_updated_at',
+        'es_cancelable',
+        'estatus_cancelacion',
+        'validacion_efos',
     ];
 
     protected $casts = [

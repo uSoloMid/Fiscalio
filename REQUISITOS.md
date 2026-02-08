@@ -57,6 +57,20 @@ Una vez que tengas el código en tu laptop, sigue estos pasos:
 
 ---
 
+## 📦 Cómo Importar tus Datos (Clientes y Facturas)
+
+Si has descargado el archivo `Fiscalio_Backup_Datos.zip`, sigue estos pasos para restaurar tus clientes y facturas en la nueva máquina:
+
+1.  **Descomprime el archivo**: Obtendrás la carpeta `sat`, el archivo `database.sqlite` y el archivo `.env`.
+2.  **Mueve los archivos**:
+    *   Copia `database.sqlite` a `sat-api/database/` (reemplaza el archivo vacío).
+    *   Copia `.env` a `sat-api/` (reemplaza el que creaste).
+    *   Copia la carpeta `sat` a `sat-api/storage/app/`.
+3.  **Verificación**:
+    *   Una vez hecho esto, al entrar al sistema, verás a todos tus clientes y las facturas que ya habías descargado sin tener que volver a pedirlas al SAT.
+
+---
+
 ## 🛠️ Cómo ejecutar el sistema
 
 Para trabajar, necesitas tener **3 terminales** abiertas:
