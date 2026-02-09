@@ -103,40 +103,46 @@ export async function getActiveRequests(rfc: string): Promise<any[]> {
     return response.json();
 }
 
-export async function listAccounts(): Promise<any[]> {
-    const response = await fetch('/api/accounts');
+export async function listAccounts(rfc: string): Promise<any[]> {
+    const response = await fetch(`/api/accounts?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching accounts');
     return response.json();
 }
 
-export async function getAccount(id: number): Promise<any> {
-    const response = await fetch('/api/accounts/' + id);
+export async function getAccount(id: number, rfc: string): Promise<any> {
+    const response = await fetch(`/api/accounts/${id}?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching account');
     return response.json();
 }
 
-export async function createAccount(data: any): Promise<any> {
-    const response = await fetch('/api/accounts', {
+export async function createAccount(data: any, rfc: string): Promise<any> {
+    const response = await fetch(`/api/accounts?rfc=${rfc}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Error creating account');
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Error creating account');
+    }
     return response.json();
 }
 
-export async function updateAccount(id: number, data: any): Promise<any> {
-    const response = await fetch('/api/accounts/' + id, {
+export async function updateAccount(id: number, data: any, rfc: string): Promise<any> {
+    const response = await fetch(`/api/accounts/${id}?rfc=${rfc}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     });
-    if (!response.ok) throw new Error('Error updating account');
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Error updating account');
+    }
     return response.json();
 }
 
-export async function deleteAccount(id: number): Promise<void> {
-    const response = await fetch('/api/accounts/' + id, {
+export async function deleteAccount(id: number, rfc: string): Promise<void> {
+    const response = await fetch(`/api/accounts/${id}?rfc=${rfc}`, {
         method: 'DELETE'
     });
     if (!response.ok) throw new Error('Error deleting account');

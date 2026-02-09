@@ -7,7 +7,7 @@ interface TreeNode extends Account {
     isOpen?: boolean;
 }
 
-export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clientName?: string }) => {
+export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () => void, clientName?: string, activeRfc: string }) => {
     const [accounts, setAccounts] = useState<Account[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -28,18 +28,47 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        fetchAccounts();
-    }, []);
+        if (activeRfc) fetchAccounts();
+    }, [activeRfc]);
 
     const fetchAccounts = async () => {
         setLoading(true);
         try {
-            const data = await listAccounts();
+            const data = await listAccounts(activeRfc);
             setAccounts(data);
         } catch (error) {
             console.error("Error fetching accounts:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        try {
+            if (selectedAccountId) {
+                await updateAccount(selectedAccountId, editForm, activeRfc);
+            } else {
+                await createAccount(editForm as any, activeRfc);
+            }
+            setIsEditing(false);
+            setSelectedAccountId(null);
+            setEditForm({});
+            fetchAccounts();
+        } catch (e: any) {
+            alert(e.message || "Error al guardar cambios");
+        }
+    };
+
+    const handleDelete = async (id: number) => {
+        if (!window.confirm("¿Estás seguro de eliminar esta cuenta? Esta acción no se puede deshacer.")) return;
+        try {
+            const { deleteAccount } = await import('../services');
+            await deleteAccount(id, activeRfc);
+            fetchAccounts();
+            setIsEditing(false);
+            setSelectedAccountId(null);
+        } catch (e: any) {
+            alert(e.message || "Error al eliminar la cuenta");
         }
     };
 
@@ -95,16 +124,13 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
     }, [search, onlyPostable, withoutSat, focusCode, filteredAccounts]);
 
     // Build tree
-    // Build tree preserving hierarchy even when filtering
     const accountTree = useMemo(() => {
         const nodes: Record<string, TreeNode> = {};
         const roots: TreeNode[] = [];
 
-        // 1. Determine which nodes to show
         const visibleCodes = new Set<string>();
         filteredAccounts.forEach(acc => {
             visibleCodes.add(acc.internal_code);
-            // Add all ancestors to visible set to preserve hierarchy
             let parentCode = acc.parent_code;
             while (parentCode) {
                 if (visibleCodes.has(parentCode)) break;
@@ -116,12 +142,10 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
 
         const dataToUse = accounts.filter(acc => visibleCodes.has(acc.internal_code));
 
-        // 2. Create nodes
         dataToUse.forEach(acc => {
             nodes[acc.internal_code] = { ...acc, children: [] };
         });
 
-        // 3. Link parents
         dataToUse.forEach(acc => {
             const node = nodes[acc.internal_code];
             if (acc.parent_code && nodes[acc.parent_code]) {
@@ -147,25 +171,8 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
         setIsEditing(true);
     };
 
-    const handleSave = async () => {
-        try {
-            if (selectedAccountId) {
-                await updateAccount(selectedAccountId, editForm);
-            } else {
-                await createAccount(editForm as any);
-            }
-            setIsEditing(false);
-            setSelectedAccountId(null);
-            setEditForm({});
-            fetchAccounts();
-        } catch (e) {
-            alert("Error al guardar cambios");
-        }
-    };
-
     const createSubAccount = (parent: Account) => {
         const nextIdx = (parent.children?.length || 0) + 1;
-        // Basic pattern: try to follow the same length if possible, or just append
         const newCode = parent.internal_code.length > 7
             ? `${parent.internal_code.substring(0, parent.internal_code.length - 3)}${String(nextIdx).padStart(3, '0')}`
             : `${parent.internal_code}-${String(nextIdx).padStart(2, '0')}`;
@@ -178,8 +185,9 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
             type: parent.type,
             naturaleza: parent.naturaleza,
             is_postable: true,
-            sat_code: parent.sat_code, // Pre-fill with parent's SAT code
-            currency: parent.currency || 'MXN'
+            sat_code: parent.sat_code,
+            currency: parent.currency || 'MXN',
+            is_custom: true
         };
         setEditForm(newAcc);
         setSelectedAccountId(null);
@@ -216,14 +224,12 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
         const file = e.target.files?.[0];
         if (!file) return;
 
-        // Simple mock of import logic for now, could be expanded to a full modal preview
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
                 const json = JSON.parse(event.target?.result as string);
                 if (Array.isArray(json)) {
                     if (confirm(`¿Importar ${json.length} cuentas? Esto actualizará/creará cuentas según el código interno.`)) {
-                        // Batch import implementation placeholder
                         fetchAccounts();
                     }
                 }
@@ -234,7 +240,6 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
         reader.readAsText(file);
     };
 
-    // Tree recursive renderer
     const renderTreeNode = (node: TreeNode, depth: number = 0) => {
         const isExpanded = expandedNodes.has(node.internal_code);
         const hasChildren = node.children.length > 0;
@@ -274,8 +279,8 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                                 {hasChildren && (
                                     <span className="text-[10px] font-black text-blue-400/50">({node.children.length})</span>
                                 )}
-                                {node.is_postable && (
-                                    <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-lg border border-emerald-100">POSTEABLE</span>
+                                {!node.is_custom && (
+                                    <span className="text-[8px] font-black bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded border border-gray-200">BASE</span>
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
@@ -304,6 +309,15 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                         >
                             <span className="material-symbols-outlined text-lg">edit</span>
                         </button>
+                        {node.is_custom && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleDelete(node.id); }}
+                                className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-red-500 shadow-sm border border-transparent hover:border-red-100 transition-all"
+                                title="Eliminar"
+                            >
+                                <span className="material-symbols-outlined text-lg">delete</span>
+                            </button>
+                        )}
                         <button
                             onClick={(e) => { e.stopPropagation(); setFocusCode(node.internal_code); }}
                             className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-purple-500 shadow-sm border border-transparent hover:border-purple-100 transition-all"
@@ -325,7 +339,6 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
 
     return (
         <div className="text-gray-800 h-screen flex bg-[#f8fafc] overflow-hidden font-['Inter']">
-            {/* Main Area */}
             <div className="flex-1 flex flex-col min-w-0 bg-white shadow-2xl z-10">
                 <header className="h-20 px-8 flex items-center justify-between border-b border-gray-100 flex-shrink-0">
                     <div className="flex items-center gap-6">
@@ -341,9 +354,7 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                                         {breadcrumbPath.map((item, idx) => (
                                             <div key={item.id} className="flex items-center gap-2">
                                                 {idx > 0 && <span className="text-[10px] text-gray-300 font-bold">/</span>}
-                                                <span
-                                                    className={`text-[11px] font-bold ${idx === breadcrumbPath.length - 1 ? 'text-blue-600' : 'text-gray-400'}`}
-                                                >
+                                                <span className={`text-[11px] font-bold ${idx === breadcrumbPath.length - 1 ? 'text-blue-600' : 'text-gray-400'}`}>
                                                     {item.name}
                                                 </span>
                                             </div>
@@ -391,25 +402,16 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                             />
                         </div>
                         <div className="h-8 w-px bg-gray-100 mx-2"></div>
-                        <button
-                            onClick={handleImportClick}
-                            className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-2xl transition-all"
-                            title="Importar JSON"
-                        >
+                        <button onClick={handleImportClick} className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-2xl transition-all" title="Importar JSON">
                             <span className="material-symbols-outlined">publish</span>
                         </button>
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
-                        <button
-                            onClick={() => handleExport('csv')}
-                            className="p-2.5 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-2xl transition-all"
-                            title="Exportar CSV"
-                        >
+                        <button onClick={() => handleExport('csv')} className="p-2.5 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-2xl transition-all" title="Exportar CSV">
                             <span className="material-symbols-outlined">download</span>
                         </button>
                     </div>
                 </header>
 
-                {/* Filters Bar */}
                 <div className="px-8 py-4 bg-gray-50/30 border-b border-gray-100 flex items-center gap-8 overflow-x-auto no-scrollbar">
                     <div className="flex items-center gap-2 pr-4 border-r border-gray-100">
                         {['all', 'Activo', 'Pasivo', 'Capital', 'Ingresos', 'Egresos'].map(type => (
@@ -441,7 +443,6 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                     </div>
                 </div>
 
-                {/* Content Area */}
                 <div className="flex-1 overflow-auto p-4 custom-scrollbar bg-gray-50/20">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -478,7 +479,14 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                                     {filteredAccounts.slice(0, 150).map(acc => (
                                         <tr key={acc.id} className="hover:bg-blue-50/30 transition-colors group">
                                             <td className="px-8 py-5 font-mono text-xs font-bold text-blue-600/70">{acc.internal_code}</td>
-                                            <td className="px-8 py-5 text-sm font-bold text-gray-900">{acc.name}</td>
+                                            <td className="px-8 py-5 text-sm font-bold text-gray-900">
+                                                <div className="flex items-center gap-2">
+                                                    {acc.name}
+                                                    {!acc.is_custom && (
+                                                        <span className="text-[8px] font-black bg-gray-50 text-gray-300 px-1 py-0.5 rounded border border-gray-100">BASE</span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-8 py-5">
                                                 {acc.sat_code ? (
                                                     <div className="flex items-center gap-2">
@@ -509,17 +517,15 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                                                     <button onClick={() => handleEdit(acc)} className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-blue-500 shadow-sm border border-gray-100">
                                                         <span className="material-symbols-outlined text-lg">edit</span>
                                                     </button>
+                                                    {acc.is_custom && (
+                                                        <button onClick={(e) => { e.stopPropagation(); handleDelete(acc.id); }} className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-red-500 shadow-sm border border-gray-100" title="Eliminar">
+                                                            <span className="material-symbols-outlined text-lg">delete</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
                                     ))}
-                                    {filteredAccounts.length > 150 && (
-                                        <tr>
-                                            <td colSpan={6} className="px-8 py-6 text-center text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] bg-gray-50/50">
-                                                Vista truncada. Usa el modo Árbol para navegar por la jerarquía completa.
-                                            </td>
-                                        </tr>
-                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -527,35 +533,27 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                 </div>
             </div>
 
-            {/* Side Panel: Account Detail / Edit */}
             <aside className={`w-[480px] border-l border-gray-100 bg-white flex flex-col shadow-[-20px_0_60px_-15px_rgba(0,0,0,0.1)] transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1) z-20 ${isEditing || selectedAccountId ? 'translate-x-0' : 'translate-x-full fixed right-0 h-full'}`}>
                 {selectedAccountId || isEditing ? (
                     <>
                         <header className="h-24 px-10 flex items-center justify-between border-b border-gray-50 flex-shrink-0 bg-white sticky top-0 z-10">
                             <div className="flex flex-col">
-                                <h2 className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mb-1">
-                                    Configuración Contable
-                                </h2>
+                                <h2 className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mb-1">Configuración Contable</h2>
                                 <h3 className="text-xl font-black text-gray-900 tracking-tight">
                                     {isEditing && !selectedAccountId ? 'Nueva Cuenta' : 'Edición Maestra'}
                                 </h3>
                             </div>
-                            <button
-                                onClick={() => { setIsEditing(false); setSelectedAccountId(null); setEditForm({}); }}
-                                className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-[20px] transition-all"
-                            >
+                            <button onClick={() => { setIsEditing(false); setSelectedAccountId(null); setEditForm({}); }} className="w-12 h-12 flex items-center justify-center text-gray-400 hover:text-gray-900 hover:bg-gray-50 rounded-[20px] transition-all">
                                 <span className="material-symbols-outlined text-2xl">close</span>
                             </button>
                         </header>
 
                         <div className="flex-1 overflow-y-auto p-10 space-y-12 custom-scrollbar pb-32">
-                            {/* Section 1: Identidad */}
                             <section className="space-y-8">
                                 <div className="flex items-center gap-3">
                                     <div className="w-1.5 h-6 bg-blue-500 rounded-full"></div>
                                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Identidad y Estructura</h4>
                                 </div>
-
                                 <div className="grid gap-8">
                                     <div className="flex flex-col gap-3">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Nombre Descriptivo</label>
@@ -567,7 +565,6 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                                             className="w-full px-6 py-4 rounded-[24px] border-transparent bg-gray-50 text-sm font-bold text-gray-900 focus:ring-4 focus:ring-blue-500/5 focus:bg-white focus:border-blue-100 transition-all outline-none"
                                         />
                                     </div>
-
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="flex flex-col gap-3">
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Código Interno</label>
@@ -592,13 +589,11 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                                 </div>
                             </section>
 
-                            {/* Section 2: Naturaleza */}
                             <section className="space-y-8">
                                 <div className="flex items-center gap-3">
                                     <div className="w-1.5 h-6 bg-amber-400 rounded-full"></div>
                                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Clasificación Fiscal</h4>
                                 </div>
-
                                 <div className="grid grid-cols-2 gap-6">
                                     <div className="flex flex-col gap-3">
                                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Tipo de Cuenta</label>
@@ -638,13 +633,11 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                                 </div>
                             </section>
 
-                            {/* Section 3: Reglas de Negocio */}
                             <section className="space-y-8">
                                 <div className="flex items-center gap-3">
                                     <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
                                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Comportamiento</h4>
                                 </div>
-
                                 <div className="space-y-4">
                                     {[
                                         { key: 'is_postable', title: 'Cuenta de Movimiento', desc: 'Permite registrar pólizas directamente.', color: 'emerald' },
@@ -674,26 +667,29 @@ export const AccountsPage = ({ onBack, clientName }: { onBack?: () => void, clie
                             </section>
                         </div>
 
-                        {/* Actions Footer */}
                         <div className="p-10 bg-white border-t border-gray-50 flex flex-col gap-4 fixed bottom-0 w-[480px]">
-                            <button
-                                onClick={handleSave}
-                                className="w-full py-5 bg-gray-900 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-[24px] hover:bg-black transition-all shadow-2xl shadow-gray-200 hover:-translate-y-0.5"
-                            >
+                            <button onClick={handleSave} className="w-full py-5 bg-gray-900 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-[24px] hover:bg-black transition-all shadow-2xl shadow-gray-200 hover:-translate-y-0.5">
                                 Validar y Guardar Cambios
                             </button>
                             {selectedAccountId && (
                                 <div className="flex gap-3">
-                                    <button className="flex-1 py-4 bg-white border border-gray-100 text-red-500 font-black uppercase tracking-widest text-[9px] rounded-[20px] hover:bg-red-50 hover:border-red-100 transition-all">
-                                        Desactivar Cuenta
-                                    </button>
+                                    {accounts.find(a => a.id === selectedAccountId)?.is_custom ? (
+                                        <button onClick={() => handleDelete(selectedAccountId)} className="flex-1 py-4 bg-white border border-red-100 text-red-500 font-black uppercase tracking-widest text-[9px] rounded-[20px] hover:bg-red-50 transition-all">
+                                            Eliminar Cuenta
+                                        </button>
+                                    ) : (
+                                        <button disabled className="flex-1 py-4 bg-gray-50 border border-gray-100 text-gray-300 font-black uppercase tracking-widest text-[9px] rounded-[20px] cursor-not-allowed" title="Las cuentas originales no se pueden eliminar">
+                                            Original (No Editable)
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => {
                                             const original = accounts.find(a => a.id === selectedAccountId);
                                             if (original) {
-                                                const duplicate = { ...original, id: undefined, internal_code: original.internal_code + '_COPIA' };
+                                                const duplicate = { ...original, id: undefined, internal_code: original.internal_code + '_COPIA', is_custom: true };
                                                 setEditForm(duplicate);
                                                 setSelectedAccountId(null);
+                                                setIsEditing(true);
                                             }
                                         }}
                                         className="px-6 py-4 bg-gray-50 text-gray-600 font-black uppercase tracking-widest text-[9px] rounded-[20px] hover:bg-gray-100 transition-all"

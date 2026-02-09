@@ -329,6 +329,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
             {currentView === 'accounts' ? (
                 <div className="flex-1 h-screen overflow-hidden">
                     <AccountsPage
+                        activeRfc={activeRfc}
                         clientName={clientName || activeClientName || activeRfc}
                         onBack={() => setCurrentView('invoices')}
                     />

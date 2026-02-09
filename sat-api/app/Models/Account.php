@@ -10,6 +10,8 @@ class Account extends Model
     use HasFactory;
 
     protected $fillable = [
+        'business_id',
+        'is_custom',
         'internal_code',
         'sat_code',
         'name',
@@ -23,7 +25,8 @@ class Account extends Model
         'currency',
         'is_cash_flow',
         'is_active',
-        'description'
+        'description',
+        'balance'
     ];
 
     protected $casts = [
@@ -32,6 +35,8 @@ class Account extends Model
         'generate_auxiliaries' => 'boolean',
         'is_cash_flow' => 'boolean',
         'is_active' => 'boolean',
+        'is_custom' => 'boolean',
+        'balance' => 'decimal:2',
         'level' => 'integer',
     ];
 }

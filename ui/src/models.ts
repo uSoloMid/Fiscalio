@@ -64,6 +64,8 @@ export interface Account {
     currency: string;
     is_cash_flow: boolean;
     is_active: boolean;
+    is_custom: boolean;
+    balance: number;
     description?: string;
     created_at?: string;
     updated_at?: string;
