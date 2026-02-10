@@ -70,9 +70,14 @@ Route::put('/clients/{id}/tags', [ClientController::class , 'updateTags']);
 Route::get('/groups', [GroupController::class , 'index']);
 Route::post('/groups', [GroupController::class , 'store']);
 
+
 // Tag routes
 Route::get('/tags', [TagController::class , 'index']);
 Route::post('/tags', [TagController::class , 'store']);
 
 // Account routes
 Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
+
+
+require __DIR__ . '/debug_routes.php';
+require __DIR__ . '/debug_cwd.php';

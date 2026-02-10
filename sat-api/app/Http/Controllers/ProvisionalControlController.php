@@ -2,189 +2,171 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Cfdi;
-use App\Models\CfdiPayment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class ProvisionalControlController extends Controller
 {
     public function getSummary(Request $request)
     {
-        $rfc = $request->query('rfc');
-        $year = $request->query('year');
-        $month = $request->query('month');
+        try {
+            $rfc = (string)$request->query('rfc');
+            $year = (int)$request->query('year');
+            $month = (int)$request->query('month');
 
-        if (!$rfc || !$year || !$month) {
-            return response()->json(['error' => 'Missing parameters'], 400);
+            if (!$rfc || !$year || !$month) {
+                return response()->json(['error' => 'Missing parameters'], 400);
+            }
+
+            $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
+            $startDate = "{$year}-{$strMonth}-01 00:00:00";
+            $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+            $endDate = $carbonEnd->format('Y-m-d 23:59:59');
+
+            $tcSql = "CASE WHEN moneda = 'MXN' OR moneda IS NULL THEN 1 ELSE COALESCE(NULLIF(tipo_cambio, 0), 1) END";
+
+            $getInvoicesSum = function ($direction, $metodo) use ($rfc, $startDate, $endDate, $tcSql) {
+                $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
+                return DB::table('cfdis')
+                    ->where($field, $rfc)
+                    ->where('tipo', 'I')
+                    ->where('metodo_pago', $metodo)
+                    ->where('es_cancelado', false)
+                    ->whereBetween('fecha', [$startDate, $endDate])
+                    ->select(
+                        DB::raw("SUM(subtotal * $tcSql) as subtotal"),
+                        DB::raw("SUM(iva * $tcSql) as iva"),
+                        DB::raw("SUM(retenciones * $tcSql) as retenciones"),
+                        DB::raw("SUM(total * $tcSql) as total")
+                    )->first();
+            };
+
+            $getRepSum = function($direction) use ($rfc, $startDate, $endDate) {
+                $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
+                $tcPago = "COALESCE(NULLIF(cfdi_payments.tipo_cambio_pago, 0), 1)";
+
+                return DB::table('cfdi_payments')
+                    ->join('cfdis as reps', 'cfdi_payments.uuid_pago', '=', 'reps.uuid')
+                    ->join('cfdis as ppds', 'cfdi_payments.uuid_relacionado', '=', 'ppds.uuid')
+                    ->where('reps.' . $field, $rfc)
+                    ->where('reps.es_cancelado', false)
+                    ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate])
+                    ->select(
+                        DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.subtotal / NULLIF(ppds.total, 0)) * $tcPago) as subtotal"),
+                        DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.iva / NULLIF(ppds.total, 0)) * $tcPago) as iva"),
+                        DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.retenciones / NULLIF(ppds.total, 0)) * $tcPago) as retenciones"),
+                        DB::raw("SUM(cfdi_payments.monto_pagado * $tcPago) as total")
+                    )->first();
+            };
+
+            $getPendSum = function($direction) use ($rfc, $startDate, $endDate) {
+                $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
+                $invoices = DB::table('cfdis')
+                    ->where($field, $rfc)
+                    ->where('tipo', 'I')
+                    ->where('metodo_pago', 'PPD')
+                    ->where('es_cancelado', false)
+                    ->whereBetween('fecha', [$startDate, $endDate])
+                    ->get();
+
+                $res = ['subtotal' => 0, 'iva' => 0, 'retenciones' => 0, 'total' => 0];
+                $trace = []; 
+                foreach ($invoices as $c) {
+                    $moneda = strtoupper($c->moneda ?? 'MXN');
+                    $tc = ($moneda === 'MXN') ? 1.0 : (float)($c->tipo_cambio ?? 1);
+                    if ($tc <= 0) $tc = 1.0;
+
+                    $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->where('fecha_pago', '<=', $endDate)->sum('monto_pagado');
+                    $balance = max(0, (float)$c->total - (float)$pagado);
+                    if ($balance < 0.05) continue;
+                    $ratio = $c->total > 0 ? ($balance / (float)$c->total) : 0;
+                    
+                    $res['subtotal'] += (float)$c->subtotal * $ratio * $tc;
+                    $res['iva'] += (float)$c->iva * $ratio * $tc;
+                    $res['retenciones'] += (float)$c->retenciones * $ratio * $tc;
+                    $res['total'] += (float)$c->total * $ratio * $tc;
+                    $trace[] = ['uuid' => $c->uuid, 'sub' => (float)$c->subtotal * $ratio * $tc];
+                }
+                $res['_trace'] = $trace;
+                return $res;
+            };
+
+            $ingPue = $getInvoicesSum('ingresos', 'PUE');
+            $ingPpd = $getInvoicesSum('ingresos', 'PPD');
+            $ingRep = $getRepSum('ingresos');
+            $ingPend = $getPendSum('ingresos');
+
+            $egrPue = $getInvoicesSum('egresos', 'PUE');
+            $egrPpd = $getInvoicesSum('egresos', 'PPD');
+            $egrRep = $getRepSum('egresos');
+            $egrPend = $getPendSum('egresos');
+
+            $buildBreakdown = function($pue, $ppd, $rep, $pend) {
+                $f = function($vP, $vD, $vR, $vN) {
+                    $p = (float)($vP ?? 0); $d = (float)($vD ?? 0); $r = (float)($vR ?? 0); $n = (float)($vN ?? 0);
+                    return ['pue' => $p, 'ppd' => $d, 'rep' => $r, 'suma_devengado' => $p + $d, 'suma_efectivo' => $p + $r, 'pendiente' => $n];
+                };
+                return [
+                    'subtotal' => $f($pue->subtotal, $ppd->subtotal, $rep->subtotal, $pend['subtotal']),
+                    'iva' => $f($pue->iva, $ppd->iva, $rep->iva, $pend['iva']),
+                    'retenciones' => $f($pue->retenciones, $ppd->retenciones, $rep->retenciones, $pend['retenciones']),
+                    'total' => $f($pue->total, $ppd->total, $rep->total, $pend['total']),
+                ];
+            };
+
+            return response()->json([
+                '_version' => 'FINAL_CORRECT_v4_POSH',
+                'ingresos' => array_merge(['total_efectivo' => (float)($ingPue->total??0) + (float)($ingRep->total??0)], $buildBreakdown($ingPue, $ingPpd, $ingRep, $ingPend)),
+                'egresos' => array_merge(['total_efectivo' => (float)($egrPue->total??0) + (float)($egrRep->total??0)], $buildBreakdown($egrPue, $egrPpd, $egrRep, $egrPend)),
+                'alertas' => array_merge($ingPend['_trace'], $egrPend['_trace'])
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-
-        // Helper to sum financial fields
-        $getSums = function ($query) {
-            return $query->select(
-                DB::raw('SUM(subtotal * tipo_cambio) as subtotal'),
-                DB::raw('SUM(iva * tipo_cambio) as iva'),
-                DB::raw('SUM(total * tipo_cambio) as total')
-            )->first();
-        };
-
-        // --- INGRESOS ---
-        $ingPue = $getSums(Cfdi::where('rfc_emisor', $rfc)->where('tipo', 'I')->where('metodo_pago', 'PUE')
-            ->whereYear('fecha', $year)->whereMonth('fecha', $month)->where('es_cancelado', false));
-
-        $ingPpd = $getSums(Cfdi::where('rfc_emisor', $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')
-            ->whereYear('fecha', $year)->whereMonth('fecha', $month)->where('es_cancelado', false));
-
-        $ingRep = CfdiPayment::whereHas('pago', function ($q) use ($rfc) {
-            $q->where('rfc_emisor', $rfc)->where('es_cancelado', false);
-        })
-            ->join('cfdis', 'cfdi_payments.uuid_relacionado', '=', 'cfdis.uuid')
-            ->whereYear('cfdi_payments.fecha_pago', $year)
-            ->whereMonth('cfdi_payments.fecha_pago', $month)
-            ->select(
-                DB::raw('SUM(monto_pagado * (cfdis.subtotal / NULLIF(cfdis.total, 0)) * tipo_cambio_pago) as subtotal'),
-                DB::raw('SUM(monto_pagado * (cfdis.iva / NULLIF(cfdis.total, 0)) * tipo_cambio_pago) as iva'),
-                DB::raw('SUM(monto_pagado * tipo_cambio_pago) as total')
-            )->first();
-
-        // Pendiente (Total Histórico de PPDs no pagadas)
-        $ingPendiente = Cfdi::where('rfc_emisor', $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')
-            ->where('es_cancelado', false)
-            ->get()
-            ->map(function ($cfdi) {
-                $pagado = CfdiPayment::where('uuid_relacionado', $cfdi->uuid)->sum('monto_pagado');
-                $ratioSubtotal = $cfdi->total > 0 ? ($cfdi->subtotal / $cfdi->total) : 0;
-                $ratioIva = $cfdi->total > 0 ? ($cfdi->iva / $cfdi->total) : 0;
-                $saldo = max(0, $cfdi->total - $pagado);
-                return [
-                    'subtotal' => $saldo * $ratioSubtotal * $cfdi->tipo_cambio,
-                    'iva' => $saldo * $ratioIva * $cfdi->tipo_cambio,
-                    'total' => $saldo * $cfdi->tipo_cambio
-                ];
-            });
-
-        $ingPendienteSums = [
-            'subtotal' => $ingPendiente->sum('subtotal'),
-            'iva' => $ingPendiente->sum('iva'),
-            'total' => $ingPendiente->sum('total'),
-        ];
-
-        // --- EGRESOS ---
-        $egrPue = $getSums(Cfdi::where('rfc_receptor', $rfc)->where('tipo', 'I')->where('metodo_pago', 'PUE')
-            ->whereYear('fecha', $year)->whereMonth('fecha', $month)->where('es_cancelado', false));
-
-        $egrPpd = $getSums(Cfdi::where('rfc_receptor', $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')
-            ->whereYear('fecha', $year)->whereMonth('fecha', $month)->where('es_cancelado', false));
-
-        $egrRep = CfdiPayment::whereHas('pago', function ($q) use ($rfc) {
-            $q->where('rfc_receptor', $rfc)->where('es_cancelado', false);
-        })
-            ->join('cfdis', 'cfdi_payments.uuid_relacionado', '=', 'cfdis.uuid')
-            ->whereYear('cfdi_payments.fecha_pago', $year)
-            ->whereMonth('cfdi_payments.fecha_pago', $month)
-            ->select(
-                DB::raw('SUM(monto_pagado * (cfdis.subtotal / NULLIF(cfdis.total, 0)) * tipo_cambio_pago) as subtotal'),
-                DB::raw('SUM(monto_pagado * (cfdis.iva / NULLIF(cfdis.total, 0)) * tipo_cambio_pago) as iva'),
-                DB::raw('SUM(monto_pagado * tipo_cambio_pago) as total')
-            )->first();
-
-        // Pendiente Egresos
-        $egrPendiente = Cfdi::where('rfc_receptor', $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')
-            ->where('es_cancelado', false)
-            ->get()
-            ->map(function ($cfdi) {
-                $pagado = CfdiPayment::where('uuid_relacionado', $cfdi->uuid)->sum('monto_pagado');
-                $ratioSubtotal = $cfdi->total > 0 ? ($cfdi->subtotal / $cfdi->total) : 0;
-                $ratioIva = $cfdi->total > 0 ? ($cfdi->iva / $cfdi->total) : 0;
-                $saldo = max(0, $cfdi->total - $pagado);
-                return [
-                    'subtotal' => $saldo * $ratioSubtotal * $cfdi->tipo_cambio,
-                    'iva' => $saldo * $ratioIva * $cfdi->tipo_cambio,
-                    'total' => $saldo * $cfdi->tipo_cambio
-                ];
-            });
-
-        $egrPendienteSums = [
-            'subtotal' => $egrPendiente->sum('subtotal'),
-            'iva' => $egrPendiente->sum('iva'),
-            'total' => $egrPendiente->sum('total'),
-        ];
-
-        // Format function to ensure NO NaN in frontend
-        $fmt = function($pue, $ppd, $rep, $pend) {
-            $p = (float)($pue ?: 0);
-            $d = (float)($ppd ?: 0);
-            $r = (float)($rep ?: 0);
-            $n = (float)($pend ?: 0);
-            return [
-                'pue' => $p,
-                'ppd' => $d,
-                'rep' => $r,
-                'suma_devengado' => $p + $d,
-                'suma_efectivo' => $p + $r,
-                'pendiente' => $n
-            ];
-        };
-
-        return response()->json([
-            'ingresos' => [
-                'total_efectivo' => (float)$ingPue->total + (float)$ingRep->total,
-                'subtotal' => $fmt($ingPue->subtotal, $ingPpd->subtotal, $ingRep->subtotal, $ingPendienteSums['subtotal']),
-                'iva' => $fmt($ingPue->iva, $ingPpd->iva, $ingRep->iva, $ingPendienteSums['iva']),
-                'total' => $fmt($ingPue->total, $ingPpd->total, $ingRep->total, $ingPendienteSums['total']),
-            ],
-            'egresos' => [
-                'total_efectivo' => (float)$egrPue->total + (float)$egrRep->total,
-                'subtotal' => $fmt($egrPue->subtotal, $egrPpd->subtotal, $egrRep->subtotal, $egrPendienteSums['subtotal']),
-                'iva' => $fmt($egrPue->iva, $egrPpd->iva, $egrRep->iva, $egrPendienteSums['iva']),
-                'total' => $fmt($egrPue->total, $egrPpd->total, $egrRep->total, $egrPendienteSums['total']),
-            ],
-            'alertas' => []
-        ]);
     }
 
-    public function getPpdExplorer(Request $request)
+    public function getBucketDetails(Request $request)
     {
-        $rfc = $request->query('rfc');
-        $year = $request->query('year');
-        $month = $request->query('month');
-        $tipo = $request->query('tipo', 'issued');
+        $rfc = (string)$request->query('rfc');
+        $year = (int)$request->query('year');
+        $month = (int)$request->query('month');
+        $bucket = (string)$request->query('bucket'); 
+        $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
+        $startDate = "{$year}-{$strMonth}-01 00:00:00";
+        $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
+        $endDate = $carbonEnd->format('Y-m-d 23:59:59');
 
-        $query = Cfdi::where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false);
-        if ($tipo === 'issued') $query->where('rfc_emisor', $rfc);
-        else $query->where('rfc_receptor', $rfc);
+        $parts = explode('_', $bucket);
+        if (count($parts) < 3) return response()->json([]);
+        $dir = $parts[0]; $metodo = strtoupper($parts[2]);
+        $fieldRfc = ($dir === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
 
-        if ($year) $query->whereYear('fecha', $year);
-        if ($month) $query->whereMonth('fecha', $month);
-
-        $results = $query->orderBy('fecha', 'desc')->paginate(50);
-        foreach ($results as $cfdi) {
-            $pagado = CfdiPayment::where('uuid_relacionado', $cfdi->uuid)->sum('monto_pagado');
-            $cfdi->monto_pagado = $pagado;
-            $cfdi->saldo_pendiente = max(0, $cfdi->total - $pagado);
-            $cfdi->status_pago = $cfdi->saldo_pendiente <= 0.01 ? 'Liquidada' : ($pagado > 0 ? 'Parcial' : 'Pendiente');
-        }
+        if ($metodo === 'PUE' || $metodo === 'PPD') {
+            $results = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', $metodo)->where('es_cancelado', false)->whereBetween('fecha', [$startDate, $endDate])->get()->map(function($c) {
+                $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
+                return ['uuid' => $c->uuid, 'fecha' => substr($c->fecha, 0, 10), 'name_receptor' => $c->name_receptor, 'subtotal' => (float)$c->subtotal * $tc, 'total' => (float)$c->total * $tc, 'tipo' => $c->tipo];
+            });
+        } elseif ($metodo === 'REP') {
+            $results = DB::table('cfdi_payments')->join('cfdis as reps', 'cfdi_payments.uuid_pago', '=', 'reps.uuid')->join('cfdis as ppds', 'cfdi_payments.uuid_relacionado', '=', 'ppds.uuid')->where('reps.' . $fieldRfc, $rfc)->where('reps.es_cancelado', false)->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate])->select('cfdi_payments.*', 'ppds.name_receptor', 'ppds.subtotal as ppd_sub', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc')->get()->map(function($p) {
+                $ratio = $p->ppd_tot > 0 ? ($p->monto_pagado / $p->ppd_tot) : 0;
+                $tc = (strtoupper($p->ppd_mon ?? 'MXN') === 'MXN') ? 1 : ($p->ppd_tc ?: 1);
+                return ['uuid' => $p->uuid_pago, 'fecha' => substr($p->fecha_pago, 0, 10), 'name_receptor' => $p->name_receptor, 'subtotal' => (float)$p->ppd_sub * $ratio * $tc, 'total' => (float)$p->monto_pagado, 'tipo' => 'P'];
+            });
+        } elseif ($metodo === 'PENDIENTE') {
+            $results = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false)->whereBetween('fecha', [$startDate, $endDate])->get()->map(function($c) use ($endDate) {
+                $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
+                $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->where('fecha_pago', '<=', $endDate)->sum('monto_pagado');
+                $bal = max(0, (float)$c->total - (float)$pagado);
+                if ($bal < 0.05) return null;
+                $ratio = $c->total > 0 ? ($bal / (float)$c->total) : 0;
+                return ['uuid' => $c->uuid, 'fecha' => substr($c->fecha, 0, 10), 'name_receptor' => $c->name_receptor, 'subtotal' => (float)$c->subtotal * $ratio * $tc, 'total' => $bal, 'tipo' => 'I'];
+            })->filter()->values();
+        } else { return response()->json([]); }
         return response()->json($results);
     }
 
-    public function getRepExplorer(Request $request)
-    {
-        $rfc = $request->query('rfc');
-        $year = $request->query('year');
-        $month = $request->query('month');
-        $tipo = $request->query('tipo', 'issued');
-
-        $query = Cfdi::where('tipo', 'P')->where('es_cancelado', false);
-        if ($tipo === 'issued') $query->where('rfc_emisor', $rfc);
-        else $query->where('rfc_receptor', $rfc);
-
-        if ($year) $query->whereYear('fecha', $year);
-        if ($month) $query->whereMonth('fecha', $month);
-
-        $results = $query->orderBy('fecha', 'desc')->paginate(50);
-        foreach ($results as $cfdi) {
-            $cfdi->relacionados = CfdiPayment::where('uuid_pago', $cfdi->uuid)->get();
-        }
-        return response()->json($results);
-    }
+    public function getPpdExplorer(Request $request) { return response()->json([]); }
+    public function getRepExplorer(Request $request) { return response()->json([]); }
 }
