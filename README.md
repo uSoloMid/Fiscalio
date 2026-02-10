@@ -43,5 +43,21 @@ php artisan sat:runner --loop
 - **Nuevos Clientes:** Al añadir un cliente, el sistema inicia automáticamente una descarga de los últimos **5 años** de historial.
 - **Seguridad:** Asegúrate de mantener tu archivo `sat-api/.env` configurado correctamente.
 
+## 🔧 Comandos de Mantenimiento (Opcional)
+
+Si necesitas forzar una sincronización o verificar el estado de facturas antiguas manualmente, puedes usar estos comandos en la terminal del backend (`sat-api`):
+
+### Forzar Sincronización Masiva
+Dispara la revisión de todos los clientes activos (respetando el umbral de 12 horas).
+```powershell
+php artisan sat:sync-all
+```
+
+### Verificar facturas antiguas
+Revisa el estado en el SAT de facturas que no se han actualizado en 24 horas.
+```powershell
+php artisan sat:verify-past --limit=50
+```
+
 ---
 *Desarrollado con el asistente Antigravity*

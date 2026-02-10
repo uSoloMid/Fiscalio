@@ -45,21 +45,40 @@ class SatRunnerCommand extends Command
 
     protected function tick()
     {
-        // Buscar requests pendientes elegibles
+        // 1. Contar solicitudes activas (que ya están hablando con el SAT)
+        $activeCount = SatRequest::whereIn('state', ['polling', 'downloading'])->count();
+
+        // 2. Contar solicitudes totales pendientes
+        $totalPending = SatRequest::whereIn('state', ['created', 'polling', 'downloading'])->count();
+
+        // Estrategia de escalonamiento: 
+        // Si hay muchas solicitudes (>10), procesamos lotes más pequeños para no saturar.
+        $batchSize = 5;
+        $delayBetweenRequests = 0;
+
+        if ($totalPending > 10) {
+            $batchSize = 2; // Reducir concurrencia
+            $delayBetweenRequests = 5; // Esperar 5 segundos entre cada una en el mismo lote
+        }
+
         $requests = SatRequest::whereIn('state', ['created', 'polling', 'downloading'])
             ->where(function ($query) {
             $query->whereNull('next_retry_at')
                 ->orWhere('next_retry_at', '<=', now());
         })
             ->orderBy('created_at', 'asc')
-            ->take(1) // Procesar 1 a la vez para evitar rate limits
+            ->take($batchSize)
             ->get();
 
         if ($requests->isEmpty()) {
             return;
         }
 
-        foreach ($requests as $req) {
+        foreach ($requests as $index => $req) {
+            if ($index > 0 && $delayBetweenRequests > 0) {
+                $this->info("Encadenando: esperando {$delayBetweenRequests}s para escalonar...");
+                sleep($delayBetweenRequests);
+            }
             $this->processRequest($req);
         }
     }
@@ -235,5 +254,6 @@ class SatRunnerCommand extends Command
 
         $req->next_retry_at = now()->addMinutes($minutes);
         $this->info("Reintento programado en $minutes min. Razón: $reason");
+        $req->save();
     }
 }

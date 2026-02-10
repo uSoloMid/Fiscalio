@@ -18,6 +18,9 @@ class Kernel extends ConsoleKernel
 
     protected function schedule($schedule)
     {
+        // Revisar sincronización de todos los negocios cada hora (el servicio protege el umbral de 12h)
+        $schedule->command('sat:sync-all')->hourly();
+
         // Verificar facturas antiguas cada 15 minutos en segundo plano
         $schedule->command('sat:verify-past --limit=200')->everyFifteenMinutes();
     }
