@@ -169,4 +169,17 @@ class InvoiceController extends Controller
     {
         return response()->json(\App\Models\SatRequest::select('sat_requests.*', 'businesses.legal_name as business_name')->join('businesses', 'sat_requests.rfc', '=', 'businesses.rfc')->orderBy('sat_requests.created_at', 'desc')->limit(10)->get());
     }
+
+    public function indexSatRequests(Request $request)
+    {
+        $query = \App\Models\SatRequest::select('sat_requests.*', 'businesses.legal_name as business_name')
+            ->join('businesses', 'sat_requests.rfc', '=', 'businesses.rfc')
+            ->orderBy('sat_requests.created_at', 'desc');
+
+        if ($request->has('rfc')) {
+            $query->where('sat_requests.rfc', strtoupper($request->input('rfc')));
+        }
+
+        return response()->json($query->paginate($request->input('pageSize', 20)));
+    }
 }

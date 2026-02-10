@@ -147,3 +147,51 @@ export async function deleteAccount(id: number, rfc: string): Promise<void> {
     });
     if (!response.ok) throw new Error('Error deleting account');
 }
+
+export async function getRecentRequests(): Promise<any[]> {
+    const response = await fetch('/api/sat/recent-requests');
+    if (!response.ok) throw new Error('Error fetching recent requests');
+    return response.json();
+}
+
+export async function listSatRequests(params: any = {}): Promise<any> {
+    const query = new URLSearchParams();
+    if (params.rfc) query.append('rfc', params.rfc);
+    if (params.page) query.append('page', params.page);
+
+    const response = await fetch('/api/sat/requests?' + query.toString());
+    if (!response.ok) throw new Error('Error fetching requests');
+    return response.json();
+}
+
+export async function getProvisionalSummary(rfc: string, year: number, month: number): Promise<any> {
+    const response = await fetch(`/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
+    if (!response.ok) throw new Error('Error fetching summary');
+    return response.json();
+}
+
+export async function listPpdExplorer(params: any): Promise<any> {
+    const query = new URLSearchParams(params);
+    const response = await fetch('/api/provisional/ppd-explorer?' + query.toString());
+    if (!response.ok) throw new Error('Error fetching PPD explorer');
+    return response.json();
+}
+
+export async function listRepExplorer(params: any): Promise<any> {
+    const query = new URLSearchParams(params);
+    const response = await fetch('/api/provisional/rep-explorer?' + query.toString());
+    if (!response.ok) throw new Error('Error fetching REP explorer');
+    return response.json();
+}
+
+export function exportInvoicesZip(params: any) {
+    const query = new URLSearchParams();
+    if (params.rfc_user) query.append('rfc_user', params.rfc_user);
+    if (params.year) query.append('year', params.year);
+    if (params.month) query.append('month', params.month);
+    if (params.tipo && params.tipo !== 'all') query.append('tipo', params.tipo);
+    if (params.q) query.append('q', params.q);
+    if (params.status) query.append('status', params.status);
+
+    window.open('/api/sat/bulk-pdf?' + query.toString(), '_blank');
+}

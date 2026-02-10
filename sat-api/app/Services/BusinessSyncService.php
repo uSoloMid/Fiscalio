@@ -56,16 +56,16 @@ class BusinessSyncService
                     $startDate = now()->subYears(5)->startOfYear();
                 }
                 else {
-                    // Incremental: latest invoice - 10 days (safety margin)
+                    // Incremental: latest invoice - 10 days
                     $startDate = Carbon::parse($latestDate)->subDays(10)->startOfDay();
                 }
 
                 $endDate = now()->endOfDay();
 
                 // Check for duplicate pending requests for this range (roughly)
-                // We avoid creating a new one if there's one with state != completed/failed
                 $exists = SatRequest::where('rfc', $business->rfc)
                     ->where('type', $type)
+                    ->where('start_date', $startDate->toDateTimeString())
                     ->whereIn('state', ['created', 'polling', 'downloading'])
                     ->exists();
 

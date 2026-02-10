@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip } from '../services';
 import { AccountsPage } from './AccountsPage';
+import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
 
 export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: string, onBack?: () => void, clientName?: string }) => {
@@ -29,7 +30,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const [activeRequests, setActiveRequests] = useState<any[]>([]);
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
-    const [currentView, setCurrentView] = useState<'invoices' | 'accounts'>('invoices');
+    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional'>('invoices');
 
 
 
@@ -322,6 +323,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                         <span className="material-symbols-outlined text-xl">account_tree</span>
                         Cuentas
                     </button>
+                    <button
+                        onClick={() => setCurrentView('provisional')}
+                        className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'provisional' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        <span className="material-symbols-outlined text-xl">monitoring</span>
+                        Control Prov.
+                    </button>
                 </nav>
             </aside>
 
@@ -329,6 +337,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
             {currentView === 'accounts' ? (
                 <div className="flex-1 h-screen overflow-hidden">
                     <AccountsPage
+                        activeRfc={activeRfc}
+                        clientName={clientName || activeClientName || activeRfc}
+                        onBack={() => setCurrentView('invoices')}
+                    />
+                </div>
+            ) : currentView === 'provisional' ? (
+                <div className="flex-1 h-screen overflow-hidden">
+                    <ProvisionalControlPage
                         activeRfc={activeRfc}
                         clientName={clientName || activeClientName || activeRfc}
                         onBack={() => setCurrentView('invoices')}
@@ -488,6 +504,21 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                     className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm ${syncing ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
                                     <span className={`material-symbols-outlined text-sm ${syncing ? 'animate-spin' : ''}`}>sync</span>
                                     {syncing ? 'Sincronizando...' : (lastSyncAt ? `Última: ${new Date(lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Sincronizar')}
+                                </button>
+
+                                <button
+                                    onClick={() => exportInvoicesZip({
+                                        rfc_user: activeRfc,
+                                        year,
+                                        month,
+                                        tipo: (filterType === 'all' || filterType === 'canceladas') ? undefined : filterType,
+                                        status: filterType === 'canceladas' ? 'cancelados' : undefined,
+                                        q: search
+                                    })}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition-all border border-gray-200"
+                                >
+                                    <span className="material-symbols-outlined text-sm">download</span>
+                                    PDFs (ZIP)
                                 </button>
 
                                 <button
@@ -789,7 +820,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
 
                                             {/* Action Buttons: PDF, XML, ZIP */}
                                             <div className="grid grid-cols-3 gap-2">
-                                                <button className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-red-50 hover:border-red-100 group transition-all">
+                                                <button
+                                                    onClick={() => window.open(`/api/cfdis/${selectedCfdi.uuid}/pdf`, '_blank')}
+                                                    className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-red-50 hover:border-red-100 group transition-all"
+                                                >
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-red-500 text-lg">picture_as_pdf</span>
                                                     <span className="text-[8px] font-bold text-gray-400 group-hover:text-red-600 uppercase mt-1">PDF</span>
                                                 </button>
@@ -801,7 +835,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-blue-500 text-lg">code</span>
                                                     <span className="text-[8px] font-bold text-gray-400 group-hover:text-blue-600 uppercase mt-1">XML</span>
                                                 </a>
-                                                <button className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 group transition-all">
+                                                <button
+                                                    onClick={() => window.open(`/api/cfdis/${selectedCfdi.uuid}/zip`, '_blank')}
+                                                    className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 group transition-all"
+                                                >
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-gray-600 text-lg">inventory_2</span>
                                                     <span className="text-[8px] font-bold text-gray-400 group-hover:text-gray-600 uppercase mt-1">ZIP</span>
                                                 </button>

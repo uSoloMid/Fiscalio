@@ -11,6 +11,7 @@
     "license": "MIT",
     "require": {
         "php": "~8.0",
+        "barryvdh/laravel-dompdf": "^2.2",
         "doctrine/dbal": "^4.4",
         "fruitcake/laravel-cors": "^2.0.4",
         "guzzlehttp/guzzle": "^7.3.0",
@@ -20,7 +21,8 @@
         "phpcfdi/cfdi-expresiones": "^3.3",
         "phpcfdi/rfc": "^1.1.0",
         "phpcfdi/sat-estado-cfdi": "^2.0",
-        "phpcfdi/sat-ws-descarga-masiva": "^0.5"
+        "phpcfdi/sat-ws-descarga-masiva": "^0.5",
+        "simplesoftwareio/simple-qrcode": "^4.2"
     },
     "require-dev": {
         "facade/ignition": "^2.5.14",

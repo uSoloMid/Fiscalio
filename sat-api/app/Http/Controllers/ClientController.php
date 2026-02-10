@@ -79,27 +79,49 @@ class ClientController extends Controller
             'certificate' => 'required|file',
         ]);
 
-        $file = $request->file('certificate');
-        $content = file_get_contents($file->getRealPath());
+        try {
+            $content = file_get_contents($request->file('certificate')->getRealPath());
+            // Use the library to handle DER/PEM/Base64 conversions automatically
+            $certificate = new \PhpCfdi\Credentials\Certificate($content);
 
-        if (strpos($content, '-----BEGIN CERTIFICATE-----') === false) {
-            $content = "-----BEGIN CERTIFICATE-----\n" . chunk_split(base64_encode($content), 64, "\n") . "-----END CERTIFICATE-----\n";
+            $rfc = $certificate->rfc();
+            $name = $certificate->legalName();
+            $validUntil = $certificate->validToDateTime()->format('Y-m-d H:i:s');
+
+            // FALLBACK: If library fails to find RFC (e.g. missing x500UniqueIdentifier standard key)
+            if (empty($rfc)) {
+                $subject = $certificate->subject();
+                // Try OID 2.5.4.45 directly
+                $rfc = $subject['2.5.4.45'] ?? '';
+
+                // Try scanning all values for RFC pattern
+                if (empty($rfc)) {
+                    foreach ($subject as $v) {
+                        // Regex for RFC (3-4 letters, 6 digits, 3 alphanum)
+                        if (preg_match('/^[A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3}$/', (string)$v)) {
+                            $rfc = $v;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // FALLBACK: If library fails to find Name
+            if (empty($name)) {
+                $subject = $certificate->subject();
+                $name = $subject['CN'] ?? $subject['commonName'] ?? $subject['O'] ?? $subject['organizationName'] ?? '';
+            }
+
+            return response()->json([
+                'rfc' => $rfc,
+                'name' => $name,
+                'valid_until' => $validUntil,
+            ]);
         }
-
-        $data = openssl_x509_parse($content);
-        if (!$data) {
-            return response()->json(['error' => 'Certificado inválido'], 400);
+        catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Certificate parse error: ' . $e->getMessage());
+            return response()->json(['error' => 'Error al leer el certificado: ' . $e->getMessage()], 400);
         }
-
-        $rfc = $data['subject']['x500UniqueIdentifier'] ?? '';
-        $name = $data['subject']['CN'] ?? '';
-        $validUntil = date('Y-m-d H:i:s', $data['validTo_time_t']);
-
-        return response()->json([
-            'rfc' => $rfc,
-            'name' => $name,
-            'valid_until' => $validUntil,
-        ]);
     }
 
     public function store(Request $request)

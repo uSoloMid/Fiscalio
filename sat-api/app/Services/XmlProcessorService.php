@@ -176,6 +176,31 @@ class XmlProcessorService
             $fecha = new DateTimeImmutable();
         }
 
+        // Pagos (REP) extraction
+        $payments = [];
+        if ($tipo === 'P') {
+            $nodosPago = $xpath->query('//*[local-name()="Pago"]');
+            foreach ($nodosPago as $nodoPago) {
+                $fechaPago = $nodoPago->getAttribute('FechaPago');
+                $monedaP = $nodoPago->getAttribute('MonedaP');
+                $tcP = $nodoPago->getAttribute('TipoCambioP') ?: 1;
+
+                $nodosDoctoRel = $xpath->query('.//*[local-name()="DoctoRelacionado"]', $nodoPago);
+                foreach ($nodosDoctoRel as $nodoDoctoRel) {
+                    $payments[] = [
+                        'uuid_relacionado' => strtoupper($nodoDoctoRel->getAttribute('IdDocumento')),
+                        'monto_pagado' => $nodoDoctoRel->getAttribute('ImpPagado') ?: $nodoDoctoRel->getAttribute('Importe'),
+                        'num_parcialidad' => $nodoDoctoRel->getAttribute('NumParcialidad'),
+                        'saldo_anterior' => $nodoDoctoRel->getAttribute('ImpSaldoAnt'),
+                        'saldo_insoluto' => $nodoDoctoRel->getAttribute('ImpSaldoInsoluto'),
+                        'fecha_pago' => $fechaPago,
+                        'moneda_pago' => $monedaP,
+                        'tipo_cambio_pago' => $tcP,
+                    ];
+                }
+            }
+        }
+
         return [
             'uuid' => strtoupper($uuid),
             'serie' => $serie,
@@ -201,6 +226,8 @@ class XmlProcessorService
             'concepto' => $concepto,
             'iva' => $iva,
             'retenciones' => $retenciones,
+            'payments' => $payments,
+            'full_xml_data' => $this->xmlToArray($dom),
         ];
     }
 
@@ -214,7 +241,7 @@ class XmlProcessorService
             return;
         }
 
-        Cfdi::create([
+        $cfdi = Cfdi::create([
             'uuid' => $data['uuid'],
             'serie' => $data['serie'],
             'folio' => $data['folio'],
@@ -241,7 +268,24 @@ class XmlProcessorService
             'retenciones' => $data['retenciones'],
             'path_xml' => $path,
             'request_id' => $requestId,
+            'xml_data' => $data['full_xml_data'] ?? null,
         ]);
+
+        if (!empty($data['payments'])) {
+            foreach ($data['payments'] as $p) {
+                \App\Models\CfdiPayment::create([
+                    'uuid_pago' => $data['uuid'],
+                    'uuid_relacionado' => $p['uuid_relacionado'],
+                    'fecha_pago' => $p['fecha_pago'],
+                    'monto_pagado' => $p['monto_pagado'],
+                    'num_parcialidad' => $p['num_parcialidad'],
+                    'saldo_anterior' => $p['saldo_anterior'],
+                    'saldo_insoluto' => $p['saldo_insoluto'],
+                    'moneda_pago' => $p['moneda_pago'],
+                    'tipo_cambio_pago' => $p['tipo_cambio_pago'],
+                ]);
+            }
+        }
     }
 
     protected function updateRequestStats(string $requestId, int $count)
@@ -252,5 +296,49 @@ class XmlProcessorService
             $req->state = 'completed'; // Asumimos completado tras procesar
             $req->save();
         }
+    }
+
+    protected function xmlToArray(\DOMDocument $dom)
+    {
+        $res = [];
+        if ($dom->documentElement) {
+            $res[$dom->documentElement->tagName] = $this->nodeToArray($dom->documentElement);
+        }
+        return $res;
+    }
+
+    protected function nodeToArray(\DOMNode $node)
+    {
+        $output = [];
+        switch ($node->nodeType) {
+            case XML_ELEMENT_NODE:
+                foreach ($node->attributes as $attr) {
+                    $output['@attributes'][$attr->nodeName] = $attr->nodeValue;
+                }
+                foreach ($node->childNodes as $child) {
+                    $v = $this->nodeToArray($child);
+                    if (isset($child->tagName)) {
+                        $t = $child->tagName;
+                        if (!isset($output[$t])) {
+                            $output[$t] = $v;
+                        }
+                        else {
+                            if (!is_array($output[$t]) || !isset($output[$t][0])) {
+                                $output[$t] = [$output[$t]];
+                            }
+                            $output[$t][] = $v;
+                        }
+                    }
+                    elseif ($v || $v === '0') {
+                        $output = $v;
+                    }
+                }
+                break;
+            case XML_TEXT_NODE:
+            case XML_CDATA_SECTION_NODE:
+                $output = trim($node->textContent);
+                break;
+        }
+        return $output;
     }
 }

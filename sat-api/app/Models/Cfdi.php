@@ -45,6 +45,7 @@ class Cfdi extends Model
         'es_cancelable',
         'estatus_cancelacion',
         'validacion_efos',
+        'xml_data',
     ];
 
     protected $casts = [
@@ -52,5 +53,10 @@ class Cfdi extends Model
         'total' => 'decimal:2',
         'iva' => 'decimal:2',
         'retenciones' => 'decimal:2',
+        'xml_data' => 'array',
     ];
+    public function pagosRelacionados()
+    {
+        return $this->hasMany(CfdiPayment::class , 'uuid_relacionado', 'uuid');
+    }
 }

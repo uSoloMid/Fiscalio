@@ -1,5 +1,5 @@
 
-import React from 'react';
+
 
 export type GroupByMode = 'group' | 'regimen' | 'sector' | 'none';
 
