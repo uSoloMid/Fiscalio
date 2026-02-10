@@ -182,4 +182,12 @@ class InvoiceController extends Controller
 
         return response()->json($query->paginate($request->input('pageSize', 20)));
     }
+    public function getRunnerStatus()
+    {
+        $lastRequest = \App\Models\SatRequest::orderBy('updated_at', 'desc')->first();
+        return response()->json([
+            'last_activity' => $lastRequest ? $lastRequest->updated_at : null,
+            'is_alive' => $lastRequest ? $lastRequest->updated_at->gt(now()->subMinutes(10)) : false
+        ]);
+    }
 }

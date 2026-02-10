@@ -44,6 +44,7 @@ Route::post('/sat/verify-status', [InvoiceController::class , 'verifyStatus']);
 Route::get('/sat/active-requests', [InvoiceController::class , 'getActiveRequests']);
 Route::get('/sat/recent-requests', [InvoiceController::class , 'getRecentRequests']);
 Route::get('/sat/requests', [InvoiceController::class , 'indexSatRequests']);
+Route::get('/sat/runner-status', [InvoiceController::class , 'getRunnerStatus']);
 Route::get('/sat/bulk-pdf', [InvoiceController::class , 'downloadBulkPdf']);
 Route::get('/cfdis/{uuid}/pdf', [InvoiceController::class , 'downloadPdf']);
 Route::get('/cfdis/{uuid}/zip', [InvoiceController::class , 'downloadSingleZip']);

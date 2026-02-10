@@ -51,13 +51,19 @@ class BusinessSyncService
 
                 $latestDate = $query->max('fecha');
 
-                if (!$latestDate) {
-                    // Initial sync: 5 years back
+                // If it's the first time syncing THIS business record, 
+                // we MUST ensure we have the 5-year history even if some invoices exist 
+                // (which could happen if the client was deleted/re-added or imported).
+                if (!$business->last_sync_at) {
+                    $startDate = now()->subYears(5)->startOfYear();
+                }
+                elseif (!$latestDate) {
+                    // Fallback for missing data
                     $startDate = now()->subYears(5)->startOfYear();
                 }
                 else {
-                    // Incremental: latest invoice - 10 days
-                    $startDate = Carbon::parse($latestDate)->subDays(10)->startOfDay();
+                    // Incremental: latest invoice - 15 days (to be safe)
+                    $startDate = Carbon::parse($latestDate)->subDays(15)->startOfDay();
                 }
 
                 $endDate = now()->endOfDay();

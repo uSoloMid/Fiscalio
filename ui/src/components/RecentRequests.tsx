@@ -139,14 +139,20 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
                                     </div>
                                 </td>
                                 <td className="px-4 py-3">
-                                    <div className="w-24 bg-gray-200 rounded-full h-1.5 mb-1">
+                                    <div className="w-24 bg-gray-100 rounded-full h-1.5 mb-1 overflow-hidden">
                                         <div
-                                            className={`h-1.5 rounded-full ${req.state === 'completed' ? 'bg-green-500' : 'bg-orange-500'}`}
-                                            style={{ width: req.state === 'completed' ? '100%' : '50%' }}
+                                            className={`h-1.5 rounded-full transition-all duration-1000 ${req.state === 'completed' ? 'bg-emerald-500 w-full' :
+                                                    req.state === 'failed' ? 'bg-red-500 w-full' :
+                                                        req.state === 'downloading' || req.state === 'extracting' ? 'bg-orange-500 w-[75%]' :
+                                                            req.state === 'polling' ? 'bg-yellow-500 w-[30%]' : 'bg-gray-300 w-[10%]'
+                                                } ${(req.state !== 'completed' && req.state !== 'failed') ? 'animate-pulse' : ''}`}
                                         ></div>
                                     </div>
-                                    <div className="text-xs text-gray-500">
-                                        {req.state === 'completed' ? 'Listo' : (req.package_count > 0 ? `${req.package_count} paquetes` : 'Esperando...')}
+                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                                        {req.state === 'completed' ? 'Finalizado' :
+                                            req.state === 'extracting' ? 'Extrayendo...' :
+                                                req.state === 'downloading' ? 'Descargando...' :
+                                                    req.state === 'polling' ? 'SAT Procesando...' : 'En cola'}
                                     </div>
                                 </td>
                                 <td className="px-4 py-3 text-gray-500">
