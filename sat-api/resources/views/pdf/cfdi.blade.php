@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title>Factura_{{ $cfdi['uuid'] }}</title>
+    <title>Factura_{{ $cfdis[0]['uuid'] }}</title>
     <style>
         @page { margin: 0; }
         body { 
@@ -122,8 +122,9 @@
     </style>
 </head>
 <body>
+@foreach($cfdis as $idx => $cfdi)
     <div class="top-bar"></div>
-    <div class="main-container">
+    <div class="main-container" style="{{ $idx < count($cfdis) - 1 ? 'page-break-after: always;' : '' }}">
         
         <!-- Header -->
         <table class="header-section">
@@ -189,32 +190,79 @@
             </div>
         </div>
 
-        <!-- Concepts -->
-        <table class="concepts-table">
-            <thead>
-                <tr>
-                    <th width="8%">Cant</th>
-                    <th width="12%">Clave SAT</th>
-                    <th>Descripción</th>
-                    <th width="15%" class="text-right">Precio Unit</th>
-                    <th width="15%" class="text-right">Importe</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($cfdi['conceptos'] as $con)
-                <tr>
-                    <td>{{ $con['cantidad'] }}</td>
-                    <td>{{ $con['clave_prod_serv'] }}</td>
-                    <td>
-                        <div class="text-bold">{{ $con['descripcion'] }}</div>
-                        <div style="font-size: 7pt; color: #94a3b8;">Unidad: {{ $con['clave_unidad'] }} - {{ $con['unidad'] }}</div>
-                    </td>
-                    <td class="text-right">${{ number_format((float)$con['valor_unitario'], 2) }}</td>
-                    <td class="text-right">${{ number_format((float)$con['importe'], 2) }}</td>
-                </tr>
+        <!-- Concepts / Payment Details -->
+        @if($cfdi['tipo_comprobante'] === 'P')
+            <div style="margin-top: 20px;">
+                <div class="address-title">Detalle del Complemento de Pago</div>
+                @foreach($cfdi['pagos'] as $pago)
+                    <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #e2e8f0;">
+                        <table style="font-size: 8pt; margin-bottom: 10px;">
+                            <tr>
+                                <td width="25%"><span class="text-bold">FECHA PAGO:</span><br>{{ $pago['fecha_pago'] }}</td>
+                                <td width="25%"><span class="text-bold">FORMA PAGO:</span><br>{{ $pago['forma_pago'] }}</td>
+                                <td width="25%"><span class="text-bold">MONEDA:</span><br>{{ $pago['moneda'] }}</td>
+                                <td width="25%"><span class="text-bold">MONTO:</span><br><span style="font-size: 10pt;">${{ number_format((float)$pago['monto'], 2) }}</span></td>
+                            </tr>
+                        </table>
+                        
+                        <div class="text-bold" style="font-size: 7pt; color: #64748b; text-transform: uppercase; margin-bottom: 5px;">Documentos Relacionados</div>
+                        <table class="concepts-table" style="margin-top: 0;">
+                            <thead>
+                                <tr>
+                                    <th>Folio / UUID</th>
+                                    <th class="text-center">Parc.</th>
+                                    <th class="text-right">S. Anterior</th>
+                                    <th class="text-right">Pagado</th>
+                                    <th class="text-right">S. Insoluto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($pago['doctos_relacionados'] as $doc)
+                                    <tr>
+                                        <td style="font-size: 7pt;">
+                                            @if($doc['serie'] || $doc['folio'])
+                                                <div class="text-bold">{{ $doc['serie'] }}{{ $doc['folio'] }}</div>
+                                            @endif
+                                            <div style="color: #64748b; font-family: monospace;">{{ $doc['uuid'] }}</div>
+                                        </td>
+                                        <td class="text-center">{{ $doc['num_parcialidad'] }}</td>
+                                        <td class="text-right">${{ number_format((float)$doc['saldo_anterior'], 2) }}</td>
+                                        <td class="text-right text-bold">${{ number_format((float)$doc['importe_pagado'], 2) }}</td>
+                                        <td class="text-right">${{ number_format((float)$doc['saldo_insoluto'], 2) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
                 @endforeach
-            </tbody>
-        </table>
+            </div>
+        @else
+            <table class="concepts-table">
+                <thead>
+                    <tr>
+                        <th width="8%">Cant</th>
+                        <th width="12%">Clave SAT</th>
+                        <th>Descripción</th>
+                        <th width="15%" class="text-right">Precio Unit</th>
+                        <th width="15%" class="text-right">Importe</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($cfdi['conceptos'] as $con)
+                    <tr>
+                        <td>{{ $con['cantidad'] }}</td>
+                        <td>{{ $con['clave_prod_serv'] }}</td>
+                        <td>
+                            <div class="text-bold">{{ $con['descripcion'] }}</div>
+                            <div style="font-size: 7pt; color: #94a3b8;">Unidad: {{ $con['clave_unit'] ?? 'N/A' }} - {{ $con['unidad'] }}</div>
+                        </td>
+                        <td class="text-right">${{ number_format((float)$con['valor_unitario'], 2) }}</td>
+                        <td class="text-right">${{ number_format((float)$con['importe'], 2) }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
 
         <!-- Totals & Amount in words -->
         <div class="summary-section clearfix">
@@ -266,8 +314,8 @@
             <table>
                 <tr>
                     <td class="qr-cell">
-                        @if(!empty($qrCode))
-                            <img src="data:image/png;base64,{{ $qrCode }}" width="120" height="120" style="display: block;"/>
+                        @if(!empty($cfdi['qrCode']))
+                            <img src="data:image/png;base64,{{ $cfdi['qrCode'] }}" width="120" height="120" style="display: block;"/>
                         @endif
                     </td>
                     <td class="seals-cell">
@@ -289,5 +337,6 @@
             Generado por <strong>Fiscalio</strong> - El software contable más avanzado.
         </div>
     </div>
+@endforeach
 </body>
 </html>
