@@ -21,4 +21,25 @@ class TagController extends Controller
 
         return response()->json(Tag::create($request->all()));
     }
+
+    public function update(Request $request, $id)
+    {
+        $tag = Tag::findOrFail($id);
+        $request->validate([
+            'name' => 'required|string|unique:tags,name,' . $id,
+            'color' => 'nullable|string'
+        ]);
+
+        $tag->update($request->all());
+        return response()->json($tag);
+    }
+
+    public function destroy($id)
+    {
+        $tag = Tag::findOrFail($id);
+        // Desvincular de negocios (pivot table)
+        $tag->businesses()->detach();
+        $tag->delete();
+        return response()->json(['success' => true]);
+    }
 }

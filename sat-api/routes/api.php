@@ -65,17 +65,23 @@ Route::post('/provisional/download-xml', [\App\Http\Controllers\DownloadControll
 Route::get('/clients', [ClientController::class , 'index']);
 Route::post('/clients/parse-certificate', [ClientController::class , 'parseCertificate']);
 Route::post('/clients', [ClientController::class , 'store']);
+Route::put('/clients/{id}', [ClientController::class , 'updateClient']);
+Route::delete('/clients/{id}', [ClientController::class , 'destroy']);
 Route::put('/clients/{id}/group', [ClientController::class , 'updateGroup']);
 Route::put('/clients/{id}/tags', [ClientController::class , 'updateTags']);
 
 // Group routes
 Route::get('/groups', [GroupController::class , 'index']);
 Route::post('/groups', [GroupController::class , 'store']);
+Route::put('/groups/{id}', [GroupController::class , 'update']);
+Route::delete('/groups/{id}', [GroupController::class , 'destroy']);
 
 
 // Tag routes
 Route::get('/tags', [TagController::class , 'index']);
 Route::post('/tags', [TagController::class , 'store']);
+Route::put('/tags/{id}', [TagController::class , 'update']);
+Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 
 // Account routes
 Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);

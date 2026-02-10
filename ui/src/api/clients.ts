@@ -41,3 +41,21 @@ export async function updateClientTags(clientId: number, tagIds: number[]): Prom
     if (!response.ok) throw new Error('Error updating client tags');
     return response.json();
 }
+
+export async function updateClientInfo(clientId: number, data: any): Promise<any> {
+    const response = await fetch(`/api/clients/${clientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error updating client info');
+    return response.json();
+}
+
+export async function deleteClient(clientId: number): Promise<any> {
+    const response = await fetch(`/api/clients/${clientId}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Error deleting client');
+    return response.json();
+}

@@ -130,6 +130,17 @@ class XmlProcessorService
         $serie = $comprobante->getAttribute('Serie');
         $folio = $comprobante->getAttribute('Folio');
 
+        // Información Global (CFDI 4.0 para público en general)
+        $globalPeriodicidad = null;
+        $globalMeses = null;
+        $globalYear = null;
+        $infoGlobalNode = $xpath->query('//cfdi:InformacionGlobal')->item(0);
+        if ($infoGlobalNode) {
+            $globalPeriodicidad = $infoGlobalNode->getAttribute('Periodicidad');
+            $globalMeses = $infoGlobalNode->getAttribute('Meses');
+            $globalYear = (int)$infoGlobalNode->getAttribute('Año');
+        }
+
         // Emisor ...
         $emisorNode = $dom->getElementsByTagName('Emisor')->item(0)
             ?? $dom->getElementsByTagNameNS('http://www.sat.gob.mx/cfd/4', 'Emisor')->item(0);
@@ -171,9 +182,31 @@ class XmlProcessorService
 
         try {
             $fecha = new DateTimeImmutable($fechaStr);
+            $fechaFiscal = $fecha;
+
+            // Si hay información global, la fecha fiscal de acumulación es la del periodo reportado
+            if ($globalYear && $globalMeses) {
+                // El campo Meses puede venir como '01'..'12' o '13'..'18' para bimestrales
+                // Mapeamos a un mes calendario real para la fecha fiscal (el primer mes del periodo)
+                $mesMapeado = (int)$globalMeses;
+                if ($mesMapeado > 12) {
+                    // 13: Ene-Feb, 14: Mar-Abr, etc.
+                    $mesMapeado = (($mesMapeado - 13) * 2) + 1;
+                }
+
+                // Asegurar que el año y mes sean válidos para crear la fecha fiscal
+                try {
+                    $fechaFiscal = $fechaFiscal->setDate($globalYear, $mesMapeado, 1)->setTime(0, 0, 0);
+                }
+                catch (\Exception $e) {
+                    // Fallback a fecha original si hay error en datos globales
+                    $fechaFiscal = $fecha;
+                }
+            }
         }
         catch (Exception $e) {
             $fecha = new DateTimeImmutable();
+            $fechaFiscal = $fecha;
         }
 
         // Pagos (REP) extraction
@@ -206,6 +239,7 @@ class XmlProcessorService
             'serie' => $serie,
             'folio' => $folio,
             'fecha' => $fecha,
+            'fecha_fiscal' => $fechaFiscal,
             'rfc_emisor' => $rfcEmisor,
             'name_emisor' => $nombreEmisor,
             'regimen_fiscal_emisor' => $regimenEmisor,
@@ -227,6 +261,9 @@ class XmlProcessorService
             'iva' => $iva,
             'retenciones' => $retenciones,
             'payments' => $payments,
+            'global_periodicidad' => $globalPeriodicidad,
+            'global_meses' => $globalMeses,
+            'global_year' => $globalYear,
             'full_xml_data' => $this->xmlToArray($dom),
         ];
     }
@@ -269,6 +306,10 @@ class XmlProcessorService
             'path_xml' => $path,
             'request_id' => $requestId,
             'xml_data' => $data['full_xml_data'] ?? null,
+            'global_periodicidad' => $data['global_periodicidad'] ?? null,
+            'global_meses' => $data['global_meses'] ?? null,
+            'global_year' => $data['global_year'] ?? null,
+            'fecha_fiscal' => $data['fecha_fiscal'] ?? $data['fecha'],
         ]);
 
         if (!empty($data['payments'])) {

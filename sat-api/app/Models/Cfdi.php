@@ -46,6 +46,10 @@ class Cfdi extends Model
         'estatus_cancelacion',
         'validacion_efos',
         'xml_data',
+        'global_periodicidad',
+        'global_meses',
+        'global_year',
+        'fecha_fiscal',
     ];
 
     protected $casts = [

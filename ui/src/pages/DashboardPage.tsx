@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { parseCertificate, createClient } from '../services';
-import { listGroups } from '../api/groups';
-import { listTags } from '../api/tags';
-import { listClients, updateClientGroup, updateClientTags } from '../api/clients';
+import { listGroups, createGroup, updateGroup, deleteGroup } from '../api/groups';
+import { listTags, createTag, updateTag, deleteTag } from '../api/tags';
+import { listClients, updateClientGroup, updateClientTags, updateClientInfo, deleteClient } from '../api/clients';
 import { GroupCardsRow } from '../components/GroupCardsRow';
 import { TagsFilter } from '../components/TagsFilter';
 import { GroupByToggle } from '../components/GroupByToggle';
@@ -28,7 +28,10 @@ export const DashboardPage = ({
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isGroupModalOpen, setIsGroupModalOpen] = useState(false);
     const [isTagsModalOpen, setIsTagsModalOpen] = useState(false);
+    const [isManageGroupsOpen, setIsManageGroupsOpen] = useState(false);
+    const [isManageTagsOpen, setIsManageTagsOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<any>(null);
+    const [isEditMode, setIsEditMode] = useState(false);
 
     // Filter states (Persisted)
     const [search, setSearch] = useState(localStorage.getItem('dash_search') || '');
@@ -47,6 +50,13 @@ export const DashboardPage = ({
     const [errorMessage, setErrorMessage] = useState('');
     const [showKeyPass, setShowKeyPass] = useState(false);
     const [showCiec, setShowCiec] = useState(false);
+
+    // Group/Tag form state
+    const [newGroupName, setNewGroupName] = useState('');
+    const [newGroupColor, setNewGroupColor] = useState('#10B981');
+    const [newTagName, setNewTagName] = useState('');
+    const [newTagColor, setNewTagColor] = useState('#3B82F6');
+    const [editingEntity, setEditingEntity] = useState<any>(null);
 
     useEffect(() => {
         loadInitialData();
@@ -104,6 +114,31 @@ export const DashboardPage = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (isEditMode) {
+            if (!alias || !rfc) {
+                setErrorMessage('El nombre y RFC son obligatorios.');
+                return;
+            }
+            setSubmitting(true);
+            try {
+                await updateClientInfo(selectedClient.id, {
+                    legal_name: alias,
+                    common_name: alias,
+                    ciec,
+                    passphrase: keyPass
+                });
+                setIsDrawerOpen(false);
+                resetForm();
+                loadClientsData();
+            } catch (err: any) {
+                setErrorMessage(err.message || 'Error al actualizar cliente');
+            } finally {
+                setSubmitting(false);
+            }
+            return;
+        }
+
         if (!cerFile || !keyFile || !rfc || !alias || !keyPass) {
             setErrorMessage('Por favor completa todos los campos obligatorios.');
             return;
@@ -140,6 +175,77 @@ export const DashboardPage = ({
         setKeyPass('');
         setCiec('');
         setErrorMessage('');
+        setIsEditMode(false);
+        setSelectedClient(null);
+    };
+
+    const handleSaveGroup = async () => {
+        if (!newGroupName) return;
+        try {
+            if (editingEntity) {
+                await updateGroup(editingEntity.id, newGroupName, newGroupColor);
+            } else {
+                await createGroup(newGroupName, newGroupColor);
+            }
+            setNewGroupName('');
+            setEditingEntity(null);
+            loadInitialData();
+            loadClientsData();
+        } catch (err) {
+            console.error("Error saving group", err);
+        }
+    };
+
+    const handleDeleteGroup = async (id: number) => {
+        if (!confirm('¿Estás seguro de eliminar este grupo? Los clientes se quedarán sin grupo.')) return;
+        try {
+            await deleteGroup(id);
+            loadInitialData();
+            loadClientsData();
+        } catch (err) {
+            console.error("Error deleting group", err);
+        }
+    };
+
+    const handleSaveTag = async () => {
+        if (!newTagName) return;
+        try {
+            if (editingEntity) {
+                await updateTag(editingEntity.id, newTagName, newTagColor);
+            } else {
+                await createTag(newTagName, newTagColor);
+            }
+            setNewTagName('');
+            setEditingEntity(null);
+            loadInitialData();
+            loadClientsData();
+        } catch (err) {
+            console.error("Error saving tag", err);
+        }
+    };
+
+    const handleDeleteTag = async (id: number) => {
+        if (!confirm('¿Estás seguro de eliminar esta etiqueta?')) return;
+        try {
+            await deleteTag(id);
+            loadInitialData();
+            loadClientsData();
+        } catch (err) {
+            console.error("Error deleting tag", err);
+        }
+    };
+
+    const handleDeleteClient = async () => {
+        if (!selectedClient) return;
+        if (!confirm(`¿Estás seguro de eliminar a ${selectedClient.legal_name}? Esta acción no se puede deshacer.`)) return;
+        try {
+            await deleteClient(selectedClient.id);
+            setIsDrawerOpen(false);
+            resetForm();
+            loadClientsData();
+        } catch (err) {
+            console.error("Error deleting client", err);
+        }
     };
 
     // Grouping logic
@@ -224,19 +330,27 @@ export const DashboardPage = ({
                         </button>
                     </div>
 
-                    {/* Agrupador Bar */}
                     <div className="px-10 py-4 border-t border-gray-50 flex items-center gap-8 text-sm">
                         <div className="flex items-center gap-3">
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Grupo</span>
-                            <select
-                                className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all min-w-[160px] appearance-none cursor-pointer"
-                                value={selectedGroupId}
-                                onChange={(e) => setSelectedGroupId(e.target.value)}
-                            >
-                                <option value="all">Todos los grupos</option>
-                                <option value="null">Sin grupo</option>
-                                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                            </select>
+                            <div className="flex items-center gap-1">
+                                <select
+                                    className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all min-w-[160px] appearance-none cursor-pointer"
+                                    value={selectedGroupId}
+                                    onChange={(e) => setSelectedGroupId(e.target.value)}
+                                >
+                                    <option value="all">Todos los grupos</option>
+                                    <option value="null">Sin grupo</option>
+                                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                </select>
+                                <button
+                                    onClick={() => setIsManageGroupsOpen(true)}
+                                    className="p-2 text-gray-400 hover:text-[#10B981] hover:bg-emerald-50 rounded-xl transition-all"
+                                    title="Configurar Grupos"
+                                >
+                                    <span className="material-symbols-outlined text-xl">settings</span>
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -246,7 +360,16 @@ export const DashboardPage = ({
 
                         <div className="flex items-center gap-3 flex-1">
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Etiquetas</span>
-                            <TagsFilter availableTags={tags} selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />
+                            <div className="flex items-center gap-1 flex-1">
+                                <TagsFilter availableTags={tags} selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />
+                                <button
+                                    onClick={() => setIsManageTagsOpen(true)}
+                                    className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                                    title="Configurar Etiquetas"
+                                >
+                                    <span className="material-symbols-outlined text-xl">settings</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </header>
@@ -330,7 +453,7 @@ export const DashboardPage = ({
                                         <div className="h-px bg-gray-100 flex-1"></div>
                                         <span className="text-[10px] font-bold text-gray-300">{group.items.length} Clientes</span>
                                     </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-4">
                                         {group.items.map(client => (
                                             <ClientCard
                                                 key={client.rfc}
@@ -338,6 +461,15 @@ export const DashboardPage = ({
                                                 onClick={() => onSelectClient(client.rfc, client.legal_name)}
                                                 onEditGroup={() => { setSelectedClient(client); setIsGroupModalOpen(true); }}
                                                 onEditTags={() => { setSelectedClient(client); setIsTagsModalOpen(true); }}
+                                                onEditClient={() => {
+                                                    setSelectedClient(client);
+                                                    setAlias(client.common_name || client.legal_name);
+                                                    setRfc(client.rfc);
+                                                    setCiec(client.ciec || '');
+                                                    setKeyPass(client.passphrase || '');
+                                                    setIsEditMode(true);
+                                                    setIsDrawerOpen(true);
+                                                }}
                                             />
                                         ))}
                                     </div>
@@ -440,22 +572,160 @@ export const DashboardPage = ({
                 </div>
             )}
 
-            {/* DRAWER: Add Client (FIEL) */}
+            {/* MODAL: Manage Groups */}
+            {isManageGroupsOpen && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsManageGroupsOpen(false)}></div>
+                    <div className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col max-h-[80vh]">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-gray-900">Configurar Grupos</h3>
+                            <button onClick={() => setIsManageGroupsOpen(false)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                                <span className="material-symbols-outlined text-gray-400">close</span>
+                            </button>
+                        </div>
+
+                        {/* Add/Edit form */}
+                        <div className="bg-gray-50 p-4 rounded-2xl mb-6 space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2">Nombre del Grupo</label>
+                                <input
+                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold"
+                                    value={newGroupName}
+                                    onChange={e => setNewGroupName(e.target.value)}
+                                    placeholder="Ej. Clientes VIP"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase">Color:</label>
+                                    <input type="color" value={newGroupColor} onChange={e => setNewGroupColor(e.target.value)} className="w-8 h-8 rounded-lg overflow-hidden border-none p-0 cursor-pointer" />
+                                </div>
+                                <button
+                                    onClick={handleSaveGroup}
+                                    className="px-4 py-2 bg-emerald-500 text-white text-xs font-bold rounded-xl hover:bg-emerald-600 transition-colors"
+                                >
+                                    {editingEntity ? 'Actualizar' : 'Crear Grupo'}
+                                </button>
+                            </div>
+                            {editingEntity && (
+                                <button onClick={() => { setEditingEntity(null); setNewGroupName(''); }} className="text-[10px] text-gray-400 hover:underline">Cancelar edición</button>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-2 no-scrollbar">
+                            {groups.map(g => (
+                                <div key={g.id} className="flex items-center justify-between p-3 rounded-2xl border border-gray-100 hover:border-gray-200 transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-4 w-4 rounded-full" style={{ backgroundColor: g.color }}></div>
+                                        <span className="text-sm font-bold text-gray-700">{g.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => { setEditingEntity(g); setNewGroupName(g.name); setNewGroupColor(g.color); }}
+                                            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">edit</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteGroup(g.id)}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL: Manage Tags */}
+            {isManageTagsOpen && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsManageTagsOpen(false)}></div>
+                    <div className="relative w-full max-w-md bg-white rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col max-h-[80vh]">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-gray-900">Configurar Etiquetas</h3>
+                            <button onClick={() => setIsManageTagsOpen(false)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                                <span className="material-symbols-outlined text-gray-400">close</span>
+                            </button>
+                        </div>
+
+                        {/* Add/Edit form */}
+                        <div className="bg-gray-50 p-4 rounded-2xl mb-6 space-y-4">
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2">Nombre de Etiqueta</label>
+                                <input
+                                    className="w-full px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold"
+                                    value={newTagName}
+                                    onChange={e => setNewTagName(e.target.value)}
+                                    placeholder="Ej. RESICO"
+                                />
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase">Color:</label>
+                                    <input type="color" value={newTagColor} onChange={e => setNewTagColor(e.target.value)} className="w-8 h-8 rounded-lg overflow-hidden border-none p-0 cursor-pointer" />
+                                </div>
+                                <button
+                                    onClick={handleSaveTag}
+                                    className="px-4 py-2 bg-blue-500 text-white text-xs font-bold rounded-xl hover:bg-blue-600 transition-colors"
+                                >
+                                    {editingEntity ? 'Actualizar' : 'Crear Etiqueta'}
+                                </button>
+                            </div>
+                            {editingEntity && (
+                                <button onClick={() => { setEditingEntity(null); setNewTagName(''); }} className="text-[10px] text-gray-400 hover:underline">Cancelar edición</button>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-2 no-scrollbar">
+                            {tags.map(t => (
+                                <div key={t.id} className="flex items-center justify-between p-3 rounded-2xl border border-gray-100 hover:border-gray-200 transition-all">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-4 w-4 rounded-full" style={{ backgroundColor: t.color }}></div>
+                                        <span className="text-sm font-bold text-gray-700">{t.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => { setEditingEntity(t); setNewTagName(t.name); setNewTagColor(t.color); }}
+                                            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">edit</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteTag(t.id)}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* DRAWER: Add/Edit Client */}
             {isDrawerOpen && (
                 <div className="fixed inset-0 z-[100] flex items-start justify-end">
                     <div
                         className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-                        onClick={() => setIsDrawerOpen(false)}
+                        onClick={() => { setIsDrawerOpen(false); resetForm(); }}
                     ></div>
                     <div className="relative w-full max-w-md bg-white h-screen shadow-2xl flex flex-col z-[110] transform transition-transform duration-300 translate-x-0 overflow-hidden">
                         {/* Header */}
                         <div className="p-8 border-b border-gray-100 flex items-center justify-between">
                             <div>
-                                <h2 className="text-xl font-bold text-gray-900">Registrar Nuevo Cliente</h2>
-                                <p className="text-xs text-gray-500 font-medium">Configura las credenciales del SAT para iniciar</p>
+                                <h2 className="text-xl font-bold text-gray-900">{isEditMode ? 'Editar Cliente' : 'Registrar Nuevo Cliente'}</h2>
+                                <p className="text-xs text-gray-500 font-medium">
+                                    {isEditMode ? 'Actualiza la información y credenciales' : 'Configura las credenciales del SAT para iniciar'}
+                                </p>
                             </div>
                             <button
-                                onClick={() => setIsDrawerOpen(false)}
+                                onClick={() => { setIsDrawerOpen(false); resetForm(); }}
                                 className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-50 transition-colors"
                             >
                                 <span className="material-symbols-outlined">close</span>
@@ -475,13 +745,13 @@ export const DashboardPage = ({
                             <section className="space-y-6">
                                 <div className="flex items-center gap-3">
                                     <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
-                                        <span className="material-symbols-outlined text-xl">person_add</span>
+                                        <span className="material-symbols-outlined text-xl">{isEditMode ? 'edit' : 'person_add'}</span>
                                     </div>
                                     <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Información Básica</h3>
                                 </div>
                                 <div className="grid gap-6">
                                     <div>
-                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Razón Social / Alias</label>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Nombre / Alias</label>
                                         <input
                                             className="w-full px-5 py-3 rounded-2xl border border-gray-200 text-sm font-semibold focus:ring-4 focus:ring-emerald-500/5 focus:border-[#10B981] transition-all"
                                             placeholder="Ej. Mi Empresa S.A."
@@ -493,7 +763,8 @@ export const DashboardPage = ({
                                     <div>
                                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">RFC</label>
                                         <input
-                                            className="w-full px-5 py-3 rounded-2xl border border-gray-200 font-mono text-sm uppercase font-semibold focus:ring-4 focus:ring-emerald-500/5 focus:border-[#10B981] transition-all"
+                                            disabled={isEditMode}
+                                            className={`w-full px-5 py-3 rounded-2xl border border-gray-200 font-mono text-sm uppercase font-semibold focus:ring-4 focus:ring-emerald-500/5 focus:border-[#10B981] transition-all ${isEditMode ? 'bg-gray-50 text-gray-400' : ''}`}
                                             placeholder="RFC123456ABC"
                                             type="text"
                                             value={rfc}
@@ -503,40 +774,42 @@ export const DashboardPage = ({
                                 </div>
                             </section>
 
-                            {/* Section 2: FIEL */}
+                            {/* Section 2: FIEL (Hide files if edit mode if you don't want to re-upload) */}
                             <section className="space-y-6">
                                 <div className="flex items-center gap-3">
                                     <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
                                         <span className="material-symbols-outlined text-xl">verified_user</span>
                                     </div>
-                                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Credenciales FIEL</h3>
+                                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Credenciales FIEL {isEditMode && '(Opcional actualizar)'}</h3>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-6 transition-all cursor-pointer ${cerFile ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/30'}`}>
-                                        <span className={`material-symbols-outlined mb-3 text-4xl ${cerFile ? 'text-emerald-500' : 'text-gray-300 group-hover:text-emerald-500'}`}>upload_file</span>
-                                        <p className="text-[10px] font-bold text-gray-500 text-center truncate max-w-full px-2">
-                                            {cerFile ? cerFile.name : 'Archivo .cer'}
-                                        </p>
-                                        <input
-                                            className="absolute inset-0 opacity-0 cursor-pointer"
-                                            type="file"
-                                            accept=".cer"
-                                            onChange={handleCerChange}
-                                        />
+                                {!isEditMode && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-6 transition-all cursor-pointer ${cerFile ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/30'}`}>
+                                            <span className={`material-symbols-outlined mb-3 text-4xl ${cerFile ? 'text-emerald-500' : 'text-gray-300 group-hover:text-emerald-500'}`}>upload_file</span>
+                                            <p className="text-[10px] font-bold text-gray-500 text-center truncate max-w-full px-2">
+                                                {cerFile ? cerFile.name : 'Archivo .cer'}
+                                            </p>
+                                            <input
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                type="file"
+                                                accept=".cer"
+                                                onChange={handleCerChange}
+                                            />
+                                        </div>
+                                        <div className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-6 transition-all cursor-pointer ${keyFile ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/30'}`}>
+                                            <span className={`material-symbols-outlined mb-3 text-4xl ${keyFile ? 'text-emerald-500' : 'text-gray-300 group-hover:text-emerald-500'}`}>key</span>
+                                            <p className="text-[10px] font-bold text-gray-500 text-center truncate max-w-full px-2">
+                                                {keyFile ? keyFile.name : 'Archivo .key'}
+                                            </p>
+                                            <input
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                type="file"
+                                                accept=".key"
+                                                onChange={(e) => setKeyFile(e.target.files?.[0] || null)}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-6 transition-all cursor-pointer ${keyFile ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/30'}`}>
-                                        <span className={`material-symbols-outlined mb-3 text-4xl ${keyFile ? 'text-emerald-500' : 'text-gray-300 group-hover:text-emerald-500'}`}>key</span>
-                                        <p className="text-[10px] font-bold text-gray-500 text-center truncate max-w-full px-2">
-                                            {keyFile ? keyFile.name : 'Archivo .key'}
-                                        </p>
-                                        <input
-                                            className="absolute inset-0 opacity-0 cursor-pointer"
-                                            type="file"
-                                            accept=".key"
-                                            onChange={(e) => setKeyFile(e.target.files?.[0] || null)}
-                                        />
-                                    </div>
-                                </div>
+                                )}
                                 <div>
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Contraseña de Clave Privada</label>
                                     <div className="relative">
@@ -590,6 +863,18 @@ export const DashboardPage = ({
                                     </div>
                                 </div>
                             </section>
+
+                            {isEditMode && (
+                                <section className="pt-8 border-t border-gray-100">
+                                    <button
+                                        onClick={handleDeleteClient}
+                                        className="w-full flex items-center justify-center gap-2 px-6 py-4 border-2 border-red-50 text-red-500 text-xs font-bold rounded-2xl hover:bg-red-50 hover:border-red-100 transition-all uppercase tracking-widest"
+                                    >
+                                        <span className="material-symbols-outlined text-lg">delete_forever</span>
+                                        Eliminar Cliente Permanente
+                                    </button>
+                                </section>
+                            )}
                         </div>
 
                         {/* Footer */}
@@ -600,9 +885,9 @@ export const DashboardPage = ({
                                 className="w-full py-5 bg-[#10B981] text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-[#059669] transition-all shadow-xl shadow-emerald-100 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <span className={`material-symbols-outlined text-xl ${submitting ? 'animate-spin' : ''}`}>
-                                    {submitting ? 'sync' : 'auto_mode'}
+                                    {submitting ? 'sync' : (isEditMode ? 'save' : 'auto_mode')}
                                 </span>
-                                {submitting ? 'Procesando...' : 'Registrar e iniciar sincronización'}
+                                {submitting ? 'Procesando...' : (isEditMode ? 'Guardar Cambios' : 'Registrar e iniciar sincronización')}
                             </button>
                         </div>
                     </div>

@@ -30,10 +30,10 @@ class InvoiceController extends Controller
             }
         }
         if ($request->filled('year')) {
-            $query->whereYear('fecha', $request->input('year'));
+            $query->whereYear('fecha_fiscal', $request->input('year'));
         }
         if ($request->filled('month')) {
-            $query->whereMonth('fecha', $request->input('month'));
+            $query->whereMonth('fecha_fiscal', $request->input('month'));
         }
         if ($request->filled('q')) {
             $q = $request->input('q');
@@ -52,7 +52,7 @@ class InvoiceController extends Controller
                 $query->where('es_cancelado', 0);
             }
         }
-        $query->orderBy('fecha', 'desc');
+        $query->orderBy('fecha_fiscal', 'desc');
         return response()->json($query->paginate($request->input('pageSize', 20)));
     }
 
@@ -61,7 +61,7 @@ class InvoiceController extends Controller
         $rfcUser = trim(strtoupper($request->input('rfc_user')));
         if (!$rfcUser)
             return response()->json([]);
-        return response()->json(Cfdi::selectRaw('substr(fecha, 1, 7) as period')->where(function ($q) use ($rfcUser) {
+        return response()->json(Cfdi::selectRaw('substr(fecha_fiscal, 1, 7) as period')->where(function ($q) use ($rfcUser) {
             $q->where('rfc_emisor', 'like', "$rfcUser%")->orWhere('rfc_receptor', 'like', "$rfcUser%");
         })->groupBy('period')->orderBy('period', 'desc')->pluck('period'));
     }

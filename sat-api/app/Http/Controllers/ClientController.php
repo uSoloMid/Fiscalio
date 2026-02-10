@@ -164,4 +164,28 @@ class ClientController extends Controller
 
         return response()->json($business);
     }
+
+    public function updateClient(Request $request, $id)
+    {
+        $request->validate([
+            'legal_name' => 'required|string',
+            'common_name' => 'nullable|string',
+            'ciec' => 'nullable|string',
+            'passphrase' => 'nullable|string',
+        ]);
+
+        $business = Business::findOrFail($id);
+        $business->update($request->only(['legal_name', 'common_name', 'ciec', 'passphrase']));
+
+        return response()->json($business);
+    }
+
+    public function destroy($id)
+    {
+        $business = Business::findOrFail($id);
+        // Podríamos querer borrar sus CFDIs y Requests asociados, o dejarlos como huérfanos.
+        // Por ahora, borrado simple.
+        $business->delete();
+        return response()->json(['success' => true]);
+    }
 }
