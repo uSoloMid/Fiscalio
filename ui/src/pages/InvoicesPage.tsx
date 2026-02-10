@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
@@ -31,6 +31,12 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
     const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional'>('invoices');
+
+    // Download XML State
+    const [showDownloadXmlModal, setShowDownloadXmlModal] = useState(false);
+    const [downloadTypes, setDownloadTypes] = useState<string[]>(['emitidas', 'recibidas']);
+    const [selectedDownloadPeriods, setSelectedDownloadPeriods] = useState<string[]>([]);
+    const [isDownloadingXml, setIsDownloadingXml] = useState(false);
 
 
 
@@ -543,6 +549,20 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                     <span className={`material-symbols-outlined text-sm ${verifying ? 'animate-spin' : ''}`}>fact_check</span>
                                     {verifying ? 'Verificando...' : 'Verificar Estatus'}
                                 </button>
+
+                                <button
+                                    onClick={async () => {
+                                        setShowDownloadXmlModal(true);
+                                        const p = await getPeriods(activeRfc);
+                                        setAvailablePeriods(p);
+                                        const current = `${year}-${month}`;
+                                        if (p.includes(current)) setSelectedDownloadPeriods([current]);
+                                    }}
+                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                                >
+                                    <span className="material-symbols-outlined text-sm">download_for_offline</span>
+                                    Descargar XMLs
+                                </button>
                             </div>
                         </div>
 
@@ -1041,6 +1061,127 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                         </div>
                     )}
                 </main>
+            )}
+            {/* Download XML Modal */}
+            {showDownloadXmlModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm shadow-2xl" onClick={() => !isDownloadingXml && setShowDownloadXmlModal(false)}></div>
+                    <div className="relative bg-white w-full max-w-xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
+                        <div className="p-10 border-b border-gray-100 flex items-center justify-between bg-white">
+                            <div>
+                                <h2 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Descargar Facturas XML</h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Configura tu exportación masiva</p>
+                            </div>
+                            <button onClick={() => setShowDownloadXmlModal(false)} className="p-3 hover:bg-gray-50 rounded-2xl transition-all">
+                                <span className="material-symbols-outlined text-gray-400">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-10 space-y-8 max-h-[500px] overflow-y-auto custom-scrollbar bg-white">
+                            {/* Filter Section */}
+                            <div className="space-y-4">
+                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">1. Selecciona el Tipo</h3>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {['emitidas', 'recibidas'].map(t => {
+                                        const isSelected = downloadTypes.includes(t);
+                                        return (
+                                            <button
+                                                key={t}
+                                                onClick={() => {
+                                                    if (isSelected) setDownloadTypes(downloadTypes.filter(s => s !== t));
+                                                    else setDownloadTypes([...downloadTypes, t]);
+                                                }}
+                                                className={`p-6 rounded-[28px] border-2 text-left transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50 shadow-inner' : 'border-gray-100 hover:border-gray-200 bg-white'}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300'}`}>
+                                                        {isSelected && <span className="material-symbols-outlined text-white text-xs">check</span>}
+                                                    </div>
+                                                    <div className={`text-sm font-black uppercase tracking-widest ${isSelected ? 'text-emerald-700' : 'text-gray-500'}`}>
+                                                        {t === 'emitidas' ? 'Emitidas (Ventas)' : 'Recibidas (Gastos)'}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Periods Section */}
+                            <div className="space-y-4">
+                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">2. Selecciona los Periodos</h3>
+                                <div className="grid grid-cols-3 gap-3">
+                                    {availablePeriods.length === 0 ? (
+                                        <div className="col-span-3 text-center py-10 text-gray-400 font-bold bg-gray-50 rounded-3xl border-2 border-dashed border-gray-100">No hay periodos disponibles</div>
+                                    ) : (
+                                        availablePeriods.map(p => {
+                                            const isSelected = selectedDownloadPeriods.includes(p);
+                                            return (
+                                                <button
+                                                    key={p}
+                                                    onClick={() => {
+                                                        if (isSelected) setSelectedDownloadPeriods(selectedDownloadPeriods.filter(s => s !== p));
+                                                        else setSelectedDownloadPeriods([...selectedDownloadPeriods, p]);
+                                                    }}
+                                                    className={`p-4 rounded-2xl border-2 text-center transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-gray-100 hover:border-gray-200 bg-white'}`}
+                                                >
+                                                    <div className={`text-xs font-black uppercase tracking-tight ${isSelected ? 'text-emerald-700' : 'text-gray-500'}`}>{p}</div>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-10 bg-gray-900 border-t border-gray-800 flex items-center justify-between">
+                            <div>
+                                <div className="text-white font-black text-lg">ZIP Listo</div>
+                                <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-0.5">
+                                    {selectedDownloadPeriods.length} periodos · {downloadTypes.length} tipos
+                                </div>
+                            </div>
+                            <button
+                                disabled={selectedDownloadPeriods.length === 0 || downloadTypes.length === 0 || isDownloadingXml}
+                                onClick={async () => {
+                                    try {
+                                        setIsDownloadingXml(true);
+                                        const pArray = selectedDownloadPeriods.map(s => {
+                                            const [y, m] = s.split('-');
+                                            return { year: parseInt(y), month: parseInt(m) };
+                                        });
+                                        const blob = await downloadProvisionalXmlZip(activeRfc, pArray, downloadTypes);
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = `Facturas_SAT_${activeRfc}.zip`;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                        setShowDownloadXmlModal(false);
+                                    } catch (err: any) {
+                                        alert(err.message);
+                                    } finally {
+                                        setIsDownloadingXml(false);
+                                    }
+                                }}
+                                className="bg-emerald-500 hover:bg-emerald-400 disabled:bg-gray-700 text-white px-10 py-5 rounded-[24px] text-[11px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-4 shadow-xl shadow-emerald-900/40"
+                            >
+                                {isDownloadingXml ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                                        Verificando SAT...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="material-symbols-outlined text-lg">download</span>
+                                        Comenzar Descarga
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

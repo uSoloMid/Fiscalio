@@ -58,6 +58,7 @@ Route::get('/provisional/summary', [\App\Http\Controllers\ProvisionalControlCont
 Route::get('/provisional/ppd-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getPpdExplorer']);
 Route::get('/provisional/rep-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getRepExplorer']);
 Route::get('/provisional/bucket-details', [\App\Http\Controllers\ProvisionalControlController::class , 'getBucketDetails']);
+Route::post('/provisional/download-xml', [\App\Http\Controllers\DownloadController::class , 'downloadXmlZip']);
 
 // Client routes
 Route::get('/clients', [ClientController::class , 'index']);

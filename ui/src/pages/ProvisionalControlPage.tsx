@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getProvisionalSummary, getBucketDetails } from '../services';
+import { getProvisionalSummary, getBucketDetails, getPeriods } from '../services';
 import { PpdExplorer, RepExplorer } from './ProvisionalExplorers';
 
 interface TaxBreakdown {
@@ -50,6 +50,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
     const [detailData, setDetailData] = useState<any[]>([]);
     const [detailLoading, setDetailLoading] = useState(false);
 
+
     useEffect(() => {
         setPeriod({ year: initialYear, month: initialMonth });
     }, [initialYear, initialMonth]);
@@ -99,10 +100,10 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ];
 
-    if (view === 'ppd_issued') return <PpdExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="issued" onBack={() => setView('summary')} />;
-    if (view === 'ppd_received') return <PpdExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="received" onBack={() => setView('summary')} />;
-    if (view === 'rep_issued') return <RepExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="issued" onBack={() => setView('summary')} />;
-    if (view === 'rep_received') return <RepExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="received" onBack={() => setView('summary')} />;
+    if (view === 'ppd_issued') return <PpdExplorer rfc={activeRfc} year={period.year} month={period.month} tipo="issued" onBack={() => setView('summary')} />;
+    if (view === 'ppd_received') return <PpdExplorer rfc={activeRfc} year={period.year} month={period.month} tipo="received" onBack={() => setView('summary')} />;
+    if (view === 'rep_issued') return <RepExplorer rfc={activeRfc} year={period.year} month={period.month} tipo="issued" onBack={() => setView('summary')} />;
+    if (view === 'rep_received') return <RepExplorer rfc={activeRfc} year={period.year} month={period.month} tipo="received" onBack={() => setView('summary')} />;
 
     const TableRow = ({ label, data, bucketPrefix, isMain = false }: { label: string, data: TaxBreakdown | undefined, bucketPrefix: string, isMain?: boolean }) => {
         if (!data) return null;
@@ -330,11 +331,11 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                             <div className="flex justify-between items-start mb-3">
                                                 <div className="min-w-0 flex-1 pr-4">
                                                     <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{item.uuid}</div>
-                                                    <div className="text-sm font-black text-gray-900 truncate">{item.name_receptor || item.name_emisor}</div>
+                                                    <div className="text-sm font-black text-gray-900 truncate">{item.nombre}</div>
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-sm font-black text-gray-900">{formatCurrency(item.total)}</div>
-                                                    <div className="text-[10px] font-bold text-gray-400">{new Date(item.fecha).toLocaleDateString()}</div>
+                                                    <div className="text-[10px] font-bold text-gray-400">{item.fecha}</div>
                                                 </div>
                                             </div>
                                             <div className="flex gap-4 border-t border-gray-100 pt-3">
@@ -358,6 +359,30 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                 </div>
                             )}
                         </div>
+
+                        {/* Footer Totals */}
+                        {!detailLoading && detailData.length > 0 && (
+                            <div className="p-8 bg-gray-900 text-white rounded-t-[40px] shadow-[0_-20px_40px_rgba(0,0,0,0.1)]">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Totales de Selección</div>
+                                    <div className="text-[10px] font-bold text-gray-500">{detailData.length} Comprobantes</div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-6">
+                                    <div>
+                                        <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">Subtotal</div>
+                                        <div className="text-lg font-black tracking-tight">{formatCurrency(detailData.reduce((acc, curr) => acc + (curr.subtotal || 0), 0))}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">IVA Total</div>
+                                        <div className="text-lg font-black tracking-tight">{formatCurrency(detailData.reduce((acc, curr) => acc + (curr.iva || 0), 0))}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Total MXN</div>
+                                        <div className="text-2xl font-black tracking-tighter text-emerald-400">{formatCurrency(detailData.reduce((acc, curr) => acc + (curr.total || 0), 0))}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -202,3 +202,15 @@ export function exportInvoicesZip(params: any) {
 
     window.open('/api/sat/bulk-pdf?' + query.toString(), '_blank');
 }
+export async function downloadProvisionalXmlZip(rfc: string, periods: { year: number, month: number }[], types: string[] = ['emitidas', 'recibidas']): Promise<Blob> {
+    const response = await fetch('/api/provisional/download-xml?rfc=' + rfc, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periods, types })
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Error downloading XML ZIP');
+    }
+    return response.blob();
+}
