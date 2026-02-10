@@ -9,8 +9,15 @@ import { TagsFilter } from '../components/TagsFilter';
 import { GroupByToggle } from '../components/GroupByToggle';
 import type { GroupByMode } from '../components/GroupByToggle';
 import { ClientCard } from '../components/ClientCard';
+import { RecentRequests } from '../components/RecentRequests';
 
-export const DashboardPage = ({ onSelectClient }: { onSelectClient: (rfc: string, name: string) => void }) => {
+export const DashboardPage = ({
+    onSelectClient,
+    onViewHistory
+}: {
+    onSelectClient: (rfc: string, name: string) => void,
+    onViewHistory: () => void
+}) => {
     // Data states
     const [clients, setClients] = useState<any[]>([]);
     const [groups, setGroups] = useState<any[]>([]);
@@ -283,6 +290,11 @@ export const DashboardPage = ({ onSelectClient }: { onSelectClient: (rfc: string
                                 <div className="h-2 w-full bg-gray-200 rounded-full"></div>
                             </div>
                         </div>
+                    </section>
+
+                    {/* Recent Requests Section */}
+                    <section>
+                        <RecentRequests onViewHistory={onViewHistory} />
                     </section>
 
                     {/* Clients Grid Section */}

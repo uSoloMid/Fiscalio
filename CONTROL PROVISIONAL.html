@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SAT Provisional Control Dashboard - Tech Solutions SA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style type="text/tailwindcss">
+        :root {
+            --primary: #10B981;
+            --primary-dark: #059669;
+            --background-light: #F9FAFB;
+            --surface-light: #FFFFFF;
+            --status-green: #10B981;
+            --status-red: #EF4444;
+            --status-orange: #F97316;
+            --status-yellow: #F59E0B;
+            --status-gray: #9CA3AF;
+            --accent-blue: #3B82F6;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-light);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .nav-item {
+            transition: all 0.2s;
+        }
+        .nav-item:hover {
+            background-color: #F3F4F6;
+            color: #111827;
+        }
+        .nav-item.active {
+            background-color: #ECFDF5;
+            color: var(--primary);
+            font-weight: 500;
+        }
+        .nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db; 
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af; 
+        }
+        .dashboard-card {
+            background: white;
+            border-radius: 1rem;
+            border: 1px solid #E5E7EB;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex overflow-hidden">
+<aside class="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 z-20">
+<div class="h-20 flex items-center px-6 border-b border-gray-100">
+<div class="flex items-center gap-2 text-[var(--primary)] font-bold text-xl tracking-tight">
+<span class="material-symbols-outlined text-3xl">account_balance_wallet</span>
+<span>Contalink</span>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
+<a class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm" href="#">
+<span class="material-symbols-outlined text-xl">dashboard</span>
+            Dashboard
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">receipt_long</span>
+            Facturas
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">error</span>
+            Errores
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">sync_alt</span>
+            Conciliación
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">account_balance</span>
+            Contabilidad
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">description</span>
+            Constancias
+        </a>
+<a class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm" href="#">
+<span class="material-symbols-outlined text-xl">bar_chart</span>
+            Reportes
+        </a>
+</nav>
+<div class="p-4 border-t border-gray-100">
+<button class="flex items-center gap-3 px-3 py-2 w-full rounded-xl hover:bg-gray-50 text-left transition-colors">
+<img alt="User Profile" class="w-8 h-8 object-cover rounded-full bg-gray-200" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdS4mbo7I7TjD55y5t8fpGT3OlaC5IBo56SJjhV5NtSYXXWDLI-9E9Td4E-JxbDIU6ZiRe0e7KQKMUAQg40HtCYCaIRkXWTnwjdj4aZ11W1Y23Y_0GFbtnZ0gtnQxk75MHWtcHzU_Y9Gc02LQ-Qcy_TOqB0V5XZ3OkkG8xkP602XkGnDCr5LBM5C6xsKnc5pUcI3e_av3DM6V9czGpTHs1wz840svHfdft3X90wo3OpE3UVQjmUH58roSJ8uEkV0rlTNT8WaNZh0A"/>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-gray-900 truncate">Contador Admin</p>
+<p class="text-xs text-gray-500 truncate">admin@firm.com</p>
+</div>
+<span class="material-symbols-outlined text-gray-400 text-lg">expand_more</span>
+</button>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-screen overflow-hidden bg-[var(--background-light)] relative">
+<header class="bg-white border-b border-gray-200 z-10 flex-shrink-0 h-20 px-8 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors text-sm font-medium group">
+<span class="material-symbols-outlined text-lg group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+                Cambiar cliente
+            </button>
+<div class="w-px h-10 bg-gray-200"></div>
+<div>
+<h1 class="text-2xl font-bold text-gray-900 leading-tight">Tech Solutions SA</h1>
+<p class="text-xs font-mono text-gray-500 tracking-wide mt-0.5">TSO123456ABC</p>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-xs font-semibold uppercase tracking-wide">Bajo control</span>
+</div>
+<button class="flex items-center gap-3 pl-4 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:border-[var(--primary)] hover:ring-1 hover:ring-emerald-500/20 transition-all shadow-sm">
+<span class="material-symbols-outlined text-[var(--primary)]">calendar_month</span>
+<span class="text-gray-900">Enero 2026</span>
+<span class="material-symbols-outlined text-gray-400">expand_more</span>
+</button>
+<div class="w-px h-6 bg-gray-200 mx-2"></div>
+<button class="p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-lg hover:bg-gray-50">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+</header>
+<div class="bg-white border-b border-gray-200 px-8 py-3 flex flex-col gap-3 sticky top-0 z-30 shadow-sm">
+<div class="flex items-center justify-between text-[11px] text-gray-400 border-b border-gray-50 pb-2 mb-1">
+<span class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px]">sync</span>
+                Última actualización: hace 12 min | Fuente: SAT
+            </span>
+</div>
+<div class="flex items-center gap-3 overflow-x-auto no-scrollbar">
+<button class="px-3 py-1 text-xs font-medium bg-gray-900 text-white rounded-full flex-shrink-0">General</button>
+<button class="px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 rounded-full transition-colors flex items-center gap-1.5 flex-shrink-0">
+                Nuevas desde última sync
+            </button>
+<button class="px-3 py-1 text-xs font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-full transition-colors flex items-center gap-1.5 flex-shrink-0">
+                Cambió estatus
+            </button>
+<div class="h-4 w-px bg-gray-200 mx-1 flex-shrink-0"></div>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full flex-shrink-0">IVA</button>
+<button class="px-3 py-1 text-xs font-medium bg-white text-gray-600 hover:bg-gray-50 border border-gray-200 rounded-full flex-shrink-0">ISR</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-8 space-y-8">
+<div class="dashboard-card p-8">
+<div class="mb-8">
+<h2 class="text-2xl font-bold text-gray-900">Control Provisional (SAT)</h2>
+<p class="text-sm text-gray-500 mt-1">Ingresos/Egresos del periodo considerando PUE, PPD y REP</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+<div class="space-y-6">
+<div class="flex flex-col">
+<span class="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-1">Ingresos Totales</span>
+<div class="flex items-baseline gap-2">
+<h3 class="text-5xl font-black text-gray-900">$1,450,230.00</h3>
+<span class="text-xs font-medium text-gray-400 uppercase">MXN</span>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-4">
+<div class="p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center group hover:border-emerald-200 transition-all cursor-default">
+<div>
+<p class="text-xs font-medium text-emerald-700">PUE emitidas (mes)</p>
+<p class="text-lg font-bold text-gray-900 mt-0.5">$845,000.00</p>
+</div>
+<span class="material-symbols-outlined text-emerald-200 text-3xl group-hover:text-emerald-400 transition-colors">receipt</span>
+</div>
+<div class="p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center group hover:border-emerald-200 transition-all cursor-default">
+<div>
+<p class="text-xs font-medium text-emerald-700">PPD cobradas por REP (mes)</p>
+<p class="text-lg font-bold text-gray-900 mt-0.5">$605,230.00</p>
+</div>
+<span class="material-symbols-outlined text-emerald-200 text-3xl group-hover:text-emerald-400 transition-colors">payments</span>
+</div>
+<div class="p-4 bg-white border border-gray-100 rounded-xl flex justify-between items-center group hover:shadow-sm transition-all cursor-default">
+<div>
+<p class="text-xs font-medium text-gray-500">PPD pendientes (Saldo)</p>
+<p class="text-lg font-bold text-gray-900 mt-0.5">$120,400.00</p>
+</div>
+<span class="material-symbols-outlined text-gray-200 text-3xl group-hover:text-gray-300 transition-colors">hourglass_top</span>
+</div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-emerald-200 text-emerald-700 rounded-xl text-sm font-semibold hover:bg-emerald-50 transition-colors">
+                        Ver PPD (Ingresos)
+                        <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+<div class="space-y-6">
+<div class="flex flex-col">
+<span class="text-sm font-semibold text-blue-600 uppercase tracking-wider mb-1">Egresos Totales</span>
+<div class="flex items-baseline gap-2">
+<h3 class="text-5xl font-black text-gray-900">$982,540.00</h3>
+<span class="text-xs font-medium text-gray-400 uppercase">MXN</span>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-4">
+<div class="p-4 bg-blue-50 border border-blue-100 rounded-xl flex justify-between items-center group hover:border-blue-200 transition-all cursor-default">
+<div>
+<p class="text-xs font-medium text-blue-700">PUE recibidas (mes)</p>
+<p class="text-lg font-bold text-gray-900 mt-0.5">$540,200.00</p>
+</div>
+<span class="material-symbols-outlined text-blue-200 text-3xl group-hover:text-blue-400 transition-colors">shopping_bag</span>
+</div>
+<div class="p-4 bg-blue-50 border border-blue-100 rounded-xl flex justify-between items-center group hover:border-blue-200 transition-all cursor-default">
+<div>
+<p class="text-xs font-medium text-blue-700">PPD pagadas por REP (mes)</p>
+<p class="text-lg font-bold text-gray-900 mt-0.5">$442,340.00</p>
+</div>
+<span class="material-symbols-outlined text-blue-200 text-3xl group-hover:text-blue-400 transition-colors">account_balance</span>
+</div>
+<div class="p-4 bg-white border border-gray-100 rounded-xl flex justify-between items-center group hover:shadow-sm transition-all cursor-default">
+<div>
+<p class="text-xs font-medium text-gray-500">PPD pendientes (Saldo)</p>
+<p class="text-lg font-bold text-gray-900 mt-0.5">$85,600.00</p>
+</div>
+<span class="material-symbols-outlined text-gray-200 text-3xl group-hover:text-gray-300 transition-colors">pending_actions</span>
+</div>
+</div>
+<button class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white border border-blue-200 text-blue-700 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-colors">
+                        Ver PPD (Egresos)
+                        <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="mt-12 pt-8 border-t border-gray-100">
+<h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Alertas de Conciliación</h4>
+<div class="flex flex-wrap gap-3">
+<div class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 border border-red-100 rounded-lg text-xs font-semibold">
+<span class="material-symbols-outlined text-sm">error</span>
+                        PPD sin REP (12)
+                    </div>
+<div class="flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-700 border border-yellow-100 rounded-lg text-xs font-semibold">
+<span class="material-symbols-outlined text-sm">link_off</span>
+                        REP sin relación válida (3)
+                    </div>
+<div class="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-700 border border-orange-100 rounded-lg text-xs font-semibold">
+<span class="material-symbols-outlined text-sm">money_off</span>
+                        Pagos exceden total (2)
+                    </div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="dashboard-card p-6 border-l-4 border-l-emerald-500">
+<h5 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Base de Impuestos</h5>
+<p class="text-2xl font-bold text-gray-900 mt-2">$467,690.00</p>
+<p class="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">trending_up</span>
+                    +5.2% vs mes anterior
+                </p>
+</div>
+<div class="dashboard-card p-6 border-l-4 border-l-blue-500">
+<h5 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Efectividad REP</h5>
+<p class="text-2xl font-bold text-gray-900 mt-2">94.8%</p>
+<p class="text-xs text-blue-600 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">check_circle</span>
+                    Meta: 98%
+                </p>
+</div>
+<div class="dashboard-card p-6 border-l-4 border-l-orange-500">
+<h5 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Diferencia SAT</h5>
+<p class="text-2xl font-bold text-gray-900 mt-2">$0.00</p>
+<p class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-xs">sync_saved_locally</span>
+                    Sincronizado
+                </p>
+</div>
+</div>
+</div>
+</main>
+
+</body></html>

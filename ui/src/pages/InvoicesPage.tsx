@@ -6,8 +6,8 @@ import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
 
 export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: string, onBack?: () => void, clientName?: string }) => {
-    const [year, setYear] = useState(new Date().getFullYear().toString());
-    const [month, setMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
+    const [year, setYear] = useState(localStorage.getItem('active_year') || new Date().getFullYear().toString());
+    const [month, setMonth] = useState(localStorage.getItem('active_month') || (new Date().getMonth() + 1).toString().padStart(2, '0'));
     const [filterType, setFilterType] = useState<'all' | 'emitidas' | 'recibidas' | 'canceladas'>('all');
     const [cfdiTipo, setCfdiTipo] = useState<'I' | 'E' | 'N' | 'P' | 'T' | ''>('I');
     const [search, setSearch] = useState('');
@@ -56,13 +56,15 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                 const periods = await getPeriods(activeRfc);
                 setAvailablePeriods(periods);
 
-                // 2. Auto-select first period (latest) if available
-                if (periods.length > 0) {
+                // 2. Auto-select first period (latest) if available AND no previous selection
+                if (periods.length > 0 && !localStorage.getItem('active_year')) {
                     const latest = periods[0]; // '2025-01'
                     const y = latest.substring(0, 4);
                     const m = latest.substring(5, 7);
                     setYear(y);
                     setMonth(m);
+                    localStorage.setItem('active_year', y);
+                    localStorage.setItem('active_month', m);
                 }
             } catch (e) {
                 console.error("Failed to load periods", e);
@@ -255,8 +257,12 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
         if (val) {
-            setYear(val.substring(0, 4));
-            setMonth(val.substring(5, 7));
+            const y = val.substring(0, 4);
+            const m = val.substring(5, 7);
+            setYear(y);
+            setMonth(m);
+            localStorage.setItem('active_year', y);
+            localStorage.setItem('active_month', m);
         }
     };
 
@@ -348,6 +354,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                         activeRfc={activeRfc}
                         clientName={clientName || activeClientName || activeRfc}
                         onBack={() => setCurrentView('invoices')}
+                        initialYear={parseInt(year)}
+                        initialMonth={parseInt(month)}
+                        onPeriodChange={(y, m) => {
+                            setYear(y.toString());
+                            setMonth(m.toString().padStart(2, '0'));
+                            localStorage.setItem('active_year', y.toString());
+                            localStorage.setItem('active_month', m.toString().padStart(2, '0'));
+                        }}
                     />
                 </div>
             ) : (

@@ -184,6 +184,13 @@ export async function listRepExplorer(params: any): Promise<any> {
     return response.json();
 }
 
+export async function getBucketDetails(params: any): Promise<any> {
+    const query = new URLSearchParams(params);
+    const response = await fetch('/api/provisional/bucket-details?' + query.toString());
+    if (!response.ok) throw new Error('Error fetching bucket details');
+    return response.json();
+}
+
 export function exportInvoicesZip(params: any) {
     const query = new URLSearchParams();
     if (params.rfc_user) query.append('rfc_user', params.rfc_user);

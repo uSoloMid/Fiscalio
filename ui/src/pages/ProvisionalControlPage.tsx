@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getProvisionalSummary } from '../services';
+import { getProvisionalSummary, getBucketDetails } from '../services';
 import { PpdExplorer, RepExplorer } from './ProvisionalExplorers';
 
 interface TaxBreakdown {
@@ -16,25 +16,43 @@ interface SummaryData {
         total_efectivo: number;
         subtotal: TaxBreakdown;
         iva: TaxBreakdown;
+        retenciones: TaxBreakdown;
         total: TaxBreakdown;
     };
     egresos: {
         total_efectivo: number;
         subtotal: TaxBreakdown;
         iva: TaxBreakdown;
+        retenciones: TaxBreakdown;
         total: TaxBreakdown;
     };
     alertas: Array<{ type: string, message: string }>;
 }
 
-export function ProvisionalControlPage({ activeRfc, clientName, onBack }: { activeRfc: string, clientName: string, onBack: () => void }) {
+export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialYear, initialMonth, onPeriodChange }: {
+    activeRfc: string,
+    clientName: string,
+    onBack: () => void,
+    initialYear: number,
+    initialMonth: number,
+    onPeriodChange: (year: number, month: number) => void
+}) {
     const [view, setView] = useState<'summary' | 'ppd_issued' | 'ppd_received' | 'rep_issued' | 'rep_received'>('summary');
     const [summary, setSummary] = useState<SummaryData | null>(null);
     const [loading, setLoading] = useState(true);
     const [period, setPeriod] = useState({
-        year: new Date().getFullYear(),
-        month: new Date().getMonth() + 1
+        year: initialYear,
+        month: initialMonth
     });
+
+    // Bucket Details State
+    const [detailBucket, setDetailBucket] = useState<string | null>(null);
+    const [detailData, setDetailData] = useState<any[]>([]);
+    const [detailLoading, setDetailLoading] = useState(false);
+
+    useEffect(() => {
+        setPeriod({ year: initialYear, month: initialMonth });
+    }, [initialYear, initialMonth]);
 
     const fetchSummary = async () => {
         try {
@@ -54,6 +72,24 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack }: { acti
         }
     }, [activeRfc, period]);
 
+    const loadBucketDetail = async (bucket: string) => {
+        setDetailBucket(bucket);
+        setDetailLoading(true);
+        try {
+            const data = await getBucketDetails({
+                rfc: activeRfc,
+                year: period.year,
+                month: period.month,
+                bucket
+            });
+            setDetailData(data);
+        } catch (error) {
+            console.error("Error loading bucket details", error);
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
     };
@@ -63,58 +99,85 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack }: { acti
         "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
     ];
 
-    if (loading && !summary) {
-        return <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-        </div>;
-    }
+    if (view === 'ppd_issued') return <PpdExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="issued" onBack={() => setView('summary')} />;
+    if (view === 'ppd_received') return <PpdExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="received" onBack={() => setView('summary')} />;
+    if (view === 'rep_issued') return <RepExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="issued" onBack={() => setView('summary')} />;
+    if (view === 'rep_received') return <RepExplorer activeRfc={activeRfc} year={period.year} month={period.month} tipo="received" onBack={() => setView('summary')} />;
 
-    const TableRow = ({ label, breakdown, highlight = false, colorClass = "emerald" }: { label: string, breakdown: TaxBreakdown, highlight?: boolean, colorClass?: string }) => (
-        <tr className={`border-b border-gray-50 transition-colors hover:bg-gray-50/50 ${highlight ? 'bg-gray-50/30' : ''}`}>
-            <td className="py-4 pl-4 pr-3 text-sm font-bold text-gray-900">{label}</td>
-            <td className="py-4 px-3 text-sm text-gray-600 text-right">{formatCurrency(breakdown.pue)}</td>
-            <td className="py-4 px-3 text-sm text-gray-600 text-right">{formatCurrency(breakdown.ppd)}</td>
-            <td className={`py-4 px-3 text-sm font-black text-right ${colorClass === 'emerald' ? 'text-emerald-600' : 'text-blue-600'}`}>{formatCurrency(breakdown.suma_devengado)}</td>
-            <td className="py-4 px-3 text-sm font-bold text-amber-600 text-right">{formatCurrency(breakdown.pendiente)}</td>
-        </tr>
-    );
+    const TableRow = ({ label, data, bucketPrefix, isMain = false }: { label: string, data: TaxBreakdown | undefined, bucketPrefix: string, isMain?: boolean }) => {
+        if (!data) return null;
+        if (label.includes("Retenciones") && data.pue === 0 && data.ppd === 0 && data.rep === 0) return null;
 
-    const CashRow = ({ label, breakdown, colorClass = "emerald" }: { label: string, breakdown: TaxBreakdown, colorClass?: string }) => (
-        <tr className="border-b border-gray-50 bg-emerald-50/10">
-            <td className="py-4 pl-4 pr-3 text-sm font-black text-gray-900">{label} (Cobrado)</td>
-            <td className="py-4 px-3 text-sm text-gray-600 text-right">{formatCurrency(breakdown.pue)}</td>
-            <td className="py-4 px-3 text-sm text-gray-600 text-right">{formatCurrency(breakdown.rep)}</td>
-            <td className={`py-4 px-3 text-sm font-black text-right ${colorClass === 'emerald' ? 'text-emerald-700' : 'text-blue-700'}`}>{formatCurrency(breakdown.suma_efectivo)}</td>
-            <td className="py-4 px-3 text-sm text-gray-400 text-right">---</td>
-        </tr>
-    );
+        return (
+            <tr className={`group transition-colors ${isMain ? 'bg-gray-50/50' : 'hover:bg-gray-50'}`}>
+                <td className="py-5 px-8">
+                    <div className={`text-sm ${isMain ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}`}>{label}</div>
+                </td>
+                <td className="py-5 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pue`)} className="text-sm font-semibold text-gray-700 hover:text-emerald-600 transition-colors">
+                        {formatCurrency(data.pue)}
+                    </button>
+                </td>
+                <td className="py-5 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_ppd`)} className="text-sm font-semibold text-gray-400 hover:text-emerald-600 transition-colors">
+                        {formatCurrency(data.ppd)}
+                    </button>
+                </td>
+                <td className="py-5 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_rep`)} className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                        {formatCurrency(data.rep)}
+                    </button>
+                </td>
+                <td className="py-5 px-8 text-right">
+                    <div className="text-sm font-black text-emerald-600">
+                        {formatCurrency(data.suma_efectivo)}
+                    </div>
+                </td>
+                <td className="py-5 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pendiente`)} className="text-sm font-semibold text-orange-500 hover:text-orange-700 transition-colors">
+                        {formatCurrency(data.pendiente)}
+                    </button>
+                </td>
+            </tr>
+        );
+    };
 
     return (
-        <div className="h-full bg-gray-50 flex flex-col font-['Inter'] overflow-hidden">
+        <div className="h-full bg-gray-50 flex flex-col font-['Inter'] relative overflow-hidden">
             {/* Header */}
-            <header className="bg-white border-b border-gray-100 flex-shrink-0">
+            <header className="bg-white border-b border-gray-100 flex-shrink-0 z-10">
                 <div className="h-20 flex items-center justify-between px-10">
-                    <div className="flex items-center gap-4">
-                        <button onClick={onBack} className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-gray-600 transition-all">
-                            <span className="material-symbols-outlined">arrow_back</span>
+                    <div className="flex items-center gap-6">
+                        <button onClick={onBack} className="p-3 hover:bg-gray-50 rounded-2xl transition-all group">
+                            <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-900 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
+                            </svg>
                         </button>
                         <div>
-                            <h1 className="text-xl font-bold text-gray-900">{clientName}</h1>
-                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none">{activeRfc}</p>
+                            <div className="text-xs font-black text-emerald-600 uppercase tracking-[0.2em] mb-0.5">Control Fiscal</div>
+                            <h1 className="text-xl font-black text-gray-900 tracking-tight">Provisional SAT <span className="text-gray-300 mx-2">/</span> <span className="text-gray-500">{clientName}</span></h1>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-4">
                         <select
                             value={period.month}
-                            onChange={(e) => setPeriod({ ...period, month: parseInt(e.target.value) })}
+                            onChange={(e) => {
+                                const m = parseInt(e.target.value);
+                                setPeriod({ ...period, month: m });
+                                onPeriodChange(period.year, m);
+                            }}
                             className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
                         >
                             {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                         </select>
                         <select
                             value={period.year}
-                            onChange={(e) => setPeriod({ ...period, year: parseInt(e.target.value) })}
+                            onChange={(e) => {
+                                const y = parseInt(e.target.value);
+                                setPeriod({ ...period, year: y });
+                                onPeriodChange(y, period.month);
+                            }}
                             className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
                         >
                             {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
@@ -123,32 +186,22 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack }: { acti
                 </div>
             </header>
 
-            <main className="flex-1 p-6 lg:p-10 overflow-y-auto overflow-x-auto min-h-0 custom-scrollbar">
-                <div className="max-w-[1600px] mx-auto space-y-10 pb-10">
-                    {/* Title Section */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-                        <div>
-                            <h2 className="text-3xl font-black text-gray-900 tracking-tight">Control Provisional (SAT)</h2>
-                            <p className="text-sm text-gray-500 font-medium mt-1">
-                                Análisis de Base ISR e IVA para Declaración Provisional
-                            </p>
+            <main className="flex-1 p-6 lg:p-10 overflow-y-auto custom-scrollbar">
+                <div className="max-w-[1600px] mx-auto space-y-10 lg:space-y-16">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center py-32 space-y-6">
+                            <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+                            <div className="text-sm font-bold text-gray-400 uppercase tracking-widest">Calculando balances...</div>
                         </div>
-                        <div className="bg-emerald-50 text-emerald-600 px-4 py-2 rounded-2xl flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Auditoría Activa</span>
-                        </div>
-                    </div>
-
-                    {view === 'summary' ? (
+                    ) : (
                         <>
-                            {/* Summary Grid */}
-                            <div className="grid grid-cols-1 gap-10">
-                                {/* Ingresos Section */}
+                            {/* Ingresos Section */}
+                            <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
                                 <div className="bg-white rounded-[40px] p-1 shadow-sm border border-gray-100 overflow-hidden">
                                     <div className="px-6 lg:px-10 py-8 bg-emerald-600">
                                         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
                                             <div className="min-w-0 flex-1">
-                                                <div className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.2em] mb-1 truncate">Ingresos Efectivizados (IVA Realizado / Cobro)</div>
+                                                <div className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.2em] mb-1 truncate">Ingresos Efectivizados (Cobro Real)</div>
                                                 <div className="text-4xl lg:text-5xl font-black text-white tracking-tighter truncate">
                                                     {formatCurrency(summary?.ingresos.total_efectivo || 0)}
                                                     <span className="text-lg text-emerald-100/50 ml-2 font-medium tracking-normal">MXN</span>
@@ -162,111 +215,152 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack }: { acti
                                     </div>
 
                                     <div className="overflow-x-auto">
-                                        <div className="p-6 lg:p-10 min-w-[800px]">
-                                            <table className="w-full text-left">
-                                                <thead>
-                                                    <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                                                        <th className="pb-4 pl-4">Concepto (Ingresos)</th>
-                                                        <th className="pb-4 px-3 text-right">PUE (Mes)</th>
-                                                        <th className="pb-4 px-3 text-right">PPD (Mes)</th>
-                                                        <th className="pb-4 px-3 text-right text-emerald-600">Suma Devengado (ISR)</th>
-                                                        <th className="pb-4 px-3 text-right text-amber-600">Pendiente Final</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {summary && (
-                                                        <>
-                                                            <TableRow label="Base ISR (Subtotal)" breakdown={summary.ingresos.subtotal} />
-                                                            <TableRow label="IVA Facturado" breakdown={summary.ingresos.iva} />
-                                                            <TableRow label="Total Facturado" breakdown={summary.ingresos.total} highlight={true} />
-                                                            <tr className="h-8"></tr>
-                                                            <CashRow label="IVA Realizado" breakdown={summary.ingresos.iva} />
-                                                            <CashRow label="Total Efectivo" breakdown={summary.ingresos.total} />
-                                                        </>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                                            <thead>
+                                                <tr className="border-b border-gray-100">
+                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto (Ingresos)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PUE (Mes)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PPD (Mes)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-blue-500 uppercase tracking-widest text-right">REP (Mes)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-right">Suma Efectivo (Cobrado)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-orange-500 uppercase tracking-widest text-right">Pendiente Final</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {summary && (
+                                                    <>
+                                                        <TableRow label="Base Gravable (Subtotal)" data={summary.ingresos.subtotal} bucketPrefix="ingresos_subtotal" />
+                                                        <TableRow label="IVA Facturado" data={summary.ingresos.iva} bucketPrefix="ingresos_iva" />
+                                                        <TableRow label="Retenciones" data={summary.ingresos.retenciones} bucketPrefix="ingresos_retenciones" />
+                                                        <TableRow label="Total Facturado" data={summary.ingresos.total} bucketPrefix="ingresos_total" isMain />
+                                                    </>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
+                            </section>
 
-                                {/* Egresos Section */}
+                            {/* Egresos Section */}
+                            <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
                                 <div className="bg-white rounded-[40px] p-1 shadow-sm border border-gray-100 overflow-hidden">
                                     <div className="px-6 lg:px-10 py-8 bg-blue-600">
                                         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                                            <div>
-                                                <div className="text-[10px] font-black text-blue-100 uppercase tracking-[0.2em] mb-1">Egresos Efectivizados (Flujo de Efectivo)</div>
-                                                <div className="text-4xl lg:text-5xl font-black text-white tracking-tighter">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-[10px] font-black text-blue-100 uppercase tracking-[0.2em] mb-1 truncate">Egresos Efectivizados (Deducciones Reales)</div>
+                                                <div className="text-4xl lg:text-5xl font-black text-white tracking-tighter truncate">
                                                     {formatCurrency(summary?.egresos.total_efectivo || 0)}
                                                     <span className="text-lg text-blue-100/50 ml-2 font-medium tracking-normal">MXN</span>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 lg:gap-4 w-full lg:w-auto">
-                                                <button onClick={() => setView('ppd_received')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all">Explorador PPD</button>
-                                                <button onClick={() => setView('rep_received')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all">Explorador REP</button>
+                                            <div className="flex flex-wrap gap-2 lg:gap-4 w-full lg:w-auto">
+                                                <button onClick={() => setView('ppd_received')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">Explorador PPD</button>
+                                                <button onClick={() => setView('rep_received')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">Explorador REP</button>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="overflow-x-auto">
-                                        <div className="p-6 lg:p-10 min-w-[800px]">
-                                            <table className="w-full text-left">
-                                                <thead>
-                                                    <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                                                        <th className="pb-4 pl-4">Concepto (Egresos)</th>
-                                                        <th className="pb-4 px-3 text-right">PUE (Mes)</th>
-                                                        <th className="pb-4 px-3 text-right">PPD (Mes)</th>
-                                                        <th className="pb-4 px-3 text-right text-blue-600">Suma Devengado (Ded.)</th>
-                                                        <th className="pb-4 px-3 text-right text-amber-600">Pendiente Final</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {summary && (
-                                                        <>
-                                                            <TableRow label="Base Deducible (Subtotal)" breakdown={summary.egresos.subtotal} colorClass="blue" />
-                                                            <TableRow label="IVA Facturado" breakdown={summary.egresos.iva} colorClass="blue" />
-                                                            <TableRow label="Total Facturado" breakdown={summary.egresos.total} highlight={true} colorClass="blue" />
-                                                            <tr className="h-8"></tr>
-                                                            <CashRow label="IVA Realizado" breakdown={summary.egresos.iva} colorClass="blue" />
-                                                            <CashRow label="Total Efectivo" breakdown={summary.egresos.total} colorClass="blue" />
-                                                        </>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                                            <thead>
+                                                <tr className="border-b border-gray-100">
+                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto (Egresos)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PUE (Mes)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PPD (Mes)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-blue-500 uppercase tracking-widest text-right">REP (Mes)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-right">Suma Efectivo (Deducible)</th>
+                                                    <th className="py-6 px-8 text-[10px] font-black text-orange-500 uppercase tracking-widest text-right">Pendiente Final</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {summary && (
+                                                    <>
+                                                        <TableRow label="Base Deducible (Subtotal)" data={summary.egresos.subtotal} bucketPrefix="egresos_subtotal" />
+                                                        <TableRow label="IVA Acreditable (Facturado)" data={summary.egresos.iva} bucketPrefix="egresos_iva" />
+                                                        <TableRow label="Retenciones" data={summary.egresos.retenciones} bucketPrefix="egresos_retenciones" />
+                                                        <TableRow label="Total Facturado" data={summary.egresos.total} bucketPrefix="egresos_total" isMain />
+                                                    </>
+                                                )}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-                            </div>
-
-                            {/* Alerts Section */}
-                            {summary?.alertas && summary.alertas.length > 0 && (
-                                <div className="space-y-4">
-                                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Riesgos y Discrepancias</h3>
-                                    <div className="flex flex-wrap gap-4">
-                                        {summary.alertas.map((alerta: { type: string, message: string }, i: number) => (
-                                            <div key={i} className={`flex items-center gap-3 px-6 py-3 rounded-2xl shadow-sm border font-bold text-[10px] uppercase tracking-wider ${alerta.type === 'danger' ? 'bg-red-50 border-red-100 text-red-600' : 'bg-amber-50 border-amber-100 text-amber-600'
-                                                }`}>
-                                                <span className="material-symbols-outlined text-[18px]">
-                                                    {alerta.type === 'danger' ? 'report' : 'warning_amber'}
-                                                </span>
-                                                {alerta.message}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            </section>
                         </>
-                    ) : view === 'ppd_issued' ? (
-                        <PpdExplorer rfc={activeRfc} tipo="issued" year={period.year} month={period.month} onBack={() => setView('summary')} />
-                    ) : view === 'ppd_received' ? (
-                        <PpdExplorer rfc={activeRfc} tipo="received" year={period.year} month={period.month} onBack={() => setView('summary')} />
-                    ) : view === 'rep_issued' ? (
-                        <RepExplorer rfc={activeRfc} tipo="issued" year={period.year} month={period.month} onBack={() => setView('summary')} />
-                    ) : (
-                        <RepExplorer rfc={activeRfc} tipo="received" year={period.year} month={period.month} onBack={() => setView('summary')} />
                     )}
                 </div>
             </main>
+
+            {/* Sidebar Details Drawer */}
+            {detailBucket && (
+                <div className="fixed inset-0 z-50 flex justify-end">
+                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setDetailBucket(null)}></div>
+                    <div className="relative w-full max-w-2xl bg-white h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+                        <div className="p-8 border-b border-gray-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Desglose Detallado</h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{detailBucket.replace(/_/g, ' ')}</p>
+                            </div>
+                            <button onClick={() => setDetailBucket(null)} className="p-3 hover:bg-gray-50 rounded-2xl transition-all group">
+                                <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            {detailLoading ? (
+                                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                                    <div className="w-8 h-8 border-3 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cargando CFDIs...</div>
+                                </div>
+                            ) : detailData.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
+                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                    </div>
+                                    <p className="text-sm font-bold text-gray-400">No se encontraron comprobantes para este rubro.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {detailData.map((item, idx) => (
+                                        <div key={idx} className="p-5 bg-gray-50 hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-emerald-100 rounded-[24px] group">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="min-w-0 flex-1 pr-4">
+                                                    <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{item.uuid}</div>
+                                                    <div className="text-sm font-black text-gray-900 truncate">{item.name_receptor || item.name_emisor}</div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <div className="text-sm font-black text-gray-900">{formatCurrency(item.total)}</div>
+                                                    <div className="text-[10px] font-bold text-gray-400">{new Date(item.fecha).toLocaleDateString()}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-4 border-t border-gray-100 pt-3">
+                                                <div className="text-[9px]">
+                                                    <span className="font-bold text-gray-400 uppercase tracking-tighter block">Subtotal</span>
+                                                    <span className="font-black text-gray-700">{formatCurrency(item.subtotal)}</span>
+                                                </div>
+                                                <div className="text-[9px]">
+                                                    <span className="font-bold text-gray-400 uppercase tracking-tighter block">IVA</span>
+                                                    <span className="font-black text-gray-700">{formatCurrency(item.iva)}</span>
+                                                </div>
+                                                {item.retenciones > 0 && (
+                                                    <div className="text-[9px]">
+                                                        <span className="font-bold text-orange-400 uppercase tracking-tighter block">Ret.</span>
+                                                        <span className="font-black text-orange-600">{formatCurrency(item.retenciones)}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

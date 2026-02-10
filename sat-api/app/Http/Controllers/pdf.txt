@@ -1,0 +1,25 @@
+    public function downloadPdf($uuid)
+    {
+        $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
+        if (!Storage::exists($cfdi->path_xml)) return response()->json(['error' => 'XML no encontrado'], 404);
+        $xmlContent = Storage::get($cfdi->path_xml);
+        $xml = simplexml_load_string($xmlContent);
+        $ns = $xml->getNamespaces(true);
+        $xml->registerXPathNamespace('c', $ns['cfdi'] ?? 'http://www.sat.gob.mx/cfd/4');
+        $xml->registerXPathNamespace('tfd', $ns['tfd'] ?? 'http://www.sat.gob.mx/TimbreFiscalDigital');
+        $data = []; $data['uuid'] = (string)$uuid;
+        $data['total'] = (string)$xml['Total'];
+        $emisorArr = $xml->xpath('//c:Emisor');
+        if (count($emisorArr) > 0) { $emisor = $emisorArr[0]; $data['emisor']['rfc'] = (string)$emisor['Rfc']; }
+        $receptorArr = $xml->xpath('//c:Receptor');
+        if (count($receptorArr) > 0) { $receptor = $receptorArr[0]; $data['receptor']['rfc'] = (string)$receptor['Rfc']; }
+        $tfdArr = $xml->xpath('//tfd:TimbreFiscalDigital');
+        if (count($tfdArr) > 0) {
+            $tfd = $tfdArr[0];
+            $data['sello_cfd'] = (string)$tfd['SelloCFD'];
+            $qrString = "https://verificacfdi.facturaelectronica.sat.gob.mx/default.aspx?id={$data['uuid']}&re={$data['emisor']['rfc']}&rr={$data['receptor']['rfc']}&tt={$data['total']}&fe=".substr($data['sello_cfd'], -8);
+            $qrCode = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(200)->generate($qrString));
+        } else { $qrCode = ''; }
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.cfdi', ['cfdi' => $data, 'qrCode' => $qrCode]);
+        return $pdf->stream('factura-'.$uuid.'.pdf');
+    }
