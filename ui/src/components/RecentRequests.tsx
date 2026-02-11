@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getRecentRequests } from '../services';
+import { getRecentRequests, deleteSatRequest } from '../services';
 
 interface SatRequest {
     id: string;
@@ -84,6 +84,19 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
         return formatDate(dateStr);
     };
 
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm('¿Estás seguro de eliminar esta solicitud?')) return;
+
+        try {
+            await deleteSatRequest(id);
+            await fetchRequests();
+        } catch (error) {
+            console.error('Error deleting request', error);
+            alert('Error al eliminar la solicitud');
+        }
+    };
+
     if (loading && requests.length === 0) {
         return <div className="p-4 text-center text-gray-500 font-medium">Cargando solicitudes...</div>;
     }
@@ -142,9 +155,9 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
                                     <div className="w-24 bg-gray-100 rounded-full h-1.5 mb-1 overflow-hidden">
                                         <div
                                             className={`h-1.5 rounded-full transition-all duration-1000 ${req.state === 'completed' ? 'bg-emerald-500 w-full' :
-                                                    req.state === 'failed' ? 'bg-red-500 w-full' :
-                                                        req.state === 'downloading' || req.state === 'extracting' ? 'bg-orange-500 w-[75%]' :
-                                                            req.state === 'polling' ? 'bg-yellow-500 w-[30%]' : 'bg-gray-300 w-[10%]'
+                                                req.state === 'failed' ? 'bg-red-500 w-full' :
+                                                    req.state === 'downloading' || req.state === 'extracting' ? 'bg-orange-500 w-[75%]' :
+                                                        req.state === 'polling' ? 'bg-yellow-500 w-[30%]' : 'bg-gray-300 w-[10%]'
                                                 } ${(req.state !== 'completed' && req.state !== 'failed') ? 'animate-pulse' : ''}`}
                                         ></div>
                                     </div>
@@ -159,9 +172,18 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
                                     {formatTimeAgo(req.updated_at)}
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                    <button className="text-gray-400 hover:text-gray-600 p-1">
-                                        👁️
-                                    </button>
+                                    <div className="flex justify-end gap-2">
+                                        <button className="text-gray-400 hover:text-gray-600 p-1" title="Ver detalles">
+                                            👁️
+                                        </button>
+                                        <button
+                                            onClick={(e) => handleDelete(req.id, e)}
+                                            className="text-red-300 hover:text-red-600 p-1 transition-colors"
+                                            title="Eliminar solicitud"
+                                        >
+                                            <span className="material-symbols-outlined text-sm">delete</span>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

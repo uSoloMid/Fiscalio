@@ -43,44 +43,52 @@ class XmlProcessorService
         $xmlsProcesados = 0;
         $files = Storage::allFiles($tmpDir);
 
-        foreach ($files as $file) {
-            if (!str_ends_with(strtolower($file), '.xml')) {
-                continue;
-            }
-
-            try {
-                $content = Storage::get($file);
-                $data = $this->parseCfdi($content);
-
-                if (!$data) {
+        DB::beginTransaction();
+        try {
+            foreach ($files as $file) {
+                if (!str_ends_with(strtolower($file), '.xml')) {
                     continue;
                 }
 
-                // Clasificar
-                $tipo = 'otros';
-                if (strtoupper($data['rfc_emisor']) === $rfcCliente) {
-                    $tipo = 'emitidas';
+                try {
+                    $content = Storage::get($file);
+                    $data = $this->parseCfdi($content);
+
+                    if (!$data) {
+                        continue;
+                    }
+
+                    // Clasificar
+                    $tipo = 'otros';
+                    if (strtoupper($data['rfc_emisor']) === $rfcCliente) {
+                        $tipo = 'emitidas';
+                    }
+                    elseif (strtoupper($data['rfc_receptor']) === $rfcCliente) {
+                        $tipo = 'recibidas';
+                    }
+
+                    // Mover archivo final
+                    $year = $data['fecha']->format('Y');
+                    $month = $data['fecha']->format('m');
+                    $finalPath = "sat/xml/$rfcCliente/$year/$tipo/$month/" . $data['uuid'] . ".xml";
+
+                    Storage::put($finalPath, $content);
+
+                    // Indexar DB (Idempotencia)
+                    $this->indexCfdi($data, $finalPath, $requestId);
+
+                    $xmlsProcesados++;
+
                 }
-                elseif (strtoupper($data['rfc_receptor']) === $rfcCliente) {
-                    $tipo = 'recibidas';
+                catch (Exception $e) {
+                    Log::error("Error procesando XML $file: " . $e->getMessage());
                 }
-
-                // Mover archivo final
-                $year = $data['fecha']->format('Y');
-                $month = $data['fecha']->format('m');
-                $finalPath = "sat/xml/$rfcCliente/$year/$tipo/$month/" . $data['uuid'] . ".xml";
-
-                Storage::put($finalPath, $content);
-
-                // Indexar DB (Idempotencia)
-                $this->indexCfdi($data, $finalPath, $requestId);
-
-                $xmlsProcesados++;
-
             }
-            catch (Exception $e) {
-                Log::error("Error procesando XML $file: " . $e->getMessage());
-            }
+            DB::commit();
+        }
+        catch (Exception $e) {
+            DB::rollBack();
+            Log::error("Error fatal en transacción de procesamiento: " . $e->getMessage());
         }
 
         // Limpieza

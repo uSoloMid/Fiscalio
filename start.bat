@@ -1,0 +1,3 @@
+@echo off
+echo Iniciando Fiscalio desde CMD...
+powershell -ExecutionPolicy Bypass -File start_dev.ps1

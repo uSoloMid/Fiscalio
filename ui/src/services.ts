@@ -164,6 +164,13 @@ export async function listSatRequests(params: any = {}): Promise<any> {
     return response.json();
 }
 
+export async function deleteSatRequest(id: string): Promise<void> {
+    const response = await fetch('/api/sat/requests/' + id, {
+        method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Error deleting request');
+}
+
 export async function getProvisionalSummary(rfc: string, year: number, month: number): Promise<any> {
     const response = await fetch(`/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
     if (!response.ok) throw new Error('Error fetching summary');

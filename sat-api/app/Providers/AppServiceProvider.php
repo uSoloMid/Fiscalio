@@ -1,6 +1,7 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1)
+;
 
 namespace App\Providers;
 
@@ -15,7 +16,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->extend(FakerGenerator::class, function (FakerGenerator $generator) {
+        $this->app->extend(FakerGenerator::class , function (FakerGenerator $generator) {
             $generator->addProvider(new RfcFaker());
             return $generator;
         });
@@ -26,5 +27,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (config('database.default') === 'sqlite') {
+            try {
+                \Illuminate\Support\Facades\DB::statement('PRAGMA journal_mode=WAL;');
+                \Illuminate\Support\Facades\DB::statement('PRAGMA busy_timeout=5000;');
+                \Illuminate\Support\Facades\DB::statement('PRAGMA synchronous=NORMAL;');
+            }
+            catch (\Exception $e) {
+            // Ignore if DB not ready
+            }
+        }
     }
 }

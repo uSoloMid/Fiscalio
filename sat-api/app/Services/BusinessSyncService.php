@@ -66,7 +66,10 @@ class BusinessSyncService
                     $startDate = Carbon::parse($latestDate)->subDays(15)->startOfDay();
                 }
 
-                $endDate = now()->endOfDay();
+                $endDate = now()->subMinutes(5);
+                // Ensure endDate is not future. Although now() is current, 
+                // SAT sometimes is picky with seconds or microseconds.
+                // endOfDay() could definitely jump to tomorrow if not careful.
 
                 // Check for duplicate pending requests for this range (roughly)
                 $exists = SatRequest::where('rfc', $business->rfc)

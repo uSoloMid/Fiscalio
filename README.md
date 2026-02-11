@@ -60,4 +60,23 @@ php artisan sat:verify-past --limit=50
 ```
 
 ---
+
+## ⚡ Inicio Automático (Recomendado)
+Para no tener que abrir 3 terminales manualmente, puedes usar el script de automatización.
+
+**Si usas CMD:**
+```cmd
+start.bat
+```
+
+**Si usas PowerShell:**
+```powershell
+.\start_dev.ps1
+```
+o también:
+```powershell
+.\start.bat
+```
+
+---
 *Desarrollado con el asistente Antigravity*

@@ -8,6 +8,7 @@ use App\Models\Business;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceController extends Controller
 {
@@ -81,7 +82,76 @@ class InvoiceController extends Controller
         $root = $dom->documentElement;
         $version = $root->getAttribute('Version');
         $ns = ($version === '4.0') ? 'cfdi' : 'cfdi33';
-        $tipoMap = ['I' => 'Factura (Ingreso)', 'E' => 'Nota de Crédito (Egreso)', 'P' => 'Complemento de Pago', 'T' => 'Traslado', 'N' => 'Nómina'];
+        $tipoMap = [
+            'I' => 'Ingreso',
+            'E' => 'Egreso',
+            'P' => 'Pago',
+            'T' => 'Traslado',
+            'N' => 'Nómina',
+            'R' => 'Retenciones'
+        ];
+
+        $regimenes = [
+            '601' => 'General de Ley Personas Morales',
+            '603' => 'Personas Morales con Fines no Lucrativos',
+            '605' => 'Sueldos y Salarios e Ingresos Asimilados a Salarios',
+            '606' => 'Arrendamiento',
+            '607' => 'Enajenación o Adquisición de Bienes',
+            '608' => 'Demás ingresos',
+            '610' => 'Residentes en el Extranjero sin Establecimiento Permanente en México',
+            '611' => 'Ingresos por Dividendos (socios y accionistas)',
+            '612' => 'Personas Físicas con Actividades Empresariales y Profesionales',
+            '614' => 'Ingresos por Intereses',
+            '615' => 'Régimen de los ingresos por obtención de premios',
+            '616' => 'Sin obligaciones fiscales',
+            '620' => 'Sociedades Cooperativas de Producción que optan por diferir sus ingresos',
+            '621' => 'Incorporación Fiscal',
+            '622' => 'Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras',
+            '623' => 'Opcional para Grupos de Sociedades',
+            '624' => 'Coordinados',
+            '625' => 'Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas',
+            '626' => 'Régimen Simplificado de Confianza',
+        ];
+
+        $usos = [
+            'G01' => 'Adquisición de mercancías',
+            'G02' => 'Devoluciones, descuentos o bonificaciones',
+            'G03' => 'Gastos en general',
+            'I01' => 'Construcciones',
+            'I02' => 'Mobiliario y equipo de oficina por inversiones',
+            'I03' => 'Equipo de transporte',
+            'I04' => 'Equipo de cómputo y accesorios',
+            'I05' => 'Dados, troqueles, moldes, matrices y herramental',
+            'I06' => 'Comunicaciones telefónicas',
+            'I07' => 'Comunicaciones satelitales',
+            'I08' => 'Otra maquinaria y equipo',
+            'D01' => 'Honorarios médicos, dentales y gastos hospitalarios',
+            'D02' => 'Gastos médicos por incapacidad o discapacidad',
+            'D03' => 'Gastos funerales',
+            'D04' => 'Donativos',
+            'D05' => 'Intereses reales efectivamente pagados por créditos hipotecarios (casa habitación)',
+            'D06' => 'Aportaciones voluntarias al SAR',
+            'D07' => 'Primas por seguros de gastos médicos',
+            'D08' => 'Gastos de transportación escolar obligatoria',
+            'D09' => 'Depósitos en cuentas especiales para el ahorro, primas que tengan como base planes de pensiones',
+            'D10' => 'Pagos por servicios educativos (colegiaturas)',
+            'S01' => 'Sin efectos fiscales',
+            'CP01' => 'Pagos',
+            'CN01' => 'Nómina',
+        ];
+
+        $exportacionMap = [
+            '01' => '01 - No aplica',
+            '02' => '02 - Definitiva',
+            '03' => '03 - Temporal',
+            '04' => '04 - Definitiva con clave distinta a A1',
+        ];
+
+        $monedaMap = [
+            'MXN' => 'MXN - Peso Mexicano',
+            'USD' => 'USD - Dólar americano',
+            'EUR' => 'EUR - Euro',
+        ];
 
         $data = [
             'uuid' => $cfdiModel->uuid,
@@ -90,9 +160,10 @@ class InvoiceController extends Controller
             'folio' => $root->getAttribute('Folio'),
             'fecha' => $root->getAttribute('Fecha'),
             'tipo_comprobante' => $root->getAttribute('TipoDeComprobante'),
-            'tipo_descripcion' => $tipoMap[$root->getAttribute('TipoDeComprobante')] ?? 'Comprobante',
+            'tipo_descripcion' => $root->getAttribute('TipoDeComprobante') . ' - ' . ($tipoMap[$root->getAttribute('TipoDeComprobante')] ?? 'Comprobante'),
             'no_certificado_emisor' => $root->getAttribute('NoCertificado'),
             'moneda' => $root->getAttribute('Moneda'),
+            'moneda_desc' => $monedaMap[$root->getAttribute('Moneda')] ?? $root->getAttribute('Moneda'),
             'lugar_expedicion' => $root->getAttribute('LugarExpedicion'),
             'subtotal' => $root->getAttribute('SubTotal'),
             'descuento' => $root->getAttribute('Descuento') ?: 0,
@@ -101,26 +172,109 @@ class InvoiceController extends Controller
             'sello_cfd' => $root->getAttribute('Sello'),
             'forma_pago' => $root->getAttribute('FormaPago'),
             'metodo_pago' => $root->getAttribute('MetodoPago'),
+            'exportacion' => $exportacionMap[$root->getAttribute('Exportacion')] ?? $root->getAttribute('Exportacion'),
         ];
 
         $emisor = $xpath->query("//$ns:Emisor")->item(0);
-        $data['emisor'] = ['rfc' => $emisor ? $emisor->getAttribute('Rfc') : '', 'nombre' => $emisor ? $emisor->getAttribute('Nombre') : '', 'regimen' => $emisor ? $emisor->getAttribute('RegimenFiscal') : ''];
+        $eReg = $emisor ? $emisor->getAttribute('RegimenFiscal') : '';
+        $data['emisor'] = [
+            'rfc' => $emisor ? $emisor->getAttribute('Rfc') : '',
+            'nombre' => $emisor ? $emisor->getAttribute('Nombre') : '',
+            'regimen' => $eReg,
+            'regimen_desc' => $eReg . ' - ' . ($regimenes[$eReg] ?? '')
+        ];
+
         $receptor = $xpath->query("//$ns:Receptor")->item(0);
-        $data['receptor'] = ['rfc' => $receptor ? $receptor->getAttribute('Rfc') : '', 'nombre' => $receptor ? $receptor->getAttribute('Nombre') : '', 'uso' => $receptor ? $receptor->getAttribute('UsoCFDI') : '', 'regimen' => $receptor ? $receptor->getAttribute('RegimenFiscalReceptor') : '', 'domicilio' => $receptor ? $receptor->getAttribute('DomicilioFiscalReceptor') : ''];
+        $rUso = $receptor ? $receptor->getAttribute('UsoCFDI') : '';
+        $rReg = $receptor ? $receptor->getAttribute('RegimenFiscalReceptor') : '';
+        $data['receptor'] = [
+            'rfc' => $receptor ? $receptor->getAttribute('Rfc') : '',
+            'nombre' => $receptor ? $receptor->getAttribute('Nombre') : '',
+            'uso' => $rUso,
+            'uso_desc' => $rUso . ' - ' . ($usos[$rUso] ?? ''),
+            'regimen' => $rReg,
+            'regimen_desc' => $rReg ? ($rReg . ' - ' . ($regimenes[$rReg] ?? '')) : '',
+            'domicilio' => $receptor ? $receptor->getAttribute('DomicilioFiscalReceptor') : ''
+        ];
+
+        $objImpMap = [
+            '01' => 'No objeto de impuesto.',
+            '02' => 'Sí objeto de impuesto.',
+            '03' => 'Sí objeto de impuesto y no obligado al desglose.',
+            '04' => 'Sí objeto de impuesto y no causa impuesto.',
+        ];
+
+        $impuestoNames = [
+            '001' => 'ISR',
+            '002' => 'IVA',
+            '003' => 'IEPS',
+        ];
 
         $data['conceptos'] = [];
         foreach ($xpath->query("//$ns:Conceptos/$ns:Concepto") as $con) {
-            $data['conceptos'][] = ['cantidad' => $con->getAttribute('Cantidad'), 'clave_unit' => $con->getAttribute('ClaveUnidad'), 'unidad' => $con->getAttribute('Unidad'), 'clave_prod_serv' => $con->getAttribute('ClaveProdServ'), 'descripcion' => $con->getAttribute('Descripcion'), 'no_identificacion' => $con->getAttribute('NoIdentificacion'), 'valor_unitario' => $con->getAttribute('ValorUnitario'), 'importe' => $con->getAttribute('Importe')];
+            $objIdx = $con->getAttribute('ObjetoImp');
+            $concept = [
+                'cantidad' => $con->getAttribute('Cantidad'),
+                'clave_unit' => $con->getAttribute('ClaveUnidad'),
+                'unidad' => $con->getAttribute('Unidad'),
+                'clave_prod_serv' => $con->getAttribute('ClaveProdServ'),
+                'descripcion' => $con->getAttribute('Descripcion'),
+                'no_identificacion' => $con->getAttribute('NoIdentificacion'),
+                'valor_unitario' => $con->getAttribute('ValorUnitario'),
+                'importe' => $con->getAttribute('Importe'),
+                'objeto_imp' => $objIdx,
+                'objeto_imp_desc' => $objIdx . ' - ' . ($objImpMap[$objIdx] ?? ''),
+                'traslados' => [],
+                'retenciones' => []
+            ];
+
+            // Tax per concept
+            foreach ($xpath->query(".//cfdi:Impuestos/cfdi:Traslados/cfdi:Traslado", $con) as $t) {
+                $code = $t->getAttribute('Impuesto');
+                $concept['traslados'][] = [
+                    'impuesto' => $code,
+                    'impuesto_desc' => $impuestoNames[$code] ?? $code,
+                    'base' => $t->getAttribute('Base'),
+                    'tasa' => $t->getAttribute('TasaOCuota'),
+                    'importe' => $t->getAttribute('Importe'),
+                    'tipo_factor' => $t->getAttribute('TipoFactor')
+                ];
+            }
+
+            foreach ($xpath->query(".//cfdi:Impuestos/cfdi:Retenciones/cfdi:Retencion", $con) as $r) {
+                $code = $r->getAttribute('Impuesto');
+                $concept['retenciones'][] = [
+                    'impuesto' => $code,
+                    'impuesto_desc' => $impuestoNames[$code] ?? $code,
+                    'base' => $r->getAttribute('Base'),
+                    'tasa' => $r->getAttribute('TasaOCuota'),
+                    'importe' => $r->getAttribute('Importe'),
+                    'tipo_factor' => $r->getAttribute('TipoFactor')
+                ];
+            }
+
+            $data['conceptos'][] = $concept;
         }
 
         $data['traslados'] = [];
         foreach ($xpath->query("/*/$ns:Impuestos/$ns:Traslados/$ns:Traslado") as $tras) {
-            $data['traslados'][] = ['impuesto' => $tras->getAttribute('Impuesto'), 'tasa' => $tras->getAttribute('TasaOCuota'), 'importe' => $tras->getAttribute('Importe')];
+            $code = $tras->getAttribute('Impuesto');
+            $data['traslados'][] = [
+                'impuesto' => $code,
+                'impuesto_desc' => $impuestoNames[$code] ?? $code,
+                'tasa' => $tras->getAttribute('TasaOCuota'),
+                'importe' => $tras->getAttribute('Importe')
+            ];
         }
 
         $data['retenciones'] = [];
         foreach ($xpath->query("/*/$ns:Impuestos/$ns:Retenciones/$ns:Retencion") as $ret) {
-            $data['retenciones'][] = ['impuesto' => $ret->getAttribute('Impuesto'), 'importe' => $ret->getAttribute('Importe')];
+            $code = $ret->getAttribute('Impuesto');
+            $data['retenciones'][] = [
+                'impuesto' => $code,
+                'impuesto_desc' => $impuestoNames[$code] ?? $code,
+                'importe' => $ret->getAttribute('Importe')
+            ];
         }
 
         $tfd = $xpath->query("//tfd:TimbreFiscalDigital")->item(0);
@@ -135,9 +289,34 @@ class InvoiceController extends Controller
         $qrString = "https://verificacfdi.facturaelectronica.sat.gob.mx/default.aspx?id={$cfdiModel->uuid}&re={$data['emisor']['rfc']}&rr={$data['receptor']['rfc']}&tt={$data['total']}&fe=" . substr($data['sello_cfd'], -8);
         $data['qrCode'] = '';
         try {
-            $data['qrCode'] = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(300)->margin(0)->generate($qrString));
+            $data['qrCode'] = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('svg')->size(100)->margin(0)->generate($qrString));
         }
         catch (\Throwable $e) {
+        }
+
+        $tiposRelacion = [
+            '01' => 'Nota de crédito de los documentos relacionados',
+            '02' => 'Nota de débito de los documentos relacionados',
+            '03' => 'Devolución de mercancía sobre facturas o traslados previos',
+            '04' => 'Sustitución de los CFDI previos',
+            '05' => 'Traslados de mercancias facturados previamente',
+            '06' => 'Factura generada por los traslados previos',
+            '07' => 'CFDI por aplicación de anticipo',
+        ];
+
+        $cfdiRelacionados = $xpath->query("//$ns:CfdiRelacionados")->item(0);
+        $data['relacionados'] = null;
+        if ($cfdiRelacionados) {
+            $tipoRel = $cfdiRelacionados->getAttribute('TipoRelacion');
+            $relData = [
+                'tipo' => $tipoRel,
+                'tipo_desc' => $tipoRel . ' - ' . ($tiposRelacion[$tipoRel] ?? ''),
+                'uuids' => []
+            ];
+            foreach ($xpath->query("./$ns:CfdiRelacionado", $cfdiRelacionados) as $rel) {
+                $relData['uuids'][] = $rel->getAttribute('UUID');
+            }
+            $data['relacionados'] = $relData;
         }
 
         // Detailed Payment Info if it's a payment
@@ -189,7 +368,7 @@ class InvoiceController extends Controller
             }
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.cfdi', ['cfdis' => $allCfdis]);
+        $pdf = Pdf::loadView('pdf.cfdi', ['cfdis' => $allCfdis]);
         $pdf->setPaper('letter', 'portrait');
         return $pdf->output();
     }
@@ -407,5 +586,12 @@ class InvoiceController extends Controller
             Log::error("Bulk PDF Error: " . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);
         }
+    }
+
+    public function deleteSatRequest($id)
+    {
+        $request = \App\Models\SatRequest::findOrFail($id);
+        $request->delete();
+        return response()->json(['message' => 'Solicitud eliminada correctamente']);
     }
 }
