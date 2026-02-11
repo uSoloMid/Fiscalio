@@ -332,6 +332,20 @@
                             <td class="amount">{{ number_format((float)$imp['importe'], 2) }}</td>
                         </tr>
                         @endforeach
+                        @foreach($cfdi['impuestos_locales']['traslados'] as $imp)
+                        <tr>
+                            <td class="uppercase">{{ $imp['nombre'] }} ({{ (float)$imp['tasa'] }}%)</td>
+                            <td class="symbol">$</td>
+                            <td class="amount">{{ number_format((float)$imp['importe'], 2) }}</td>
+                        </tr>
+                        @endforeach
+                        @foreach($cfdi['impuestos_locales']['retenciones'] as $imp)
+                        <tr>
+                            <td class="uppercase">RET. LOCAL {{ $imp['nombre'] }} ({{ (float)$imp['tasa'] }}%)</td>
+                            <td class="symbol">-$</td>
+                            <td class="amount">{{ number_format((float)$imp['importe'], 2) }}</td>
+                        </tr>
+                        @endforeach
                         <tr class="total-row">
                             <td>TOTAL</td>
                             <td class="symbol">$</td>

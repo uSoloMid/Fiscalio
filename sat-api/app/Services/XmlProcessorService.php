@@ -108,6 +108,7 @@ class XmlProcessorService
         $xpath = new \DOMXPath($dom);
         $xpath->registerNamespace('cfdi', 'http://www.sat.gob.mx/cfd/4');
         $xpath->registerNamespace('tfd', 'http://www.sat.gob.mx/TimbreFiscalDigital');
+        $xpath->registerNamespace('implocal', 'http://www.sat.gob.mx/implocal');
 
         // UUID
         $uuidNode = $xpath->query('//tfd:TimbreFiscalDigital/@UUID')->item(0);
@@ -268,6 +269,8 @@ class XmlProcessorService
             'concepto' => $concepto,
             'iva' => $iva,
             'retenciones' => $retenciones,
+            'traslados_locales' => $trasladosLocales,
+            'retenciones_locales' => $retencionesLocales,
             'payments' => $payments,
             'global_periodicidad' => $globalPeriodicidad,
             'global_meses' => $globalMeses,
@@ -311,6 +314,8 @@ class XmlProcessorService
             'concepto' => $data['concepto'],
             'iva' => $data['iva'],
             'retenciones' => $data['retenciones'],
+            'traslados_locales' => $data['traslados_locales'] ?? 0,
+            'retenciones_locales' => $data['retenciones_locales'] ?? 0,
             'path_xml' => $path,
             'request_id' => $requestId,
             'xml_data' => $data['full_xml_data'] ?? null,

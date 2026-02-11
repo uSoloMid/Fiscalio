@@ -78,6 +78,7 @@ class InvoiceController extends Controller
         $xpath->registerNamespace('tfd', 'http://www.sat.gob.mx/TimbreFiscalDigital');
         $xpath->registerNamespace('pago20', 'http://www.sat.gob.mx/Pagos20');
         $xpath->registerNamespace('pago10', 'http://www.sat.gob.mx/Pagos');
+        $xpath->registerNamespace('implocal', 'http://www.sat.gob.mx/implocal');
 
         $root = $dom->documentElement;
         $version = $root->getAttribute('Version');
@@ -275,6 +276,29 @@ class InvoiceController extends Controller
                 'impuesto_desc' => $impuestoNames[$code] ?? $code,
                 'importe' => $ret->getAttribute('Importe')
             ];
+        }
+
+        // Impuestos Locales
+        $data['impuestos_locales'] = [
+            'traslados' => [],
+            'retenciones' => []
+        ];
+        $locales = $xpath->query("//implocal:ImpuestosLocales")->item(0);
+        if ($locales) {
+            foreach ($xpath->query("./implocal:TrasladosLocales", $locales) as $t) {
+                $data['impuestos_locales']['traslados'][] = [
+                    'nombre' => $t->getAttribute('ImpLocTrasladado'),
+                    'tasa' => $t->getAttribute('TasadeTraslado'),
+                    'importe' => $t->getAttribute('Importe')
+                ];
+            }
+            foreach ($xpath->query("./implocal:RetencionesLocales", $locales) as $r) {
+                $data['impuestos_locales']['retenciones'][] = [
+                    'nombre' => $r->getAttribute('ImpLocRetenido'),
+                    'tasa' => $r->getAttribute('TasadeRetencion'),
+                    'importe' => $r->getAttribute('Importe')
+                ];
+            }
         }
 
         $tfd = $xpath->query("//tfd:TimbreFiscalDigital")->item(0);

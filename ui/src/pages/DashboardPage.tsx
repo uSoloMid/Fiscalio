@@ -302,40 +302,42 @@ export const DashboardPage = ({
             {/* Main Content */}
             <main className="flex-1 flex flex-col overflow-hidden">
                 <header className="bg-white border-b border-gray-100 z-10 sticky top-0">
-                    <div className="h-20 flex items-center justify-between px-10">
-                        <div className="flex items-center gap-6">
-                            <h1 className="text-xl font-bold tracking-tight text-gray-900">Dashboard de Clientes</h1>
-                            <div className="h-6 w-px bg-gray-200"></div>
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between px-6 lg:px-10 py-4 md:h-20 gap-4">
+                        <div className="flex items-center justify-between md:justify-start gap-4 lg:gap-6">
+                            <h1 className="text-lg lg:text-xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+                            <div className="hidden sm:block h-6 w-px bg-gray-200"></div>
+                            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] lg:text-xs font-bold whitespace-nowrap">
                                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
                                 SAT Sync: hace 2h
                             </div>
                         </div>
-                        <div className="flex-1 max-w-xl mx-8 relative">
+
+                        <div className="flex-1 w-full md:max-w-md lg:max-w-xl md:mx-4 relative order-3 md:order-2">
                             <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none material-symbols-outlined text-gray-400 text-xl">search</span>
                             <input
-                                className="block w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-[#10B981] transition-all"
+                                className="block w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-[#10B981] transition-all text-sm"
                                 placeholder="Buscar por Alias o RFC..."
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
+
                         <button
                             onClick={() => setIsDrawerOpen(true)}
-                            className="flex items-center gap-2 px-6 py-2.5 bg-[#10B981] text-white text-sm font-bold rounded-2xl hover:bg-[#059669] transition-all shadow-lg shadow-emerald-100 whitespace-nowrap"
+                            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[#10B981] text-white text-sm font-bold rounded-2xl hover:bg-[#059669] transition-all shadow-lg shadow-emerald-100 whitespace-nowrap order-2 md:order-3"
                         >
                             <span className="material-symbols-outlined">add_circle</span>
                             Nuevo Cliente
                         </button>
                     </div>
 
-                    <div className="px-10 py-4 border-t border-gray-50 flex items-center gap-8 text-sm">
+                    <div className="px-6 lg:px-10 py-4 border-t border-gray-50 flex flex-wrap items-center gap-4 lg:gap-8 text-sm">
                         <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Grupo</span>
+                            <span className="hidden sm:inline text-[10px] font-bold text-gray-400 uppercase tracking-widest">Grupo</span>
                             <div className="flex items-center gap-1">
                                 <select
-                                    className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all min-w-[160px] appearance-none cursor-pointer"
+                                    className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all min-w-[140px] appearance-none cursor-pointer"
                                     value={selectedGroupId}
                                     onChange={(e) => setSelectedGroupId(e.target.value)}
                                 >
@@ -354,12 +356,11 @@ export const DashboardPage = ({
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Agrupar por:</span>
                             <GroupByToggle mode={groupByMode} onChange={setGroupByMode} />
                         </div>
 
-                        <div className="flex items-center gap-3 flex-1">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Etiquetas</span>
+                        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                            <span className="hidden sm:inline text-[10px] font-bold text-gray-400 uppercase tracking-widest">Etiquetas</span>
                             <div className="flex items-center gap-1 flex-1">
                                 <TagsFilter availableTags={tags} selectedTagIds={selectedTagIds} onChange={setSelectedTagIds} />
                                 <button

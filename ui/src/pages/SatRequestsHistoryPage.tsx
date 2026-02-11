@@ -74,18 +74,18 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col font-['Inter']">
-            <header className="bg-white border-b border-gray-100 flex-shrink-0">
-                <div className="h-20 flex items-center justify-between px-10">
-                    <div className="flex items-center gap-4">
+            <header className="bg-white border-b border-gray-100 flex-shrink-0 py-2 md:py-0">
+                <div className="h-auto md:h-20 flex items-center justify-between px-4 md:px-10">
+                    <div className="flex items-center gap-3 md:gap-4">
                         <button
                             onClick={onBack}
-                            className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-gray-600 transition-all"
+                            className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-gray-600 transition-all flex-shrink-0"
                         >
                             <span className="material-symbols-outlined">arrow_back</span>
                         </button>
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900">Historial de Solicitudes SAT</h1>
-                            <p className="text-xs text-gray-500 font-medium">Registro completo de descargas y auditorías</p>
+                        <div className="min-w-0">
+                            <h1 className="text-base md:text-xl font-bold text-gray-900 truncate">Historial Solicitudes SAT</h1>
+                            <p className="text-[10px] md:text-xs text-gray-500 font-medium truncate">Registro completo de descargas</p>
                         </div>
                     </div>
                 </div>

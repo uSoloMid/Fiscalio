@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getProvisionalSummary, getBucketDetails, getPeriods } from '../services';
+import { getProvisionalSummary, getBucketDetails } from '../services';
 import { PpdExplorer, RepExplorer } from './ProvisionalExplorers';
 
 interface TaxBreakdown {
@@ -146,21 +146,25 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
     return (
         <div className="h-full bg-gray-50 flex flex-col font-['Inter'] relative overflow-hidden">
             {/* Header */}
-            <header className="bg-white border-b border-gray-100 flex-shrink-0 z-10">
-                <div className="h-20 flex items-center justify-between px-10">
-                    <div className="flex items-center gap-6">
-                        <button onClick={onBack} className="p-3 hover:bg-gray-50 rounded-2xl transition-all group">
+            <header className="bg-white border-b border-gray-100 flex-shrink-0 z-10 py-3 md:py-0">
+                <div className="h-auto md:h-20 flex flex-col md:flex-row items-center justify-between px-4 md:px-10 gap-4 md:gap-0">
+                    <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto">
+                        <button onClick={onBack} className="p-2 md:p-3 hover:bg-gray-50 rounded-2xl transition-all group flex-shrink-0">
                             <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-900 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
                             </svg>
                         </button>
-                        <div>
-                            <div className="text-xs font-black text-emerald-600 uppercase tracking-[0.2em] mb-0.5">Control Fiscal</div>
-                            <h1 className="text-xl font-black text-gray-900 tracking-tight">Provisional SAT <span className="text-gray-300 mx-2">/</span> <span className="text-gray-500">{clientName}</span></h1>
+                        <div className="min-w-0">
+                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-0.5">Control Fiscal</div>
+                            <h1 className="text-base md:text-xl font-black text-gray-900 tracking-tight flex items-center gap-1 flex-wrap">
+                                <span>Provisional</span>
+                                <span className="text-gray-300 hidden sm:inline">/</span>
+                                <span className="text-gray-500 truncate">{clientName}</span>
+                            </h1>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-end">
                         <select
                             value={period.month}
                             onChange={(e) => {
@@ -168,7 +172,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                 setPeriod({ ...period, month: m });
                                 onPeriodChange(period.year, m);
                             }}
-                            className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            className="flex-1 md:flex-none bg-gray-50 border-none rounded-xl px-3 md:px-4 py-2 text-xs md:text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
                         >
                             {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
                         </select>
@@ -179,7 +183,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                 setPeriod({ ...period, year: y });
                                 onPeriodChange(y, period.month);
                             }}
-                            className="bg-gray-50 border-none rounded-xl px-4 py-2 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                            className="flex-1 md:flex-none bg-gray-50 border-none rounded-xl px-3 md:px-4 py-2 text-xs md:text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
                         >
                             {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
                         </select>

@@ -31,8 +31,9 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
     const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional'>('invoices');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    // Download XML State
+    const [showCancelled, setShowCancelled] = useState(false);
     const [showDownloadXmlModal, setShowDownloadXmlModal] = useState(false);
     const [downloadTypes, setDownloadTypes] = useState<string[]>(['emitidas', 'recibidas']);
     const [selectedDownloadPeriods, setSelectedDownloadPeriods] = useState<string[]>([]);
@@ -83,13 +84,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     // Reset page when filters change
     useEffect(() => {
         setPage(1);
-    }, [year, month, filterType, search, cfdiTipo]);
+    }, [year, month, filterType, search, cfdiTipo, showCancelled]);
 
     useEffect(() => {
         if (!activeRfc) return;
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeRfc, year, month, filterType, search, cfdiTipo, page]);
+    }, [activeRfc, year, month, filterType, search, cfdiTipo, showCancelled, page]);
 
     useEffect(() => {
         if (selectedUuid) {
@@ -109,7 +110,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                 month,
                 tipo: (filterType === 'all' || filterType === 'canceladas') ? undefined : filterType,
                 cfdi_tipo: filterType === 'canceladas' ? undefined : cfdiTipo,
-                status: filterType === 'canceladas' ? 'cancelados' : undefined,
+                status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
                 q: search,
                 page: page,
                 pageSize: 50
@@ -303,18 +304,29 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     }
 
     return (
-        <div className="text-gray-800 min-h-screen flex overflow-hidden">
+        <div className="text-gray-800 min-h-screen flex flex-col md:flex-row overflow-hidden relative">
+            {/* Mobile Menu Overlay */}
+            {isSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[25] md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className="w-64 flex-shrink-0 flex flex-col bg-white border-r border-gray-200 z-20">
-                <div className="h-20 flex items-center px-6 border-b border-gray-100">
+            <aside className={`fixed md:relative w-64 h-full flex-shrink-0 flex flex-col bg-white border-r border-gray-200 z-30 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+                <div className="h-20 flex items-center px-6 border-b border-gray-100 justify-between">
                     <div className="flex items-center gap-2 text-[var(--primary)] font-bold text-xl tracking-tight">
                         <span className="material-symbols-outlined text-3xl">account_balance_wallet</span>
                         <span>Fiscalio</span>
                     </div>
+                    <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-gray-400">
+                        <span className="material-symbols-outlined">close</span>
+                    </button>
                 </div>
                 <nav className="flex-1 flex flex-col gap-1 p-4 overflow-y-auto">
                     <button
-                        onClick={() => fetchData()}
+                        onClick={() => { fetchData(); setIsSidebarOpen(false); }}
                         className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-500 text-sm hover:bg-gray-50 mb-4"
                     >
                         <span className="material-symbols-outlined text-xl">refresh</span>
@@ -322,21 +334,21 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                     </button>
                     <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Principal</div>
                     <button
-                        onClick={() => setCurrentView('invoices')}
+                        onClick={() => { setCurrentView('invoices'); setIsSidebarOpen(false); }}
                         className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'invoices' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
                         <span className="material-symbols-outlined text-xl">receipt_long</span>
                         Facturas
                     </button>
                     <button
-                        onClick={() => setCurrentView('accounts')}
+                        onClick={() => { setCurrentView('accounts'); setIsSidebarOpen(false); }}
                         className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'accounts' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
                         <span className="material-symbols-outlined text-xl">account_tree</span>
                         Cuentas
                     </button>
                     <button
-                        onClick={() => setCurrentView('provisional')}
+                        onClick={() => { setCurrentView('provisional'); setIsSidebarOpen(false); }}
                         className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'provisional' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
                         <span className="material-symbols-outlined text-xl">monitoring</span>
@@ -372,27 +384,35 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                 </div>
             ) : (
                 <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[var(--background-light)] relative">
-                    <header className="bg-white border-b border-gray-200 z-10 flex-shrink-0 h-20 px-8 flex items-center justify-between shadow-sm">
-                        <div className="flex items-center gap-6">
+                    <header className="bg-white border-b border-gray-200 z-10 flex-shrink-0 h-auto md:h-20 px-4 lg:px-8 py-3 md:py-0 flex flex-col md:flex-row items-center justify-between shadow-sm gap-4">
+                        <div className="flex items-center gap-4 w-full md:w-auto">
                             <button
-                                onClick={onBack || handleRfcChange}
-                                className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors text-sm font-medium group"
+                                onClick={() => setIsSidebarOpen(true)}
+                                className="p-2 md:hidden text-gray-500"
                             >
-                                <span className="material-symbols-outlined text-lg group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
-                                {onBack ? 'Volver al Dashboard' : 'Cambiar cliente'}
+                                <span className="material-symbols-outlined">menu</span>
                             </button>
-                            <div className="w-px h-10 bg-gray-200"></div>
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-900 leading-tight">{clientName || activeClientName || activeRfc}</h1>
-                                <p className="text-xs font-mono text-gray-500 tracking-wide mt-0.5">{activeRfc}</p>
+                            <div className="flex items-center gap-4 lg:gap-6 flex-1 md:flex-none overflow-hidden">
+                                <button
+                                    onClick={onBack || handleRfcChange}
+                                    className="flex items-center gap-1.5 text-gray-500 hover:text-gray-900 transition-colors text-xs lg:text-sm font-medium group flex-shrink-0"
+                                >
+                                    <span className="material-symbols-outlined text-lg group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
+                                    <span className="hidden sm:inline">{onBack ? 'Dashboard' : 'Cambiar'}</span>
+                                </button>
+                                <div className="w-px h-8 md:h-10 bg-gray-200 flex-shrink-0"></div>
+                                <div className="truncate">
+                                    <h1 className="text-base md:text-xl lg:text-2xl font-bold text-gray-900 leading-tight truncate">{clientName || activeClientName || activeRfc}</h1>
+                                    <p className="text-[10px] font-mono text-gray-500 tracking-wide mt-0.5 truncate">{activeRfc}</p>
+                                </div>
                             </div>
                         </div>
                         {/* Header Filters */}
-                        <div className="flex items-center gap-6">
-                            <div className="relative">
-                                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">calendar_month</span>
+                        <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                            <div className="relative w-full md:w-auto">
+                                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-lg">calendar_month</span>
                                 <select
-                                    className="appearance-none border border-gray-200 rounded-lg pl-9 pr-8 py-2 text-sm bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow cursor-pointer min-w-[140px]"
+                                    className="appearance-none border border-gray-200 rounded-lg pl-9 pr-8 py-2 text-sm bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow cursor-pointer w-full md:min-w-[140px]"
                                     value={`${year}-${month}`}
                                     onChange={handlePeriodChange}
                                 >
@@ -408,7 +428,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                         </div>
                     </header>
 
-                    <div className="bg-white border-b border-gray-200 px-6 py-3 flex flex-col gap-3 sticky top-0 z-30 shadow-sm">
+                    <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 flex flex-col gap-3 sticky top-0 z-30 shadow-sm overflow-x-auto">
                         {/* Active Requests Banner */}
                         {activeRequests.some(r => ['created', 'polling', 'downloading', 'extracting'].includes(r.state) || (r.state === 'failed' && new Date(r.updated_at) > new Date(Date.now() - 300000))) && (
                             <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3 flex flex-col gap-2 mb-1 shadow-sm">
@@ -513,6 +533,22 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                 >
                                     Canceladas
                                 </button>
+                                {filterType !== 'canceladas' && (
+                                    <div className="flex items-center gap-2 ml-2 px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100">
+                                        <label className="flex items-center gap-2 cursor-pointer group">
+                                            <div className={`w-8 h-4 rounded-full relative transition-all duration-300 ${showCancelled ? 'bg-red-500' : 'bg-gray-200'}`}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={showCancelled}
+                                                    onChange={e => setShowCancelled(e.target.checked)}
+                                                    className="hidden"
+                                                />
+                                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-all duration-300 ${showCancelled ? 'left-4.5' : 'left-0.5'}`} style={{ left: showCancelled ? '18px' : '2px' }} />
+                                            </div>
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${showCancelled ? 'text-red-600' : 'text-gray-400'}`}>Ver Canceladas</span>
+                                        </label>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex-1"></div>
@@ -532,7 +568,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                         year,
                                         month,
                                         tipo: (filterType === 'all' || filterType === 'canceladas') ? undefined : filterType,
-                                        status: filterType === 'canceladas' ? 'cancelados' : undefined,
+                                        status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
                                         q: search
                                     })}
                                     className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-xs font-bold rounded-xl hover:bg-gray-200 transition-all border border-gray-200"
