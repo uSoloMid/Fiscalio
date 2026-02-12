@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Business;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
 
 class AgentController extends Controller
 {
@@ -12,10 +12,9 @@ class AgentController extends Controller
      */
     public function syncClients()
     {
-        // En producción deberíamos validar un token de agente aquí.
-        // Por ahora, asumimos que si pueden llamar a la API, es válido (o añadiremos middleware luego).
-
-        $clients = Business::all();
+        // Usamos Query Builder directo para evitar problemas de Eloquent/Modelos/Hidden
+        // Esto devuelve un array de objetos stdClass con TODAS las columnas
+        $clients = DB::table('businesses')->get();
 
         return response()->json($clients->map(function ($c) {
             return [
@@ -23,9 +22,8 @@ class AgentController extends Controller
                 'legal_name' => $c->legal_name,
                 'certificate' => $c->certificate, // Base64
                 'private_key' => $c->private_key, // Base64
-                // Accedemos a los atributos ocultos explícitamente y nos aseguramos de que no sean NULL
-                'passphrase' => $c->passphrase ?? '',
-                'ciec' => $c->ciec ?? '',
+                'passphrase' => $c->passphrase, // Base de datos (texto plano)
+                'ciec' => $c->ciec, // Base de datos (texto plano)
             ];
         }));
     }
