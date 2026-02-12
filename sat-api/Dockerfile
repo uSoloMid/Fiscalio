@@ -34,10 +34,12 @@ RUN chown -R www-data:www-data /var/www
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
 # Nginx config + supervisor + entrypoint
+RUN rm -rf /etc/nginx/sites-enabled/* && rm -rf /etc/nginx/conf.d/*
 COPY ./nginx/render.conf /etc/nginx/conf.d/default.conf
 COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
 
 EXPOSE 10000
 CMD ["/entrypoint.sh"]
