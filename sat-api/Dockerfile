@@ -16,7 +16,7 @@ ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/do
 RUN chmod +x /usr/local/bin/install-php-extensions
 
 # ✅ Extensiones necesarias para Laravel + SQLite
-RUN install-php-extensions pdo_sqlite sqlite3 mbstring bcmath gd soap zip
+RUN install-php-extensions pdo pdo_sqlite sqlite3 mbstring bcmath gd soap zip intl pcntl
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

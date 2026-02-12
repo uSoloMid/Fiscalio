@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+echo "==> Módulos PHP instalados:"
+php -m
+
 echo "==> Iniciando Entrypoint Profesional (Debug Mode)..."
 # Trigger new deploy for cache clearing
 
