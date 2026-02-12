@@ -2,6 +2,7 @@
 set -e
 
 echo "==> Iniciando Entrypoint Profesional (Debug Mode)..."
+# Trigger new deploy for cache clearing
 
 # 1. Preparar almacenamiento
 mkdir -p /var/www/storage/app/public /var/www/storage/framework/{cache,sessions,views} /var/www/storage/logs /var/www/bootstrap/cache
