@@ -1,4 +1,6 @@
 
+import { API_BASE_URL } from './config';
+
 export interface ClientFilterParams {
     q?: string;
     group_id?: string | number | null;
@@ -17,13 +19,13 @@ export async function listClients(params: ClientFilterParams): Promise<any> {
     if (params.page) query.append('page', String(params.page));
     if (params.pageSize) query.append('pageSize', String(params.pageSize));
 
-    const response = await fetch('/api/clients?' + query.toString());
+    const response = await fetch(`${API_BASE_URL}/api/clients?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching clients');
     return response.json();
 }
 
 export async function updateClientGroup(clientId: number, groupId: number | null): Promise<any> {
-    const response = await fetch(`/api/clients/${clientId}/group`, {
+    const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/group`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ group_id: groupId })
@@ -33,7 +35,7 @@ export async function updateClientGroup(clientId: number, groupId: number | null
 }
 
 export async function updateClientTags(clientId: number, tagIds: number[]): Promise<any> {
-    const response = await fetch(`/api/clients/${clientId}/tags`, {
+    const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}/tags`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tag_ids: tagIds })
@@ -43,7 +45,7 @@ export async function updateClientTags(clientId: number, tagIds: number[]): Prom
 }
 
 export async function updateClientInfo(clientId: number, data: any): Promise<any> {
-    const response = await fetch(`/api/clients/${clientId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -53,7 +55,7 @@ export async function updateClientInfo(clientId: number, data: any): Promise<any
 }
 
 export async function deleteClient(clientId: number): Promise<any> {
-    const response = await fetch(`/api/clients/${clientId}`, {
+    const response = await fetch(`${API_BASE_URL}/api/clients/${clientId}`, {
         method: 'DELETE'
     });
     if (!response.ok) throw new Error('Error deleting client');

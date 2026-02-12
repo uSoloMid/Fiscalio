@@ -1,4 +1,5 @@
 import type { Cfdi, CfdiPagination } from './models';
+import { API_BASE_URL } from './api/config';
 
 export async function listCfdis(params: any): Promise<CfdiPagination> {
     const query = new URLSearchParams();
@@ -13,7 +14,7 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
     if (params.status) query.append('status', params.status);
     if (params.cfdi_tipo) query.append('cfdi_tipo', params.cfdi_tipo);
 
-    const response = await fetch('/api/cfdis?' + query.toString());
+    const response = await fetch(`${API_BASE_URL}/api/cfdis?${query.toString()}`);
     if (!response.ok) {
         throw new Error('Error fetching CFDIs');
     }
@@ -21,7 +22,7 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
 }
 
 export async function getCfdi(uuid: string): Promise<{ metadata: Cfdi, xml_url: string, sat_response?: any }> {
-    const response = await fetch('/api/cfdis/' + uuid);
+    const response = await fetch(`${API_BASE_URL}/api/cfdis/${uuid}`);
     if (!response.ok) {
         throw new Error('Error fetching CFDI detail');
     }
@@ -29,7 +30,7 @@ export async function getCfdi(uuid: string): Promise<{ metadata: Cfdi, xml_url: 
 }
 
 export async function refreshCfdiStatus(uuid: string): Promise<{ metadata: Cfdi, sat_response: any }> {
-    const response = await fetch('/api/cfdis/' + uuid + '/refresh-status', {
+    const response = await fetch(`${API_BASE_URL}/api/cfdis/${uuid}/refresh-status`, {
         method: 'POST'
     });
     if (!response.ok) {
@@ -39,7 +40,7 @@ export async function refreshCfdiStatus(uuid: string): Promise<{ metadata: Cfdi,
 }
 
 export async function getPeriods(rfcUser: string): Promise<string[]> {
-    const response = await fetch('/api/cfdis/periods?rfc_user=' + rfcUser);
+    const response = await fetch(`${API_BASE_URL}/api/cfdis/periods?rfc_user=${rfcUser}`);
     if (!response.ok) {
         throw new Error('Error fetching periods');
     }
@@ -47,7 +48,7 @@ export async function getPeriods(rfcUser: string): Promise<string[]> {
 }
 
 export async function listClients(): Promise<any[]> {
-    const response = await fetch('/api/clients');
+    const response = await fetch(`${API_BASE_URL}/api/clients`);
     if (!response.ok) throw new Error('Error fetching clients');
     return response.json();
 }
@@ -55,7 +56,7 @@ export async function listClients(): Promise<any[]> {
 export async function parseCertificate(file: File): Promise<{ rfc: string, name: string, valid_until: string }> {
     const formData = new FormData();
     formData.append('certificate', file);
-    const response = await fetch('/api/clients/parse-certificate', {
+    const response = await fetch(`${API_BASE_URL}/api/clients/parse-certificate`, {
         method: 'POST',
         body: formData
     });
@@ -67,7 +68,7 @@ export async function parseCertificate(file: File): Promise<{ rfc: string, name:
 }
 
 export async function createClient(data: FormData): Promise<any> {
-    const response = await fetch('/api/clients', {
+    const response = await fetch(`${API_BASE_URL}/api/clients`, {
         method: 'POST',
         body: data
     });
@@ -78,7 +79,7 @@ export async function createClient(data: FormData): Promise<any> {
     return response.json();
 }
 export async function startSync(rfc: string): Promise<any> {
-    const response = await fetch('/api/sat/sync', {
+    const response = await fetch(`${API_BASE_URL}/api/sat/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rfc })
@@ -88,7 +89,7 @@ export async function startSync(rfc: string): Promise<any> {
 }
 
 export async function verifyStatus(params: any): Promise<any> {
-    const response = await fetch('/api/sat/verify-status', {
+    const response = await fetch(`${API_BASE_URL}/api/sat/verify-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params)
@@ -98,25 +99,25 @@ export async function verifyStatus(params: any): Promise<any> {
 }
 
 export async function getActiveRequests(rfc: string): Promise<any[]> {
-    const response = await fetch('/api/sat/active-requests?rfc=' + rfc);
+    const response = await fetch(`${API_BASE_URL}/api/sat/active-requests?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching active requests');
     return response.json();
 }
 
 export async function listAccounts(rfc: string): Promise<any[]> {
-    const response = await fetch(`/api/accounts?rfc=${rfc}`);
+    const response = await fetch(`${API_BASE_URL}/api/accounts?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching accounts');
     return response.json();
 }
 
 export async function getAccount(id: number, rfc: string): Promise<any> {
-    const response = await fetch(`/api/accounts/${id}?rfc=${rfc}`);
+    const response = await fetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching account');
     return response.json();
 }
 
 export async function createAccount(data: any, rfc: string): Promise<any> {
-    const response = await fetch(`/api/accounts?rfc=${rfc}`, {
+    const response = await fetch(`${API_BASE_URL}/api/accounts?rfc=${rfc}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -129,7 +130,7 @@ export async function createAccount(data: any, rfc: string): Promise<any> {
 }
 
 export async function updateAccount(id: number, data: any, rfc: string): Promise<any> {
-    const response = await fetch(`/api/accounts/${id}?rfc=${rfc}`, {
+    const response = await fetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -142,14 +143,14 @@ export async function updateAccount(id: number, data: any, rfc: string): Promise
 }
 
 export async function deleteAccount(id: number, rfc: string): Promise<void> {
-    const response = await fetch(`/api/accounts/${id}?rfc=${rfc}`, {
+    const response = await fetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`, {
         method: 'DELETE'
     });
     if (!response.ok) throw new Error('Error deleting account');
 }
 
 export async function getRecentRequests(): Promise<any[]> {
-    const response = await fetch('/api/sat/recent-requests');
+    const response = await fetch(`${API_BASE_URL}/api/sat/recent-requests`);
     if (!response.ok) throw new Error('Error fetching recent requests');
     return response.json();
 }
@@ -159,41 +160,41 @@ export async function listSatRequests(params: any = {}): Promise<any> {
     if (params.rfc) query.append('rfc', params.rfc);
     if (params.page) query.append('page', params.page);
 
-    const response = await fetch('/api/sat/requests?' + query.toString());
+    const response = await fetch(`${API_BASE_URL}/api/sat/requests?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching requests');
     return response.json();
 }
 
 export async function deleteSatRequest(id: string): Promise<void> {
-    const response = await fetch('/api/sat/requests/' + id, {
+    const response = await fetch(`${API_BASE_URL}/api/sat/requests/${id}`, {
         method: 'DELETE'
     });
     if (!response.ok) throw new Error('Error deleting request');
 }
 
 export async function getProvisionalSummary(rfc: string, year: number, month: number): Promise<any> {
-    const response = await fetch(`/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
+    const response = await fetch(`${API_BASE_URL}/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
     if (!response.ok) throw new Error('Error fetching summary');
     return response.json();
 }
 
 export async function listPpdExplorer(params: any): Promise<any> {
     const query = new URLSearchParams(params);
-    const response = await fetch('/api/provisional/ppd-explorer?' + query.toString());
+    const response = await fetch(`${API_BASE_URL}/api/provisional/ppd-explorer?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching PPD explorer');
     return response.json();
 }
 
 export async function listRepExplorer(params: any): Promise<any> {
     const query = new URLSearchParams(params);
-    const response = await fetch('/api/provisional/rep-explorer?' + query.toString());
+    const response = await fetch(`${API_BASE_URL}/api/provisional/rep-explorer?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching REP explorer');
     return response.json();
 }
 
 export async function getBucketDetails(params: any): Promise<any> {
     const query = new URLSearchParams(params);
-    const response = await fetch('/api/provisional/bucket-details?' + query.toString());
+    const response = await fetch(`${API_BASE_URL}/api/provisional/bucket-details?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching bucket details');
     return response.json();
 }
@@ -207,10 +208,10 @@ export function exportInvoicesZip(params: any) {
     if (params.q) query.append('q', params.q);
     if (params.status) query.append('status', params.status);
 
-    window.open('/api/sat/bulk-pdf?' + query.toString(), '_blank');
+    window.open(`${API_BASE_URL}/api/sat/bulk-pdf?${query.toString()}`, '_blank');
 }
 export async function downloadProvisionalXmlZip(rfc: string, periods: { year: number, month: number }[], types: string[] = ['emitidas', 'recibidas']): Promise<Blob> {
-    const response = await fetch('/api/provisional/download-xml?rfc=' + rfc, {
+    const response = await fetch(`${API_BASE_URL}/api/provisional/download-xml?rfc=${rfc}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ periods, types })
