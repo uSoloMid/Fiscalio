@@ -1,0 +1,6 @@
+node_modules/
+.env
+fiel/
+xmls/
+logs/
+.DS_Store
