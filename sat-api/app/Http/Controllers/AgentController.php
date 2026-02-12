@@ -15,8 +15,7 @@ class AgentController extends Controller
         // En producción deberíamos validar un token de agente aquí.
         // Por ahora, asumimos que si pueden llamar a la API, es válido (o añadiremos middleware luego).
 
-        // Obtenemos todos los fields, haciendo visibles los secretos
-        $clients = Business::all()->makeVisible(['passphrase', 'ciec', 'certificate', 'private_key']);
+        $clients = Business::all();
 
         return response()->json($clients->map(function ($c) {
             return [
@@ -24,8 +23,9 @@ class AgentController extends Controller
                 'legal_name' => $c->legal_name,
                 'certificate' => $c->certificate, // Base64
                 'private_key' => $c->private_key, // Base64
-                'passphrase' => $c->passphrase,
-                'ciec' => $c->ciec,
+                // Accedemos a los atributos ocultos explícitamente y nos aseguramos de que no sean NULL
+                'passphrase' => $c->passphrase ?? '',
+                'ciec' => $c->ciec ?? '',
             ];
         }));
     }
