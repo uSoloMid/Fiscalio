@@ -13,6 +13,13 @@ use App\Http\Controllers\GroupController;
 use App\Http\Controllers\TagController;
 
 // unprotected routes
+Route::get('/ping', function () {
+    return 'pong';
+});
+
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok']);
+});
 Route::post('/tokens/login', [Api\TokensController::class , 'create'])->name('tokens.login');
 Route::post('/initial-set-up', Api\InitialSetUp::class)
     ->middleware(SystemHasNotBeenSetUp::class)
