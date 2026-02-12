@@ -1,33 +1,23 @@
 FROM php:8.3-fpm
 
-# System deps
 RUN apt-get update && apt-get install -y \
-    nginx \
-    supervisor \
-    git \
-    curl \
-    unzip \
-    zip \
-    libpng-dev \
-    libjpeg62-turbo-dev \
-    libfreetype6-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    libsqlite3-dev \
-    sqlite3 \
+    nginx supervisor git curl unzip zip sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions
-RUN docker-php-ext-install \
-    pdo \
+# ✅ Instalador robusto de extensiones PHP
+ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
+RUN chmod +x /usr/local/bin/install-php-extensions
+
+# ✅ Instala extensiones sin pelear con config.m4
+RUN install-php-extensions \
     pdo_sqlite \
     sqlite3 \
     mbstring \
     bcmath \
+    gd \
     soap \
-    zip \
-    gd
+    zip
+
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
