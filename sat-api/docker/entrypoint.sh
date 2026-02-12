@@ -21,6 +21,13 @@ chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 # 4. Optimizaciones de Laravel
 echo "==> Optimizando Laravel..."
 php artisan storage:link --force || true
+echo "==> Limpiando caché profunda..."
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan cache:clear || true
+php artisan view:clear || true
+
+echo "==> Re-generando caché de producción..."
 php artisan config:cache || true
 php artisan route:cache || true
 
