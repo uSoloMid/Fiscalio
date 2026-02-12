@@ -11,6 +11,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\GroupController;
 use App\Http\Controllers\TagController;
+use App\Http\Controllers\AgentController;
 
 // unprotected routes
 Route::get('/ping', function () {
@@ -93,6 +94,9 @@ Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 
 // Account routes
 Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
+
+// Agent Synchro
+Route::get('/agent/sync-clients', [AgentController::class , 'syncClients']);
 
 
 require __DIR__ . '/debug_routes.php';
