@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     unzip \
     zip \
     libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
@@ -16,8 +18,9 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
-# PHP extensions (incluye sqlite)
-RUN docker-php-ext-install \
+# PHP extensions
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install \
     pdo \
     pdo_sqlite \
     sqlite3 \
