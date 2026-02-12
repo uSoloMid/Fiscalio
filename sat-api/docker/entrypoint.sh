@@ -40,7 +40,9 @@ fi
 
 
 # Substitute $PORT in nginx config
-envsubst '$PORT' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp && mv /etc/nginx/conf.d/default.conf.tmp /etc/nginx/conf.d/default.conf
+export PORT=${PORT:-10000}
+envsubst '${PORT}' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp && mv /etc/nginx/conf.d/default.conf.tmp /etc/nginx/conf.d/default.conf
+
 
 if [ $# -gt 0 ]; then
     exec "$@"
