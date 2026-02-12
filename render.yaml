@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: fiscalio-sat-api
+    env: docker
+    rootDir: sat-api
+    plan: starter
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: fiscalio-sat-storage
+      mountPath: /var/www/storage
+      sizeGB: 10
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: APP_URL
+        value: https://TU_DOMINIO_RENDER.onrender.com
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: DB_DATABASE
+        value: /var/www/storage/database.sqlite
+      - key: RUN_MIGRATIONS
+        value: "true"
+      # PONER EN RENDER COMO SECRET:
+      # - APP_KEY
+      # - cualquier credencial SAT si aplica
+
+  - type: worker
+    name: fiscalio-sat-scheduler
+    env: docker
+    rootDir: sat-api
+    plan: starter
+    autoDeploy: true
+    disk:
+      name: fiscalio-sat-storage
+      mountPath: /var/www/storage
+      sizeGB: 10
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: APP_URL
+        value: https://TU_DOMINIO_RENDER.onrender.com
+      - key: DB_CONNECTION
+        value: sqlite
+      - key: DB_DATABASE
+        value: /var/www/storage/database.sqlite
+      # APP_KEY como Secret también aquí
+    startCommand: /entrypoint.sh php artisan schedule:work

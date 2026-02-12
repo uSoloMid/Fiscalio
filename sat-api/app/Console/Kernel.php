@@ -18,11 +18,16 @@ class Kernel extends ConsoleKernel
 
     protected function schedule($schedule)
     {
-        // Revisar sincronización de todos los negocios cada hora (el servicio protege el umbral de 12h)
-        $schedule->command('sat:sync-all')->hourly();
+        // Heartbeat para verificar que el worker está corriendo en Render
+        $schedule->call(function () {
+            \Log::info('Scheduler Heartbeat (SAT Worker Active)');
+        })->everyMinute();
 
-        // Verificar facturas antiguas cada 15 minutos en segundo plano
-        $schedule->command('sat:verify-past --limit=200')->everyFifteenMinutes();
+        // Orquestador de tareas del SAT (Sincronización + Verificación)
+        // Ejecución serial cada 15 minutos para evitar bloqueos de SQLite
+        $schedule->command('sat:run-jobs')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
     }
 
     /**

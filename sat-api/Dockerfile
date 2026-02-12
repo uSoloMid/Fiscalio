@@ -1,36 +1,51 @@
-FROM php:8.1-fpm
+FROM php:8.3-fpm
 
-# Install system dependencies
+# System deps
 RUN apt-get update && apt-get install -y \
+    nginx \
+    supervisor \
     git \
     curl \
+    unzip \
+    zip \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
-    zip \
-    unzip
+    libzip-dev \
+    libsqlite3-dev \
+    sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# PHP extensions (incluye sqlite)
+RUN docker-php-ext-install \
+    pdo \
+    pdo_sqlite \
+    sqlite3 \
+    mbstring \
+    bcmath \
+    gd \
+    soap \
+    zip
 
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd soap
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Get latest Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-# Set working directory
 WORKDIR /var/www
 
-# Copy existing application directory contents
+# Copia código
 COPY . /var/www
 
-# Install dependencies
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+# Permisos básicos (storage irá en disk persistente)
+RUN chown -R www-data:www-data /var/www
 
-# Change current user to www
-USER www-data
+# Instala deps sin dev
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-# Expose port 9000 and start php-fpm server
-EXPOSE 9000
-CMD ["php-fpm"]
+# Nginx config + supervisor + entrypoint
+COPY ./nginx/render.conf /etc/nginx/conf.d/default.conf
+COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY ./docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 10000
+CMD ["/entrypoint.sh"]
