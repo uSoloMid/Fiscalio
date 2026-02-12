@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-echo "==> Iniciando Entrypoint Profesional (Socket Mode)..."
+echo "==> Iniciando Entrypoint Profesional (Debug Mode)..."
 
 # 1. Preparar almacenamiento
 mkdir -p /var/www/storage/app/public /var/www/storage/framework/{cache,sessions,views} /var/www/storage/logs /var/www/bootstrap/cache
@@ -30,7 +30,7 @@ mkdir -p /var/run/php
 chown -R www-data:www-data /var/run/php
 chmod 755 /var/run/php
 
-# Si borramos el conf anterior en pasos previos, aseguramos que exista uno base
+# Asegurar que exista el pool config
 if [ ! -f /usr/local/etc/php-fpm.d/www.conf ]; then
     echo '[www]
 user = www-data
@@ -45,24 +45,26 @@ fi
 
 # Forzar escucha en socket
 sed -i 's|^listen = .*|listen = /var/run/php/php-fpm.sock|g' /usr/local/etc/php-fpm.d/www.conf
-
-# Asegurar permisos del socket
-grep -q '^listen.owner' /usr/local/etc/php-fpm.d/www.conf \
-  && sed -i 's|^listen.owner = .*|listen.owner = www-data|g' /usr/local/etc/php-fpm.d/www.conf \
-  || echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf
-
-grep -q '^listen.group' /usr/local/etc/php-fpm.d/www.conf \
-  && sed -i 's|^listen.group = .*|listen.group = www-data|g' /usr/local/etc/php-fpm.d/www.conf \
-  || echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf
-
-grep -q '^listen.mode' /usr/local/etc/php-fpm.d/www.conf \
-  && sed -i 's|^listen.mode = .*|listen.mode = 0660|g' /usr/local/etc/php-fpm.d/www.conf \
-  || echo "listen.mode = 0660" >> /usr/local/etc/php-fpm.d/www.conf
+echo "listen.owner = www-data" >> /usr/local/etc/php-fpm.d/www.conf
+echo "listen.group = www-data" >> /usr/local/etc/php-fpm.d/www.conf
+echo "listen.mode = 0660" >> /usr/local/etc/php-fpm.d/www.conf
 
 # 6. ✅ CONFIGURACIÓN DE NGINX ($PORT)
 REAL_PORT=${PORT:-10000}
-echo "==> Configurando Nginx en puerto: $REAL_PORT"
-sed -i "s/\${PORT}/$REAL_PORT/g" /etc/nginx/conf.d/default.conf
+echo "==> Usando PORT=$REAL_PORT"
+
+# Forzar el config correcto desde el código hacia la carpeta de Nginx
+cp -f /var/www/nginx/render.conf /etc/nginx/conf.d/default.conf 2>/dev/null || true
+
+# Reemplazar ${PORT} en TODOS los conf de nginx para no fallar
+sed -i "s/\${PORT}/$REAL_PORT/g" /etc/nginx/conf.d/*.conf
+
+# Debug: Verificar config
+echo "==> Nginx conf test:"
+nginx -t || true
+
+echo "==> Port listening check:"
+grep -R "listen " -n /etc/nginx/conf.d/*.conf || true
 
 # 7. Despegue
 echo "==> ¡Sistema LISTO!"
