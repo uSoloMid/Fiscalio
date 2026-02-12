@@ -24,6 +24,12 @@ php artisan storage:link --force || true
 php artisan config:cache || true
 php artisan route:cache || true
 
+# 4.1. Migraciones (Auto-Schema)
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+    echo "==> Ejecutando migraciones..."
+    php artisan migrate --force
+fi
+
 # 5. ✅ CONFIGURACIÓN DE PHP-FPM (Unix Socket)
 echo "==> Configurando PHP-FPM por Unix Socket..."
 
