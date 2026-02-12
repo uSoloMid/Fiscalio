@@ -38,8 +38,13 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
   php artisan migrate --force || true
 fi
 
+# Substitute $PORT in nginx config
+export PORT=${PORT:-10000}
+envsubst '$PORT' < /etc/nginx/conf.d/default.conf > /etc/nginx/conf.d/default.conf.tmp && mv /etc/nginx/conf.d/default.conf.tmp /etc/nginx/conf.d/default.conf
+
 if [ $# -gt 0 ]; then
     exec "$@"
 else
     exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 fi
+

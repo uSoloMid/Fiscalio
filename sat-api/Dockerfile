@@ -1,7 +1,7 @@
 FROM php:8.3-fpm
 
 RUN apt-get update && apt-get install -y \
-    nginx supervisor git curl unzip zip sqlite3 \
+    nginx supervisor git curl unzip zip sqlite3 gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 # ✅ Instalador robusto de extensiones PHP
@@ -39,5 +39,6 @@ COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+EXPOSE 80
 EXPOSE 10000
 CMD ["/entrypoint.sh"]
