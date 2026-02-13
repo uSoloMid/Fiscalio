@@ -22,6 +22,10 @@ Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
 Route::post('/tokens/login', [Api\TokensController::class , 'create'])->name('tokens.login');
+Route::get('/health', function () {
+    return response()->json(['ok' => true]);
+})->name('health');
+
 Route::post('/initial-set-up', Api\InitialSetUp::class)
     ->middleware(SystemHasNotBeenSetUp::class)
     ->name('initial-set-up');
@@ -68,6 +72,8 @@ Route::get('/provisional/summary', [\App\Http\Controllers\ProvisionalControlCont
 Route::get('/provisional/ppd-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getPpdExplorer']);
 Route::get('/provisional/rep-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getRepExplorer']);
 Route::get('/provisional/bucket-details', [\App\Http\Controllers\ProvisionalControlController::class , 'getBucketDetails']);
+Route::post('/cfdis/{uuid}/update-deductibility', [\App\Http\Controllers\ProvisionalControlController::class , 'updateDeductibility']);
+Route::get('/provisional/export-pdf', [\App\Http\Controllers\ProvisionalControlController::class , 'exportDetailedBucketPdf']);
 Route::post('/provisional/download-xml', [\App\Http\Controllers\DownloadController::class , 'downloadXmlZip']);
 
 // Client routes

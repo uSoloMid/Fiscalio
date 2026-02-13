@@ -199,6 +199,24 @@ export async function getBucketDetails(params: any): Promise<any> {
     return response.json();
 }
 
+export async function updateDeductibility(uuid: string, data: { is_deductible: boolean, deduction_type?: string }): Promise<void> {
+    const response = await fetch(`/api/cfdis/${uuid}/update-deductibility`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error updating deductibility');
+}
+
+export function exportCfdiPdf(uuid: string) {
+    window.open(`/api/cfdis/${uuid}/pdf`, '_blank');
+}
+
+export function exportDetailedBucketPdf(params: any) {
+    const query = new URLSearchParams(params);
+    window.open('/api/provisional/export-pdf?' + query.toString(), '_blank');
+}
+
 export function exportInvoicesZip(params: any) {
     const query = new URLSearchParams();
     if (params.rfc_user) query.append('rfc_user', params.rfc_user);

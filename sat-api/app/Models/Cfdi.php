@@ -49,6 +49,8 @@ class Cfdi extends Model
         'global_periodicidad',
         'global_meses',
         'global_year',
+        'is_deductible',
+        'deduction_type',
         'fecha_fiscal',
     ];
 

@@ -338,7 +338,9 @@ class InvoiceController extends Controller
                 'uuids' => []
             ];
             foreach ($xpath->query("./$ns:CfdiRelacionado", $cfdiRelacionados) as $rel) {
-                $relData['uuids'][] = $rel->getAttribute('UUID');
+                $ruuid = strtoupper($rel->getAttribute('UUID'));
+                $relData['uuids'][] = $ruuid;
+                $relatedUuids[] = $ruuid;
             }
             $data['relacionados'] = $relData;
         }
