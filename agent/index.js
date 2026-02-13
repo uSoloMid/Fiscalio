@@ -60,14 +60,6 @@ async function syncCredentials() {
             }
 
             console.log(chalk.green(`   ✅ ${chalk.bold(rfc)}: Archivos actualizados localmente.`));
-
-            // 5. Avisar a la API para que borre las credenciales de la nube (Buzón Seguro)
-            try {
-                await axios.post(`${API_URL}/api/agent/confirm-credentials`, { rfc: rfc });
-                console.log(chalk.gray(`      🔒 Nube limpiada para ${rfc}.`));
-            } catch (confirmError) {
-                console.log(chalk.red(`      ⚠️ No se pudo limpiar la nube para ${rfc}: ${confirmError.message}`));
-            }
         }
         console.log(chalk.gray('\n✨ Sincronización completada.'));
 
@@ -89,8 +81,8 @@ async function syncCredentials() {
 // 1. Ejecutar inmediatamente al abrir
 syncCredentials();
 
-// 2. Programar revisión cada 5 minutos
-schedule.scheduleJob('*/5 * * * *', syncCredentials);
+// 2. Programar revisión cada minuto (Mantiene el servidor despierto y es reactivo)
+schedule.scheduleJob('* * * * *', syncCredentials);
 
 // Mantener vivo
-console.log(chalk.gray('⏱️  Agente activo. Revisando cambios cada 5 minutos...'));
+console.log(chalk.gray('⏱️  Agente activo. Revisando cambios cada minuto...'));

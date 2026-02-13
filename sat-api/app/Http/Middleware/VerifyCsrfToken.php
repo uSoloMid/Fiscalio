@@ -1,6 +1,7 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1)
+;
 
 namespace App\Http\Middleware;
 
@@ -14,6 +15,6 @@ class VerifyCsrfToken extends Middleware
      * @var array<string>
      */
     protected $except = [
-
+        'api/agent/*',
     ];
 }
