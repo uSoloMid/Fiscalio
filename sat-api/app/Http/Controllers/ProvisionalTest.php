@@ -1,0 +1,1 @@
+<?php namespace App\Http\Controllers; use Illuminate\Http\Request; class ProvisionalControlController extends Controller { public function getSummary() { return response()->json(['status' => 'ok']); } }

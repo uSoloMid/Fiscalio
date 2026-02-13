@@ -1,0 +1,2 @@
+<?php namespace App\Http\Controllers; use Illuminate\Http\Request; use Illuminate\Support\Facades\DB; use Illuminate\Support\Facades\Log; use Carbon\Carbon; use Throwable; class ProvisionalControlController extends Controller {
+public function getSummary(Request \) { try { \=(string)\->query('rfc'); \=(int)\->query('year'); \=(int)\->query('month');

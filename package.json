@@ -1,0 +1,20 @@
+{
+  "name": "fiscalio",
+  "version": "1.0.0",
+  "description": "Este proyecto es una herramienta robusta para la descarga, gestión y análisis de facturas (CFDI) directamente desde el SAT.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uSoloMid/Fiscalio.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/uSoloMid/Fiscalio/issues"
+  },
+  "homepage": "https://github.com/uSoloMid/Fiscalio#readme"
+}

@@ -42,6 +42,7 @@ class XmlProcessorService
 
         $xmlsProcesados = 0;
         $files = Storage::allFiles($tmpDir);
+        Log::info("Archivos encontrados en $tmpDir: " . count($files));
 
         DB::beginTransaction();
         try {
@@ -187,6 +188,15 @@ class XmlProcessorService
                 $iva = $traslados;
             if (is_numeric($ret))
                 $retenciones = $ret;
+        }
+
+        // Impuestos Locales
+        $trasladosLocales = 0;
+        $retencionesLocales = 0;
+        $impLocalNode = $xpath->query('//implocal:ImpuestosLocales')->item(0);
+        if ($impLocalNode) {
+            $trasladosLocales = $impLocalNode->getAttribute('TotaldeTraslados') ?: 0;
+            $retencionesLocales = $impLocalNode->getAttribute('TotaldeRetenciones') ?: 0;
         }
 
         try {

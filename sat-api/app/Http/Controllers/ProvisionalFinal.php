@@ -1,0 +1,1 @@
+<?php namespace App\Http\Controllers; class ProvisionalControlController extends Controller { public function getSummary() { return response()->json(['status' => 'FINAL_TEST']); } }
