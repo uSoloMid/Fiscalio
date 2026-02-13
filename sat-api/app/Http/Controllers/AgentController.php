@@ -12,6 +12,13 @@ class AgentController extends Controller
      */
     public function syncClients()
     {
-        return response()->json(['message' => 'Agent controller is working, testing DB connection...']);
+        return response()->json([
+            'message' => 'Agent controller is working',
+            'debug' => [
+                'DB_CONNECTION' => config('database.default'),
+                'DB_DATABASE' => config('database.connections.sqlite.database'),
+                'PDO_DRIVERS' => \PDO::getAvailableDrivers(),
+            ]
+        ]);
     }
 }
