@@ -101,9 +101,11 @@ Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 // Account routes
 Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
 
-// Agent Synchro
-Route::get('/agent/sync-clients', [AgentController::class , 'syncClients']);
-
+// Agent routes
+Route::prefix('agent')->group(function () {
+    Route::get('sync-clients', [AgentController::class , 'syncClients']);
+    Route::post('confirm-credentials', [AgentController::class , 'confirmCredentials']);
+});
 
 require __DIR__ . '/debug_routes.php';
 require __DIR__ . '/debug_cwd.php';

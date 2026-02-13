@@ -60,12 +60,26 @@ async function syncCredentials() {
             }
 
             console.log(chalk.green(`   ✅ ${chalk.bold(rfc)}: Archivos actualizados localmente.`));
+
+            // 5. Avisar a la API para que borre las credenciales de la nube (Buzón Seguro)
+            try {
+                await axios.post(`${API_URL}/api/agent/confirm-credentials`, { rfc: rfc });
+                console.log(chalk.gray(`      🔒 Nube limpiada para ${rfc}.`));
+            } catch (confirmError) {
+                console.log(chalk.red(`      ⚠️ No se pudo limpiar la nube para ${rfc}: ${confirmError.message}`));
+            }
         }
         console.log(chalk.gray('\n✨ Sincronización completada.'));
 
     } catch (error) {
         console.log(chalk.red('ERROR'));
-        console.error(chalk.red(`❌ Fallo al conectar con la API: ${error.message}`));
+        if (error.response) {
+            console.error(chalk.red(`❌ Error del Servidor (${error.response.status}):`));
+            console.error(chalk.gray(JSON.stringify(error.response.data, null, 2)));
+        } else {
+            console.error(chalk.red(`❌ Fallo al conectar con la API: ${error.message}`));
+        }
+
         if (error.code === 'ECONNREFUSED') {
             console.log(chalk.yellow('   Sugerencia: Revisa que la API esté corriendo o el internet funcione.'));
         }
