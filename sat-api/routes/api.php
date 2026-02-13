@@ -105,6 +105,7 @@ Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
 Route::prefix('agent')->group(function () {
     Route::get('sync-clients', [AgentController::class , 'syncClients']);
     Route::post('confirm-credentials', [AgentController::class , 'confirmCredentials']);
+    Route::get('runner-tick', [AgentController::class , 'runnerTick']);
 });
 
 require __DIR__ . '/debug_routes.php';

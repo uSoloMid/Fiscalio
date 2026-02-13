@@ -53,4 +53,25 @@ class AgentController extends Controller
 
         return response()->json(['success' => true, 'message' => "Credenciales de $rfc eliminadas de la nube."]);
     }
+
+    /**
+     * Ejecuta un ciclo del SAT Runner (Marcapasos)
+     */
+    public function runnerTick()
+    {
+        try {
+            // Ejecutamos el comando artisan sat:runner (solo una vez, sin loop)
+            \Illuminate\Support\Facades\Artisan::call('sat:runner');
+            $output = \Illuminate\Support\Facades\Artisan::output();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pulso del Runner completado',
+                'output' => $output
+            ]);
+        }
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }

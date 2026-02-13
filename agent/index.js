@@ -19,7 +19,14 @@ async function syncCredentials() {
     try {
         process.stdout.write(chalk.yellow('🔄 Sincronizando credenciales... '));
 
-        // Petición a la API
+        // 0. Pulsar el Runner (Marcapasos) para procesar solicitudes en la nube
+        try {
+            await axios.get(`${API_URL}/api/agent/runner-tick`);
+        } catch (tickErr) {
+            // Ignoramos si falla el pulso, puede ser timeout de Render
+        }
+
+        // Petición a la API de clientes
         const response = await axios.get(`${API_URL}/api/agent/sync-clients`);
         const clients = response.data;
 
