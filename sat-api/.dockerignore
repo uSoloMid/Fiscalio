@@ -1,0 +1,30 @@
+
+# Directorios de dependencias
+/vendor
+/node_modules
+
+# Logs y almacenamiento
+/storage/*.key
+/storage/logs/*.log
+/storage/framework/cache
+/storage/framework/sessions
+/storage/framework/views
+/storage/*.json
+
+# Archivos de entorno y configuración
+/.env
+/.env.backup
+/.env.production
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker y despliegue
+docker-compose.override.yml
+/test.pdf
+
+# Git
+.git
+.gitignore
+.gitattributes
