@@ -9,21 +9,13 @@ services:
     container_name: sat-api-app
     restart: unless-stopped
     working_dir: /var/www
+    ports:
+      - "${APP_PORT:-10000}:${PORT:-10000}"
+    environment:
+      - PORT=${PORT:-10000}
     volumes:
       - ./:/var/www
       - ./secrets:/var/www/secrets
-    networks:
-      - fiscalio-network
-
-  nginx:
-    image: nginx:alpine
-    container_name: sat-api-nginx
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    volumes:
-      - ./:/var/www
-      - ./nginx/conf.d/:/etc/nginx/conf.d/
     networks:
       - fiscalio-network
 
