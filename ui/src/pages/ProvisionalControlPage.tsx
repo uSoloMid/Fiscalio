@@ -190,22 +190,22 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         if (label.includes("Retenciones") && data.pue === 0 && data.ppd === 0 && data.rep === 0) return null;
 
         return (
-            <tr className={`group transition - colors ${isMain ? 'bg-gray-50/50' : 'hover:bg-gray-50'} `}>
+            <tr className={`group transition-colors ${isMain ? 'bg-gray-50/50' : 'hover:bg-gray-50'}`}>
                 <td className="py-5 px-8">
-                    <div className={`text - sm ${isMain ? 'font-bold text-gray-900' : 'font-medium text-gray-600'} `}>{label}</div>
+                    <div className={`text-sm ${isMain ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}`}>{label}</div>
                 </td>
                 <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix} _pue`)} className="text-sm font-semibold text-gray-700 hover:text-emerald-600 transition-colors">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pue`)} className="text-sm font-semibold text-gray-700 hover:text-emerald-600 transition-colors">
                         {formatCurrency(data.pue)}
                     </button>
                 </td>
                 <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix} _ppd`)} className="text-sm font-semibold text-gray-400 hover:text-emerald-600 transition-colors">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_ppd`)} className="text-sm font-semibold text-gray-400 hover:text-emerald-600 transition-colors">
                         {formatCurrency(data.ppd)}
                     </button>
                 </td>
                 <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix} _rep`)} className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_rep`)} className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
                         {formatCurrency(data.rep)}
                     </button>
                 </td>
@@ -215,7 +215,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                     </div>
                 </td>
                 <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix} _pendiente`)} className="text-sm font-semibold text-orange-500 hover:text-orange-700 transition-colors">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pendiente`)} className="text-sm font-semibold text-orange-500 hover:text-orange-700 transition-colors">
                         {formatCurrency(data.pendiente)}
                     </button>
                 </td>
