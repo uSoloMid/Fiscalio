@@ -15,7 +15,9 @@ services:
       - PORT=${PORT:-10000}
     volumes:
       - ./:/var/www
+      - ../Base_datos:/var/www/Base_datos
       - ./secrets:/var/www/secrets
+
     networks:
       - fiscalio-network
 
