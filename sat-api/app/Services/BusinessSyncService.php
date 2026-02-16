@@ -95,10 +95,12 @@ class BusinessSyncService
                 'sync_status' => 'queued'
             ]);
 
-            // Optional: Verification
-            if (!$business->last_verification_at || $business->last_verification_at < now()->subHours(24)) {
-                $this->verifyInvoices($business);
-            }
+            // Verification is now handled by the scheduled SatRunJobsCommand 15m or manually.
+            /*
+             if (!$business->last_verification_at || $business->last_verification_at < now()->subHours(24)) {
+             $this->verifyInvoices($business);
+             }
+             */
 
             return [
                 'status' => 'success',
