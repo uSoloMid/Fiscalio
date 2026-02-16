@@ -79,4 +79,10 @@ o también:
 ```
 
 ---
+
+## 📖 Documentación Avanzada
+*   [🖥️ Guía de Administración del Servidor (Mini PC)](INSTRUCCIONES_SERVIDOR.md)
+*   [🌐 Guía para trabajar desde otras máquinas (Remoto)](GUIA_TRABAJO_REMOTO.md)
+
+---
 *Desarrollado con el asistente Antigravity*
