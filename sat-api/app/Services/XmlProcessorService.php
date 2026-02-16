@@ -141,6 +141,12 @@ class XmlProcessorService
         // Comprobante (Raíz)
         $comprobante = $dom->documentElement;
         $fechaStr = $comprobante->getAttribute('Fecha');
+
+        // Preferir Fecha de Timbrado (Certificación) para la contabilidad si está disponible
+        $tfd = $xpath->query('//tfd:TimbreFiscalDigital')->item(0);
+        if ($tfd && $tfd->getAttribute('FechaTimbrado')) {
+            $fechaStr = $tfd->getAttribute('FechaTimbrado');
+        }
         $total = $comprobante->getAttribute('Total');
         $subtotal = $comprobante->getAttribute('SubTotal');
         $descuento = $comprobante->getAttribute('Descuento') ?: 0;
