@@ -139,17 +139,42 @@ class SatRunnerCommand extends Command
             if (!file_exists($extractPath))
                 mkdir($extractPath, 0777, true);
 
-            $this->info("Descomprimiendo con UNZIP en: $extractPath");
-            $cmd = "unzip -o \"$zipFullPath\" -d \"$extractPath\"";
-            exec($cmd, $output, $returnCode);
+            $this->info("Descomprimiendo en: $extractPath");
+            $zip = new \ZipArchive();
+            $opened = $zip->open($zipFullPath);
 
-            if ($returnCode === 0) {
+            if ($opened === TRUE) {
+                if (!file_exists($extractPath))
+                    mkdir($extractPath, 0777, true);
+                $zip->extractTo($extractPath);
+                $zip->close();
                 $files = scandir($extractPath);
-                $this->info("¡ÉXITO! Paquete descomprimido. Archivos encontrados: " . count($files));
+                $this->info("¡ÉXITO! Paquete descomprimido con ZipArchive. Archivos: " . count($files));
             }
             else {
-                $this->error("Error al descomprimir. Código: $returnCode");
+                $this->warn("ZipArchive falló (Código $opened). Intentando fallback...");
+                if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                    $cmd = "powershell -command \"Expand-Archive -Path '$zipFullPath' -DestinationPath '$extractPath' -Force\"";
+                    exec($cmd, $output, $returnCode);
+                    if ($returnCode === 0) {
+                        $this->info("¡ÉXITO! Paquete descomprimido con PowerShell.");
+                    }
+                    else {
+                        $this->error("Fallo total en extracción. PowerShell return: $returnCode");
+                    }
+                }
+                else {
+                    $cmd = "unzip -o \"$zipFullPath\" -d \"$extractPath\"";
+                    exec($cmd, $output, $returnCode);
+                    if ($returnCode === 0) {
+                        $this->info("¡ÉXITO! Paquete descomprimido con UNZIP.");
+                    }
+                    else {
+                        $this->error("Fallo total en extracción. UNZIP return: $returnCode");
+                    }
+                }
             }
+
         }
 
         // Ahora dejamos que el procesador original intente leer (o falle, pero ya sabremos que descomprimió)
