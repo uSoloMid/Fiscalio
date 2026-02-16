@@ -198,6 +198,8 @@ class XmlProcessorService
             $retencionesLocales = $impuestosLocalesNode->getAttribute('TotaldeRetenciones') ?: 0;
         }
 
+
+
         try {
             $fecha = new DateTimeImmutable($fechaStr);
             $fechaFiscal = $fecha;
