@@ -78,11 +78,11 @@ export async function createClient(data: FormData): Promise<any> {
     }
     return response.json();
 }
-export async function startSync(rfc: string): Promise<any> {
+export async function startSync(rfc: string, force: boolean = false): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/api/sat/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rfc })
+        body: JSON.stringify({ rfc, force })
     });
     if (!response.ok) throw new Error('Error starting sync');
     return response.json();

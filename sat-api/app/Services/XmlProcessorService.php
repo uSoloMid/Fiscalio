@@ -31,14 +31,28 @@ class XmlProcessorService
 
         // Descomprimir
         $zip = new ZipArchive;
-        if ($zip->open($fullZipPath) === TRUE) {
+        $zipOpen = $zip->open($fullZipPath);
+
+        if ($zipOpen === TRUE) {
             $zip->extractTo($fullTmpDir);
             $zip->close();
         }
         else {
-            Log::error("No se pudo abrir el ZIP: $fullZipPath");
-            return;
+            // Intentar buscar carpeta ya extraida (Fallback de SatRunnerCommand)
+            $possibleExtractedPath = substr($fullZipPath, 0, -4); // Quitar .zip
+            if (is_dir($possibleExtractedPath)) {
+                Log::info("Usando carpeta pre-extraída: $possibleExtractedPath");
+                // Copiar archivos a tmpDir para uniformizar procesamiento y limpieza
+                // O simplemente moverlos? Copiar es mas seguro.
+                // Usaremos exec para rapidez.
+                exec("cp -r \"$possibleExtractedPath/.\" \"$fullTmpDir/\"");
+            }
+            else {
+                Log::error("No se pudo abrir el ZIP y no se encontró carpeta extraída: $fullZipPath (Código: $zipOpen)");
+                return;
+            }
         }
+
 
         $xmlsProcesados = 0;
         $files = Storage::allFiles($tmpDir);

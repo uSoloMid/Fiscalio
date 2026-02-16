@@ -496,7 +496,9 @@ class InvoiceController extends Controller
         $rfc = $request->input('rfc');
         if (!$rfc)
             return response()->json(['error' => 'RFC required'], 400);
-        return response()->json($service->syncIfNeeded(\App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail()));
+
+        $force = (bool)$request->input('force', false);
+        return response()->json($service->syncIfNeeded(\App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail(), $force));
     }
     public function verifyStatus(Request $request, \App\Services\BusinessSyncService $service)
     {

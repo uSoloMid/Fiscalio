@@ -20,16 +20,16 @@ class BusinessSyncService
     /**
      * Start a sync process for a business if needed.
      */
-    public function syncIfNeeded(Business $business)
+    public function syncIfNeeded(Business $business, bool $force = false)
     {
         // Threshold: 12 hours since last sync check
         $syncThreshold = now()->subHours(12);
 
-        if ($business->is_syncing) {
+        if ($business->is_syncing && !$force) {
             return ['status' => 'already_syncing'];
         }
 
-        if ($business->last_sync_at && $business->last_sync_at > $syncThreshold) {
+        if (!$force && $business->last_sync_at && $business->last_sync_at > $syncThreshold) {
             return ['status' => 'too_recent', 'last_sync' => $business->last_sync_at];
         }
 
@@ -53,7 +53,6 @@ class BusinessSyncService
 
                 // If it's the first time syncing THIS business record, 
                 // we MUST ensure we have the 5-year history even if some invoices exist 
-                // (which could happen if the client was deleted/re-added or imported).
                 if (!$business->last_sync_at) {
                     $startDate = now()->subYears(5)->startOfYear();
                 }
@@ -62,23 +61,22 @@ class BusinessSyncService
                     $startDate = now()->subYears(5)->startOfYear();
                 }
                 else {
-                    // Incremental: latest invoice - 15 days (to be safe)
-                    $startDate = Carbon::parse($latestDate)->subDays(15)->startOfDay();
+                    // Incremental: latest invoice - 2 days (as requested by user)
+                    $startDate = Carbon::parse($latestDate)->subDays(2)->startOfDay();
                 }
 
                 $endDate = now()->subMinutes(5);
-                // Ensure endDate is not future. Although now() is current, 
-                // SAT sometimes is picky with seconds or microseconds.
-                // endOfDay() could definitely jump to tomorrow if not careful.
 
                 // Check for duplicate pending requests for this range (roughly)
+                // If it's a forced sync, we might want to allow it anyway if the date range is different
                 $exists = SatRequest::where('rfc', $business->rfc)
                     ->where('type', $type)
                     ->where('start_date', $startDate->toDateTimeString())
+                    ->where('end_date', $endDate->toDateTimeString())
                     ->whereIn('state', ['created', 'polling', 'downloading'])
                     ->exists();
 
-                if (!$exists) {
+                if (!$exists || $force) {
                     SatRequest::create([
                         'id' => (string)\Illuminate\Support\Str::uuid(),
                         'rfc' => $business->rfc,
