@@ -29,7 +29,7 @@ class ProvisionalControlController extends Controller
 
             $tcSql = "CASE WHEN moneda = 'MXN' OR moneda IS NULL THEN 1 ELSE COALESCE(NULLIF(tipo_cambio, 0), 1) END";
 
-            $getInvoicesSum = function ($direction, $metodo) use ($rfc, $startDate, $endDate, $tcSql) {
+            $getInvoicesSum = function ($direction, $metodo, $onlyDeductible = true) use ($rfc, $startDate, $endDate, $tcSql) {
                 $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
                 $query = DB::table('cfdis')
                     ->where($field, $rfc)
@@ -39,7 +39,7 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('fecha', [$startDate, $endDate]);
                 
                 if ($direction === 'egresos') {
-                    $query->where('is_deductible', true);
+                    $query->where('is_deductible', $onlyDeductible);
                 }
 
                 return $query->select(
@@ -50,7 +50,7 @@ class ProvisionalControlController extends Controller
                     )->first();
             };
 
-            $getRepSum = function($direction) use ($rfc, $startDate, $endDate) {
+            $getRepSum = function($direction, $onlyDeductible = true) use ($rfc, $startDate, $endDate) {
                 $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
                 $tcPago = "COALESCE(NULLIF(cfdi_payments.tipo_cambio_pago, 0), 1)";
 
@@ -62,7 +62,7 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
                 if ($direction === 'egresos') {
-                    $query->where('ppds.is_deductible', true);
+                    $query->where('ppds.is_deductible', $onlyDeductible);
                 }
 
                 return $query->select(
@@ -73,7 +73,7 @@ class ProvisionalControlController extends Controller
                     )->first();
             };
 
-            $getPendSum = function($direction) use ($rfc, $startDate, $endDate) {
+            $getPendSum = function($direction, $onlyDeductible = true) use ($rfc, $startDate, $endDate) {
                 $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
                 $query = DB::table('cfdis')
                     ->where($field, $rfc)
@@ -83,7 +83,7 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('fecha', [$startDate, $endDate]);
 
                 if ($direction === 'egresos') {
-                    $query->where('is_deductible', true);
+                    $query->where('is_deductible', $onlyDeductible);
                 }
 
                 $invoices = $query->get();
@@ -112,10 +112,15 @@ class ProvisionalControlController extends Controller
             $ingRep = $getRepSum('ingresos');
             $ingPend = $getPendSum('ingresos');
 
-            $egrPue = $getInvoicesSum('egresos', 'PUE');
-            $egrPpd = $getInvoicesSum('egresos', 'PPD');
-            $egrRep = $getRepSum('egresos');
-            $egrPend = $getPendSum('egresos');
+            $egrPue = $getInvoicesSum('egresos', 'PUE', true);
+            $egrPpd = $getInvoicesSum('egresos', 'PPD', true);
+            $egrRep = $getRepSum('egresos', true);
+            $egrPend = $getPendSum('egresos', true);
+
+            $ndPue = $getInvoicesSum('egresos', 'PUE', false);
+            $ndPpd = $getInvoicesSum('egresos', 'PPD', false);
+            $ndRep = $getRepSum('egresos', false);
+            $ndPend = $getPendSum('egresos', false);
 
             $totalEfectivoIng = (float)($ingPue?->total ?? 0) + (float)($ingRep?->total ?? 0);
             $totalEfectivoEgr = (float)($egrPue?->total ?? 0) + (float)($egrRep?->total ?? 0);
@@ -143,7 +148,12 @@ class ProvisionalControlController extends Controller
                     'retenciones' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'retenciones'),
                     'total' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'total'),
                 ],
-                'no_deducibles' => ['total_efectivo' => 0, 'total_pendiente' => 0],
+                'no_deducibles' => [
+                    'total_efectivo' => (float)($ndPue?->total ?? 0) + (float)($ndRep?->total ?? 0),
+                    'total_pendiente' => (float)($ndPend['total'] ?? 0),
+                    'subtotal' => $formatRow($ndPue, $ndPpd, $ndRep, $ndPend, 'subtotal'),
+                    'total' => $formatRow($ndPue, $ndPpd, $ndRep, $ndPend, 'total'),
+                ],
                 'alertas' => []
             ]);
         } catch (Throwable $e) {
@@ -158,77 +168,75 @@ class ProvisionalControlController extends Controller
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
             $bucket = (string)$request->query('bucket'); 
+            
             $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
             $startDate = "{$year}-{$strMonth}-01 00:00:00";
             $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
             $endDate = $carbonEnd->format('Y-m-d 23:59:59');
 
             $parts = explode('_', $bucket);
-            if (count($parts) < 3) return response()->json([]);
-            $dir = $parts[0]; $metodo = trim(strtoupper($parts[2]));
+            if (count($parts) < 2) return response()->json([]);
+            
+            $dir = $parts[0]; 
+            $cat = $parts[1]; 
+            $metodo = count($parts) >= 3 ? trim(strtoupper($parts[2])) : null;
+            
             $fieldRfc = ($dir === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
+            $onlyDeductible = ($dir === 'egresos' && $cat !== 'nodeducibles');
+            $onlyNonDeductible = ($dir === 'egresos' && $cat === 'nodeducibles');
 
-            if ($metodo === 'PUE' || $metodo === 'PPD') {
-                $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', $metodo)->where('es_cancelado', false)->whereBetween('fecha', [$startDate, $endDate]);
-                // if ($dir === 'egresos') $query->where('is_deductible', true);
-                $results = $query->get()->map(function($c) use ($dir) {
+            $results = collect();
+
+            if (!$metodo || $metodo === 'PUE' || $metodo === 'PPD') {
+                $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('es_cancelado', false)->whereBetween('fecha', [$startDate, $endDate]);
+                if ($metodo) $query->where('metodo_pago', $metodo);
+                else $query->whereIn('metodo_pago', ['PUE', 'PPD']);
+
+                if ($onlyDeductible) $query->where('is_deductible', true);
+                if ($onlyNonDeductible) $query->where('is_deductible', false);
+
+                $resInvoices = $query->get()->map(function($c) use ($dir) {
                     $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
                     $nombre = ($dir === 'ingresos') ? $c->name_receptor : $c->name_emisor;
                     return [
-                        'uuid' => $c->uuid, 
-                        'fecha' => substr($c->fecha, 0, 10), 
-                        'nombre' => $nombre,
-                        'subtotal' => (float)$c->subtotal * $tc, 
-                        'iva' => (float)($c->iva ?? 0) * $tc,
-                        'total' => (float)$c->total * $tc, 
-                        'metodo_pago' => $c->metodo_pago,
-                        'forma_pago' => $c->forma_pago,
-                        'is_deductible' => (bool)($c->is_deductible ?? true),
-                        'uso_cfdi' => $c->uso_cfdi ?? 'G03'
+                        'uuid' => $c->uuid, 'fecha' => substr($c->fecha, 0, 10), 'nombre' => $nombre,
+                        'subtotal' => (float)$c->subtotal * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
+                        'total' => (float)$c->total * $tc, 'metodo_pago' => $c->metodo_pago,
+                        'forma_pago' => $c->forma_pago, 'is_deductible' => (bool)($c->is_deductible ?? true), 'uso_cfdi' => $c->uso_cfdi ?? 'G03'
                     ];
                 });
-            } elseif ($metodo === 'REP') {
+                $results = $results->concat($resInvoices);
+            }
+
+            if (!$metodo || $metodo === 'REP') {
                 $query = DB::table('cfdi_payments')
                     ->join('cfdis as reps', 'cfdi_payments.uuid_pago', '=', 'reps.uuid')
                     ->join('cfdis as ppds', 'cfdi_payments.uuid_relacionado', '=', 'ppds.uuid')
-                    ->where('reps.' . $fieldRfc, $rfc)
-                    ->where('reps.es_cancelado', false)
-                    ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
-                // if ($dir === 'egresos') $query->where('ppds.is_deductible', true);
-                $results = $query->select(
-                        'cfdi_payments.*', 
-                        'ppds.name_receptor', 'ppds.name_emisor',
-                        'ppds.subtotal as ppd_sub', 
-                        'ppds.iva as ppd_iva',
-                        'ppds.total as ppd_tot', 
-                        'ppds.moneda as ppd_mon', 
-                        'ppds.tipo_cambio as ppd_tc',
-                        'ppds.forma_pago',
-                        'ppds.is_deductible',
-                        'ppds.uso_cfdi'
-                    )
-                    ->get()
-                    ->map(function($p) use ($dir) {
+                    ->where('reps.' . $fieldRfc, $rfc)->where('reps.es_cancelado', false)->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
+
+                if ($onlyDeductible) $query->where('ppds.is_deductible', true);
+                if ($onlyNonDeductible) $query->where('ppds.is_deductible', false);
+
+                $resReps = $query->select('cfdi_payments.*', 'ppds.name_receptor', 'ppds.name_emisor', 'ppds.subtotal as ppd_sub', 'ppds.iva as ppd_iva', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc', 'ppds.forma_pago', 'ppds.is_deductible', 'ppds.uso_cfdi')
+                    ->get()->map(function($p) use ($dir) {
                         $ratio = $p->ppd_tot > 0 ? ($p->monto_pagado / $p->ppd_tot) : 0;
                         $tc = (strtoupper($p->ppd_mon ?? 'MXN') === 'MXN') ? 1 : ($p->ppd_tc ?: 1);
                         $nombre = ($dir === 'ingresos') ? $p->name_receptor : $p->name_emisor;
                         return [
-                            'uuid' => $p->uuid_pago, 
-                            'fecha' => substr($p->fecha_pago, 0, 10), 
-                            'nombre' => $nombre,
-                            'subtotal' => (float)($p->ppd_sub ?? 0) * $ratio * $tc, 
-                            'iva' => (float)($p->ppd_iva ?? 0) * $ratio * $tc,
-                            'total' => (float)$p->monto_pagado, 
-                            'metodo_pago' => 'REP',
-                            'forma_pago' => $p->forma_pago ?? '99',
-                            'is_deductible' => (bool)($p->is_deductible ?? true),
-                            'uso_cfdi' => $p->uso_cfdi ?? 'G03'
+                            'uuid' => $p->uuid_pago, 'fecha' => substr($p->fecha_pago, 0, 10), 'nombre' => $nombre,
+                            'subtotal' => (float)($p->ppd_sub ?? 0) * $ratio * $tc, 'iva' => (float)($p->ppd_iva ?? 0) * $ratio * $tc,
+                            'total' => (float)$p->monto_pagado, 'metodo_pago' => 'REP', 'forma_pago' => $p->forma_pago ?? '99', 'is_deductible' => (bool)($p->is_deductible ?? true), 'uso_cfdi' => $p->uso_cfdi ?? 'G03'
                         ];
                     });
-            } elseif ($metodo === 'PENDIENTE') {
+                $results = $results->concat($resReps);
+            }
+
+            if (!$metodo || $metodo === 'PENDIENTE') {
                 $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false)->whereBetween('fecha', [$startDate, $endDate]);
-                // if ($dir === 'egresos') $query->where('is_deductible', true);
-                $results = $query->get()->map(function($c) use ($endDate, $dir) {
+                if ($onlyDeductible) $query->where('is_deductible', true);
+                if ($onlyNonDeductible) $query->where('is_deductible', false);
+
+                $resPend = $query->get()->map(function($c) use ($endDate, $dir) {
                     $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
                     $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->where('fecha_pago', '<=', $endDate)->sum('monto_pagado');
                     $bal = max(0, (float)$c->total - (float)$pagado);
@@ -236,20 +244,15 @@ class ProvisionalControlController extends Controller
                     $ratio = $c->total > 0 ? ($bal / (float)$c->total) : 0;
                     $nombre = ($dir === 'ingresos') ? $c->name_receptor : $c->name_emisor;
                     return [
-                        'uuid' => $c->uuid, 
-                        'fecha' => substr($c->fecha, 0, 10), 
-                        'nombre' => $nombre,
-                        'subtotal' => (float)$c->subtotal * $ratio * $tc, 
-                        'iva' => (float)($c->iva ?? 0) * $ratio * $tc,
-                        'total' => $bal * $tc, 
-                        'metodo_pago' => $c->metodo_pago,
-                        'is_deductible' => (bool)($c->is_deductible ?? true),
-                        'uso_cfdi' => $c->uso_cfdi ?? 'G03',
-                        'forma_pago' => $c->forma_pago
+                        'uuid' => $c->uuid, 'fecha' => substr($c->fecha, 0, 10), 'nombre' => $nombre,
+                        'subtotal' => (float)$c->subtotal * $ratio * $tc, 'iva' => (float)($c->iva ?? 0) * $ratio * $tc,
+                        'total' => $bal * $tc, 'metodo_pago' => $c->metodo_pago, 'is_deductible' => (bool)($c->is_deductible ?? true), 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 'forma_pago' => $c->forma_pago
                     ];
                 })->filter()->values();
-            } else { return response()->json([]); }
-            return response()->json($results);
+                $results = $results->concat($resPend);
+            }
+
+            return response()->json($results->values());
         } catch (Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -259,10 +262,7 @@ class ProvisionalControlController extends Controller
     {
         try {
             $cfdi = \App\Models\Cfdi::where('uuid', $uuid)->firstOrFail();
-            $cfdi->update([
-                'is_deductible' => $request->input('is_deductible'),
-                'deduction_type' => $request->input('deduction_type', $cfdi->deduction_type)
-            ]);
+            $cfdi->update(['is_deductible' => $request->input('is_deductible'), 'deduction_type' => $request->input('deduction_type', $cfdi->deduction_type)]);
             return response()->json(['ok' => true]);
         } catch (Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
@@ -271,7 +271,6 @@ class ProvisionalControlController extends Controller
 
     public function exportDetailedBucketPdf(Request $request)
     {
-        // Placeholder for PDF export logic if needed
         return response()->json(['error' => 'Not implemented yet'], 501);
     }
 }
