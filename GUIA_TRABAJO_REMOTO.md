@@ -3,11 +3,17 @@
 Esta guía explica cómo colaborar en el proyecto Fiscalio desde diferentes máquinas, asegurando que la **Mini PC** siempre sea el centro de la verdad (Single Source of Truth).
 
 ## 🏗️ Arquitectura del Sistema
-El sistema no es solo una web; es un ecosistema distribuido:
-1.  **Servidor (Mini PC):** Hosteado en la red local (`192.168.100.97`) o vía Tailscale/Cloudflare.
-2.  **Base de Datos:** SQLite centralizado en la Mini PC.
-    *   **Ruta en Producción:** `~/Fiscalio/sat-api/database/database.sqlite` (dentro del contenedor `/var/www/database/database.sqlite`).
-3.  **Servicios:** Orquestados por Docker (API, Runner, Agent, Tunnel).
+El sistema tiene dos entornos coexistiendo en la Mini PC:
+
+1.  **Producción (Rama `main`):**
+    *   **Directorio:** `~/Fiscalio`
+    *   **Puerto:** `8080`
+    *   **Base de Datos:** `Base_datos/database.sqlite` (Mapeada en container como `/var/www/Base_datos/database.sqlite`).
+2.  **Desarrollo/Pruebas (Rama `dev`):**
+    *   **Directorio:** `~/Fiscalio-Test`
+    *   **Puerto:** `10001`
+    *   **Base de Datos:** `Base_datos/database_dev.sqlite` (Mapeada en container como `/var/www/Base_datos/database_dev.sqlite`).
+
 
 ---
 
@@ -59,9 +65,10 @@ Si quieres probar algo localmente con los 3 clientes y CFDI reales:
 
 ### Para los Agentes IA (Antigravity):
 El agente (yo) ahora tiene acceso SSH a la Mini PC. Puedo:
-*   Ver logs: `docker logs -f sat-api-app`.
+*   Ver logs: `docker logs -f sat-api-app` (Prod) o `docker logs -f sat-api-app-test` (Dev).
 *   Ejecutar comandos Artisan: `docker exec sat-api-app php artisan ...`.
-*   Arreglar el `.env` si el sistema se cae.
+*   Sincronizar ramas: Puedo mover cambios entre `main` y `dev`.
+
 
 ---
 

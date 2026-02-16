@@ -189,6 +189,16 @@ class XmlProcessorService
                 $retenciones = $ret;
         }
 
+        // Impuestos Locales
+        $trasladosLocales = 0;
+        $retencionesLocales = 0;
+        $impuestosLocalesNode = $xpath->query('//implocal:ImpuestosLocales')->item(0);
+        if ($impuestosLocalesNode) {
+            $trasladosLocales = $impuestosLocalesNode->getAttribute('TotaldeTraslados') ?: 0;
+            $retencionesLocales = $impuestosLocalesNode->getAttribute('TotaldeRetenciones') ?: 0;
+        }
+
+
         try {
             $fecha = new DateTimeImmutable($fechaStr);
             $fechaFiscal = $fecha;

@@ -36,7 +36,10 @@ class Cfdi extends Model
         'concepto',
         'iva',
         'retenciones',
+        'traslados_locales',
+        'retenciones_locales',
         'path_xml',
+
         'request_id',
         'estado_sat',
         'es_cancelado',
@@ -59,7 +62,10 @@ class Cfdi extends Model
         'total' => 'decimal:2',
         'iva' => 'decimal:2',
         'retenciones' => 'decimal:2',
+        'traslados_locales' => 'decimal:2',
+        'retenciones_locales' => 'decimal:2',
         'xml_data' => 'array',
+
     ];
     public function pagosRelacionados()
     {
