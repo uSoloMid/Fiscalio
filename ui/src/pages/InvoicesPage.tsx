@@ -222,7 +222,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const handleAutoSync = async (manual = false) => {
         setSyncing(true);
         try {
-            const res = await startSync(activeRfc);
+            const res = await startSync(activeRfc, manual);
             if (res.last_sync) {
                 setLastSyncAt(res.last_sync);
             }
