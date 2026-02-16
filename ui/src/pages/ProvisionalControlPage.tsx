@@ -447,10 +447,9 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                         const isExpanded = expandedCard === item.uuid;
                                         return (
                                             <div
-                                                key={idx}
+                                                key={item.uuid}
                                                 onClick={() => setExpandedCard(isExpanded ? null : item.uuid)}
-                                                className={`p - 5 bg - white transition - all border rounded - [24px] cursor - pointer group relative overflow - hidden ${!item.is_deductible ? 'border-orange-200 bg-orange-50/20 opacity-80' : 'border-transparent hover:shadow-xl hover:border-emerald-100 shadow-sm'
-                                                    } `}
+                                                className={`p-5 bg-white transition-all border rounded-[24px] cursor-pointer group relative overflow-hidden ${!item.is_deductible ? 'border-orange-200 bg-orange-50/20 opacity-80' : 'border-transparent hover:shadow-xl hover:border-emerald-100 shadow-sm'} `}
                                             >
                                                 {!item.is_deductible && (
                                                     <div className="absolute top-0 right-10 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-b-lg">No Deducible</div>
