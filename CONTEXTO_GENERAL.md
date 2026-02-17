@@ -32,9 +32,11 @@ Cada vez que realices un cambio en el backend (`sat-api`), debes seguir este flu
 - **Fecha Fiscal**: Para el módulo de **Control Provisional**, la fecha contable principal es la **Fecha de Timbrado** (nodo `TimbreFiscalDigital`) o el nodo de `InformacionGlobal`.
 - **Transparencia**: El usuario exige ver el 100% de la información en desgloses (incluyendo facturas no deducibles o excluidas) para poder auditarlas manualmente.
 
-## 4. ESTADO ACTUAL (16 de Febrero, 2026)
+## 4. ESTADO ACTUAL (17 de Febrero, 2026)
 - **Módulo Control Provisional**: Se ha corregido el desglose detallado. Ahora soporta clics en etiquetas generales y desglosa correctamente por método (PUE, PPD, REP).
-- **Procesador XML**: Se configuró para priorizar la fecha del certificado (Fecha de Timbrado) al indexar nuevas facturas, asegurando que las facturas globales caigan en el mes que les corresponde legalmente.
+- **Procesador XML**: Se eliminó la lógica que sobrescribía la fecha fiscal basándose en el nodo de Información Global. Ahora se respeta estrictamente la fecha de emisión del XML para la categorización mensual.
+- **Exportación Excel**: Se implementó la funcionalidad de exportar facturas a Excel con selección de columnas personalizada.
+- **Base de Datos**: Se configuró `.gitignore` para ignorar la carpeta `Base_datos` y prevenir conflictos en despliegues.
 - **Pendiente**: Limpiar advertencias de lint en `ui/src/pages/ProvisionalControlPage.tsx` y verificar el re-procesamiento de facturas antiguas para corregir sus fechas contables.
 
 ---
