@@ -37,7 +37,8 @@ Cada vez que realices un cambio en el backend (`sat-api`), debes seguir este flu
 - **Procesador XML**: Se eliminó la lógica que sobrescribía la fecha fiscal basándose en el nodo de Información Global. Ahora se respeta estrictamente la fecha de emisión del XML para la categorización mensual.
 - **Exportación Excel**: Se implementó la funcionalidad de exportar facturas a Excel con selección de columnas personalizada.
 - **Base de Datos**: Se configuró `.gitignore` para ignorar la carpeta `Base_datos` y prevenir conflictos en despliegues.
-- **Pendiente**: Limpiar advertencias de lint en `ui/src/pages/ProvisionalControlPage.tsx` y verificar el re-procesamiento de facturas antiguas para corregir sus fechas contables.
+- **Vercel Deploy**: Se corrigió un error de TypeScript en `ProvisionalControlPage.tsx` que impedía el build en Vercel.
+- **Pendiente**: Verificar el re-procesamiento de facturas antiguas para corregir sus fechas contables.
 
 ---
 **IMPORTANTE**: Si eres una IA, lee este archivo antes de sugerir cualquier cambio. Al terminar tu tarea, actualiza la sección "ESTADO ACTUAL".
