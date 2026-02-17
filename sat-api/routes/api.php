@@ -21,10 +21,34 @@ Route::get('/ping', function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
+
+Route::get('/debug-files', function () {
+    return response()->json([
+    'public' => scandir(public_path()),
+    'storage_app' => is_dir(storage_path('app')) ? scandir(storage_path('app')) : 'not a dir',
+    'storage_logs' => is_dir(storage_path('logs')) ? scandir(storage_path('logs')) : 'not a dir',
+    ]);
+});
 Route::post('/tokens/login', [Api\TokensController::class , 'create'])->name('tokens.login');
 Route::get('/health', function () {
     return response()->json(['ok' => true]);
 })->name('health');
+
+Route::get('/runner-debug', function () {
+    $pending = \App\Models\SatRequest::whereIn('state', ['created', 'polling', 'downloading'])
+        ->where(function ($q) {
+            $q->whereNull('next_retry_at')->orWhere('next_retry_at', '<=', now());
+        }
+        )->get();
+
+        return response()->json([
+        'now' => now()->toIso8601String(),
+        'pending_count' => $pending->count(),
+        'pending_sample' => $pending->take(3),
+        'total_requests' => \App\Models\SatRequest::count(),
+        'total_businesses' => \App\Models\Business::count(),
+        ]);
+    });
 
 Route::post('/initial-set-up', Api\InitialSetUp::class)
     ->middleware(SystemHasNotBeenSetUp::class)

@@ -20,6 +20,25 @@ class SatRunnerCommand extends Command
     public function handle()
     {
         $this->info("Iniciando SAT Runner... (VERSION FINALISIMA v2)");
+
+        // DEBUG INFO
+        $this->info("--- DEBUG START ---");
+        $this->info("CWD: " . getcwd());
+        $this->info("DB: " . config('database.connections.sqlite.database'));
+
+        $logPath = storage_path('logs/laravel.log');
+        if (file_exists($logPath)) {
+            $this->info("Last 5 lines of laravel.log:");
+            $lines = array_slice(file($logPath), -5);
+            foreach ($lines as $line)
+                $this->info(trim($line));
+        }
+        else {
+            $this->info("Log file not found at $logPath");
+        }
+
+        $this->info("--- DEBUG END ---");
+
         do {
             $this->tick();
             if ($this->option('loop'))

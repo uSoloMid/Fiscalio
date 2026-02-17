@@ -1,12 +1,13 @@
 <?php
-require __DIR__ . '/vendor/autoload.php';
-$app = require_once __DIR__ . '/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
-
-use App\Models\Business;
-
-$businesses = Business::all();
-foreach ($businesses as $b) {
-    echo "ID: {$b->id}, Name: {$b->name}, RFC: {$b->rfc}\n";
+$dbPath = 'C:\Fiscalio\Base_datos\database.sqlite';
+try {
+    $db = new PDO("sqlite:$dbPath");
+    $stmt = $db->query("SELECT * FROM businesses");
+    echo "Summary of businesses in database.sqlite:\n";
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        echo "- RFC: {$row['rfc']} | Legal Name: {$row['legal_name']}\n";
+    }
+}
+catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
 }
