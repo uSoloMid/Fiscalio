@@ -443,7 +443,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {detailData.map((item, idx) => {
+                                    {detailData.map((item) => {
                                         const isExpanded = expandedCard === item.uuid;
                                         return (
                                             <div
