@@ -564,6 +564,79 @@ class InvoiceController extends Controller
         ]);
     }
 
+    public function exportExcel(Request $request)
+    {
+        $query = Cfdi::query();
+        if ($request->has('rfc_user')) {
+            $rfcUser = trim(strtoupper($request->input('rfc_user')));
+            $tipo = $request->input('tipo');
+            if ($tipo === 'emitidas') {
+                $query->where('rfc_emisor', 'like', "$rfcUser%");
+            }
+            elseif ($tipo === 'recibidas') {
+                $query->where('rfc_receptor', 'like', "$rfcUser%");
+            }
+            else {
+                $query->where(function ($q) use ($rfcUser) {
+                    $q->where('rfc_emisor', 'like', "$rfcUser%")->orWhere('rfc_receptor', 'like', "$rfcUser%");
+                });
+            }
+        }
+        if ($request->filled('year')) {
+            $query->whereYear('fecha_fiscal', $request->input('year'));
+        }
+        if ($request->filled('month')) {
+            $query->whereMonth('fecha_fiscal', $request->input('month'));
+        }
+        if ($request->filled('q')) {
+            $q = $request->input('q');
+            $query->where(function ($sub) use ($q) {
+                $sub->where('uuid', 'like', "%$q%")->orWhere('rfc_emisor', 'like', "%$q%")->orWhere('rfc_receptor', 'like', "%$q%");
+            });
+        }
+        if ($request->filled('cfdi_tipo')) {
+            $query->where('tipo', $request->input('cfdi_tipo'));
+        }
+        if ($request->filled('status')) {
+            if ($request->input('status') === 'cancelados') {
+                $query->where('es_cancelado', 1);
+            }
+            else {
+                $query->where('es_cancelado', 0);
+            }
+        }
+        $query->orderBy('fecha_fiscal', 'desc');
+
+        $rows = $query->get();
+
+        $columnsParam = $request->input('columns', 'uuid,fecha,rfc_emisor,name_emisor,rfc_receptor,name_receptor,total,moneda');
+        $columns = explode(',', $columnsParam);
+
+        $callback = function () use ($rows, $columns) {
+            $file = fopen('php://output', 'w');
+            // BOM for Excel
+            fputs($file, "\xEF\xBB\xBF");
+
+            fputcsv($file, $columns);
+            foreach ($rows as $cfdi) {
+                $data = [];
+                foreach ($columns as $col) {
+                    $data[] = $cfdi->{ $col} ?? '';
+                }
+                fputcsv($file, $data);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename=export_cfdis_" . date('Y-m-d_H-i-s') . ".csv",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        ]);
+    }
+
     public function downloadBulkPdf(Request $request)
     {
         try {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
@@ -38,6 +38,36 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const [downloadTypes, setDownloadTypes] = useState<string[]>(['emitidas', 'recibidas']);
     const [selectedDownloadPeriods, setSelectedDownloadPeriods] = useState<string[]>([]);
     const [isDownloadingXml, setIsDownloadingXml] = useState(false);
+
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportColumns, setExportColumns] = useState<string[]>([
+        'uuid', 'fecha', 'serie', 'folio', 'rfc_emisor', 'name_emisor', 'rfc_receptor', 'name_receptor',
+        'concepto', 'subtotal', 'iva', 'retenciones', 'total', 'moneda', 'tipo', 'metodo_pago', 'estado_sat'
+    ]);
+    const allColumns = [
+        { id: 'uuid', label: 'UUID' },
+        { id: 'fecha', label: 'Fecha Emisión' },
+        { id: 'fecha_fiscal', label: 'Fecha Fiscal' },
+        { id: 'serie', label: 'Serie' },
+        { id: 'folio', label: 'Folio' },
+        { id: 'rfc_emisor', label: 'RFC Emisor' },
+        { id: 'name_emisor', label: 'Nombre Emisor' },
+        { id: 'rfc_receptor', label: 'RFC Receptor' },
+        { id: 'name_receptor', label: 'Nombre Receptor' },
+        { id: 'concepto', label: 'Concepto (Principal)' },
+        { id: 'subtotal', label: 'Subtotal' },
+        { id: 'descuento', label: 'Descuento' },
+        { id: 'iva', label: 'IVA' },
+        { id: 'retenciones', label: 'Retenciones' },
+        { id: 'total', label: 'Total' },
+        { id: 'moneda', label: 'Moneda' },
+        { id: 'tipo_cambio', label: 'Tipo Cambio' },
+        { id: 'forma_pago', label: 'Forma Pago' },
+        { id: 'metodo_pago', label: 'Método Pago' },
+        { id: 'uso_cfdi', label: 'Uso CFDI' },
+        { id: 'tipo', label: 'Tipo CFDI' },
+        { id: 'estado_sat', label: 'Estado SAT' },
+    ];
 
 
 
@@ -587,6 +617,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                 </button>
 
                                 <button
+                                    onClick={() => setShowExportModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-slate-900 transition-all shadow-lg shadow-slate-200"
+                                >
+                                    <span className="material-symbols-outlined text-sm">table_view</span>
+                                    Excel
+                                </button>
+
+                                <button
                                     onClick={async () => {
                                         setShowDownloadXmlModal(true);
                                         const p = await getPeriods(activeRfc);
@@ -1098,6 +1136,71 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                     )}
                 </main>
             )}
+            {/* Export Excel Modal */}
+            {showExportModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm shadow-2xl" onClick={() => setShowExportModal(false)}></div>
+                    <div className="relative bg-white w-full max-w-xl max-h-[90vh] flex flex-col rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100">
+                        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white flex-shrink-0">
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Exportar a Excel</h2>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Personaliza tu reporte</p>
+                            </div>
+                            <button onClick={() => setShowExportModal(false)} className="p-3 hover:bg-gray-50 rounded-2xl transition-all">
+                                <span className="material-symbols-outlined text-gray-400">close</span>
+                            </button>
+                        </div>
+
+                        <div className="p-8 overflow-y-auto custom-scrollbar bg-white flex-1">
+                            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-4 block">Selecciona las columnas:</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                {allColumns.map(col => (
+                                    <label key={col.id} className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all cursor-pointer ${exportColumns.includes(col.id) ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-200'}`}>
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${exportColumns.includes(col.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'}`}>
+                                            {exportColumns.includes(col.id) && <span className="material-symbols-outlined text-white text-[10px] font-bold">check</span>}
+                                        </div>
+                                        <span className={`text-xs font-bold uppercase tracking-tight ${exportColumns.includes(col.id) ? 'text-blue-700' : 'text-gray-500'}`}>{col.label}</span>
+                                        <input
+                                            type="checkbox"
+                                            className="hidden"
+                                            checked={exportColumns.includes(col.id)}
+                                            onChange={e => {
+                                                if (e.target.checked) {
+                                                    setExportColumns([...exportColumns, col.id]);
+                                                } else {
+                                                    setExportColumns(exportColumns.filter(c => c !== col.id));
+                                                }
+                                            }}
+                                        />
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="p-8 bg-gray-50 border-t border-gray-100 flex-shrink-0">
+                            <button
+                                onClick={() => {
+                                    exportCfdisExcel({
+                                        rfc_user: activeRfc,
+                                        year,
+                                        month,
+                                        tipo: (filterType === 'all' || filterType === 'canceladas') ? undefined : filterType,
+                                        status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
+                                        cfdi_tipo: filterType === 'canceladas' ? undefined : cfdiTipo,
+                                        q: search
+                                    }, exportColumns);
+                                    setShowExportModal(false);
+                                }}
+                                className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white font-black rounded-2xl transition-all text-sm uppercase tracking-widest shadow-xl shadow-gray-200 flex items-center justify-center gap-3"
+                            >
+                                <span className="material-symbols-outlined">download</span>
+                                Descargar Reporte
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Download XML Modal */}
             {showDownloadXmlModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

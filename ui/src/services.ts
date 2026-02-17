@@ -240,3 +240,19 @@ export async function downloadProvisionalXmlZip(rfc: string, periods: { year: nu
     }
     return response.blob();
 }
+
+export function exportCfdisExcel(params: any, columns: string[]) {
+    const query = new URLSearchParams();
+    if (params.rfc_user) query.append('rfc_user', params.rfc_user);
+    if (params.year) query.append('year', params.year);
+    if (params.month) query.append('month', params.month);
+    if (params.tipo && params.tipo !== 'all') query.append('tipo', params.tipo);
+    if (params.q) query.append('q', params.q);
+    if (params.status) query.append('status', params.status);
+    if (params.cfdi_tipo) query.append('cfdi_tipo', params.cfdi_tipo);
+
+    query.append('columns', columns.join(','));
+
+    // Trigger download
+    window.open(`${API_BASE_URL}/api/cfdis/export?${query.toString()}`, '_blank');
+}

@@ -72,6 +72,7 @@ Route::get('/cfdis', [InvoiceController::class , 'indexCfdis']);
 Route::get('/cfdis/{uuid}', [InvoiceController::class , 'showCfdi']);
 Route::post('/cfdis/{uuid}/refresh-status', [InvoiceController::class , 'refreshCfdiStatus']);
 Route::get('/cfdis/{uuid}/xml', [InvoiceController::class , 'downloadXml']);
+Route::get('/cfdis/export', [InvoiceController::class , 'exportExcel']);
 
 // SAT Request route
 Route::get('/sat/requests/{id}', [InvoiceController::class , 'showRequest']);

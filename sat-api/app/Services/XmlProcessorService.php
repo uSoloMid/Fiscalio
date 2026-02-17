@@ -224,25 +224,29 @@ class XmlProcessorService
             $fecha = new DateTimeImmutable($fechaStr);
             $fechaFiscal = $fecha;
 
-            // Si hay información global, la fecha fiscal de acumulación es la del periodo reportado
-            if ($globalYear && $globalMeses) {
-                // El campo Meses puede venir como '01'..'12' o '13'..'18' para bimestrales
-                // Mapeamos a un mes calendario real para la fecha fiscal (el primer mes del periodo)
-                $mesMapeado = (int)$globalMeses;
-                if ($mesMapeado > 12) {
-                    // 13: Ene-Feb, 14: Mar-Abr, etc.
-                    $mesMapeado = (($mesMapeado - 13) * 2) + 1;
-                }
+        // GLOBAL NODE LOGIC REMOVED UPON USER REQUEST (2026-02-17)
+        // The user wants the invoice to be reflected in the month of emission, regardless of the Global Information node.
 
-                // Asegurar que el año y mes sean válidos para crear la fecha fiscal
-                try {
-                    $fechaFiscal = $fechaFiscal->setDate($globalYear, $mesMapeado, 1)->setTime(0, 0, 0);
-                }
-                catch (\Exception $e) {
-                    // Fallback a fecha original si hay error en datos globales
-                    $fechaFiscal = $fecha;
-                }
-            }
+        /*
+         // Si hay información global, la fecha fiscal de acumulación es la del periodo reportado
+         if ($globalYear && $globalMeses) {
+         // El campo Meses puede venir como '01'..'12' o '13'..'18' para bimestrales
+         // Mapeamos a un mes calendario real para la fecha fiscal (el primer mes del periodo)
+         $mesMapeado = (int)$globalMeses;
+         if ($mesMapeado > 12) {
+         // 13: Ene-Feb, 14: Mar-Abr, etc.
+         $mesMapeado = (($mesMapeado - 13) * 2) + 1;
+         }
+         // Asegurar que el año y mes sean válidos para crear la fecha fiscal
+         try {
+         $fechaFiscal = $fechaFiscal->setDate($globalYear, $mesMapeado, 1)->setTime(0, 0, 0);
+         }
+         catch (\Exception $e) {
+         // Fallback a fecha original si hay error en datos globales
+         $fechaFiscal = $fecha;
+         }
+         }
+         */
         }
         catch (Exception $e) {
             $fecha = new DateTimeImmutable();
