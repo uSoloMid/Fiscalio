@@ -7,10 +7,12 @@ $kernel->bootstrap();
 use App\Models\Cfdi;
 
 echo "Checking XAXX invoices...\n";
-$cfdis = Cfdi::where('rfc_emisor', 'like', 'XAXX%')
-    ->orWhere('rfc_receptor', 'like', 'XAXX%')
+$cfdis = Cfdi::where(function ($q) {
+    $q->where('rfc_emisor', 'like', 'XAXX%')
+        ->orWhere('rfc_receptor', 'like', 'XAXX%');
+})
+    ->where('fecha', 'like', '2026-02%')
     ->orderBy('fecha', 'desc')
-    ->limit(10)
     ->get();
 
 foreach ($cfdis as $cfdi) {
