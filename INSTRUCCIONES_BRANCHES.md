@@ -12,7 +12,9 @@ Este documento define cómo trabajamos con Ramas y Vercel para mantener la estab
 - **`dev` (Desarrollo/Staging)**  
   - AQUÍ SE TRABAJA.
   - Vercel despliega automáticamente cada commit de esta rama a un entorno de "Preview".
-  - Úsala para probar cosas nuevas sin romper el servidor local del cliente.
+  - **ADVERTENCIA CRÍTICA**: Vercel apunta a la API de producción (`api.fiscalio.cloud`). 
+  - **CUIDADO**: Cualquier cambio de datos (borrar/crear facturas) en Vercel **SE REFLEJA EN LA MINI PC REAL**.
+
 
 ## 2. Flujo de Trabajo (Workflow)
 
