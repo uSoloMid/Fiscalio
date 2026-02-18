@@ -71,11 +71,12 @@ interface ProvisionalControlPageProps {
     activeRfc: string;
     clientName: string;
     onBack: () => void;
-    currentPeriod: { year: number, month: number };
+    initialYear: number;
+    initialMonth: number;
     onPeriodChange: (year: number, month: number) => void;
 }
 
-export function ProvisionalControlPage({ activeRfc, clientName, onBack, currentPeriod, onPeriodChange }: ProvisionalControlPageProps) {
+export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialYear, initialMonth, onPeriodChange }: ProvisionalControlPageProps) {
     const [summary, setSummary] = useState<SummaryData | null>(null);
     const [loading, setLoading] = useState(true);
     const [detailBucket, setDetailBucket] = useState<string | null>(null);
@@ -83,7 +84,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, currentP
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [view, setView] = useState<'summary' | 'ppd_issued' | 'ppd_received' | 'rep_issued' | 'rep_received'>('summary');
 
-    const [period, setPeriod] = useState(currentPeriod);
+    const [period, setPeriod] = useState({ year: initialYear, month: initialMonth });
     const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
 
     const fetchSummary = async () => {
