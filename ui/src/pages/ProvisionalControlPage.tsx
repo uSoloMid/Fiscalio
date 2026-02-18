@@ -149,6 +149,14 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         });
     };
 
+    const exportSummaryPdf = () => {
+        const query = new URLSearchParams();
+        query.append('rfc', activeRfc);
+        query.append('year', period.year.toString());
+        query.append('month', period.month.toString());
+        window.open(`/api/provisional/export-pdf-summary?${query.toString()}`, '_blank');
+    };
+
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
     };
@@ -169,31 +177,31 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
 
         return (
             <tr className={`group transition-colors ${isMain ? 'bg-gray-50/50' : 'hover:bg-gray-50'}`}>
-                <td className="py-5 px-8">
-                    <div className={`text-sm ${isMain ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}`}>{label}</div>
+                <td className="py-4 px-8">
+                    <div className={`text-xs ${isMain ? 'font-bold text-gray-900' : 'font-medium text-gray-600'}`}>{label}</div>
                 </td>
-                <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pue`)} className="text-sm font-semibold text-gray-700 hover:text-emerald-600 transition-colors">
+                <td className="py-4 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pue`)} className={`text-xs font-bold ${data.pue !== 0 ? 'text-gray-900' : 'text-gray-300'}`}>
                         {formatCurrency(data.pue)}
                     </button>
                 </td>
-                <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_ppd`)} className="text-sm font-semibold text-gray-400 hover:text-emerald-600 transition-colors">
+                <td className="py-4 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_ppd`)} className={`text-xs font-bold ${data.ppd !== 0 ? 'text-gray-900' : 'text-gray-300'}`}>
                         {formatCurrency(data.ppd)}
                     </button>
                 </td>
-                <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_rep`)} className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors">
+                <td className="py-4 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_rep`)} className={`text-xs font-bold ${data.rep !== 0 ? 'text-blue-600' : 'text-gray-300'}`}>
                         {formatCurrency(data.rep)}
                     </button>
                 </td>
-                <td className="py-5 px-8 text-right">
-                    <div className="text-sm font-black text-emerald-600">
+                <td className="py-4 px-8 text-right">
+                    <div className={`text-xs font-black ${bucketPrefix.startsWith('ingresos') ? 'text-emerald-600' : 'text-blue-600'}`}>
                         {formatCurrency(data.suma_efectivo)}
                     </div>
                 </td>
-                <td className="py-5 px-8 text-right">
-                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pendiente`)} className="text-sm font-semibold text-orange-500 hover:text-orange-700 transition-colors">
+                <td className="py-4 px-8 text-right">
+                    <button onClick={() => loadBucketDetail(`${bucketPrefix}_pendiente`)} className={`text-xs font-bold ${data.pendiente !== 0 ? 'text-orange-500' : 'text-gray-300'}`}>
                         {formatCurrency(data.pendiente)}
                     </button>
                 </td>
@@ -214,7 +222,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                         </button>
                         <div className="min-w-0">
                             <div className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-0.5">Control Fiscal</div>
-                            <h1 className="text-base md:text-xl font-black text-gray-900 tracking-tight flex items-center gap-1 flex-wrap">
+                            <h1 className="text-base md:text-xl font-black text-gray-900 tracking-tight flex items-center gap-1 flex-wrap uppercase">
                                 <span>Provisional</span>
                                 <span className="text-gray-300 hidden sm:inline">/</span>
                                 <span className="text-gray-500 truncate">{clientName}</span>
@@ -224,6 +232,16 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
 
                     <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-end">
                         <button
+                            onClick={exportSummaryPdf}
+                            className="p-2 md:p-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl transition-all flex items-center gap-2"
+                            title="Exportar a PDF"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-xs md:text-sm font-bold hidden sm:inline uppercase">PDF</span>
+                        </button>
+                        <button
                             onClick={() => exportProvisionalExcel({ rfc: activeRfc, year: period.year, month: period.month })}
                             className="p-2 md:p-3 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-xl transition-all flex items-center gap-2"
                             title="Exportar a Excel"
@@ -231,7 +249,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            <span className="text-xs md:text-sm font-bold hidden sm:inline">Excel</span>
+                            <span className="text-xs md:text-sm font-bold hidden sm:inline uppercase">Excel</span>
                         </button>
                         <select
                             value={period.month}
@@ -260,7 +278,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
             </header>
 
             <main className="flex-1 p-6 lg:p-10 overflow-y-auto custom-scrollbar">
-                <div className="max-w-[1600px] mx-auto space-y-10 lg:space-y-16">
+                <div className="max-w-[1400px] mx-auto space-y-12">
                     {loading ? (
                         <div className="flex flex-col items-center justify-center py-32 space-y-6">
                             <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
@@ -268,176 +286,159 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                         </div>
                     ) : (
                         <>
-                            {/* Summary Totals Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 transition-all group">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <div className="w-12 md:w-14 h-12 md:h-14 bg-emerald-50 rounded-2xl flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500">
-                                            <svg className="w-6 md:w-7 h-6 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                            </svg>
-                                        </div>
-                                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-3 py-1.5 rounded-full">Efectivo</span>
-                                    </div>
-                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ingresos del Mes</div>
-                                    <div className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">
-                                        {formatCurrency(summary?.ingresos.total_efectivo || 0)}
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all group">
-                                    <div className="flex items-center justify-between mb-6">
-                                        <div className="w-12 md:w-14 h-12 md:h-14 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all duration-500">
-                                            <svg className="w-6 md:w-7 h-6 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
-                                            </svg>
-                                        </div>
-                                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full">Deducible</span>
-                                    </div>
-                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Gastos del Mes</div>
-                                    <div className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">
-                                        {formatCurrency(summary?.egresos.total_efectivo || 0)}
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm transition-all group lg:col-span-2 overflow-hidden relative">
-                                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50/30 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-                                    <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between h-full gap-6 md:gap-0">
+                            {/* INGRESOS SECTION */}
+                            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-emerald-500/5 overflow-hidden">
+                                <div className="bg-emerald-600 p-8 md:p-10 text-white relative">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                                         <div>
-                                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                                                Balance Operativo (Estimado)
-                                            </div>
-                                            <div className="text-3xl md:text-4xl font-black text-gray-900 tracking-tighter">
-                                                {formatCurrency((summary?.ingresos.total_efectivo || 0) - (summary?.egresos.total_efectivo || 0))}
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Ingresos Efectivizados (Cobro Real)</div>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-4xl md:text-5xl font-black tracking-tighter">
+                                                    {formatCurrency(summary?.ingresos.total_efectivo || 0)}
+                                                </span>
+                                                <span className="text-xs font-bold opacity-60">MXN</span>
                                             </div>
                                         </div>
-                                        <div className="flex gap-4 md:gap-8 border-l border-gray-100 pl-0 md:pl-8 w-full md:w-auto">
-                                            <div>
-                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">IVA Trasladado</div>
-                                                <div className="text-lg font-black text-emerald-600">{formatCurrency(summary?.ingresos.iva.suma_efectivo || 0)}</div>
-                                            </div>
-                                            <div>
-                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">IVA Acreditable</div>
-                                                <div className="text-lg font-black text-blue-600">{formatCurrency(summary?.egresos.iva.suma_efectivo || 0)}</div>
-                                            </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setView('ppd_issued')}
+                                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all backdrop-blur-md border border-white/10"
+                                            >
+                                                Explorador PPD
+                                            </button>
+                                            <button
+                                                onClick={() => setView('rep_issued')}
+                                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all backdrop-blur-md border border-white/10"
+                                            >
+                                                Explorador REP
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
+                                <div className="p-2 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[800px]">
+                                        <thead>
+                                            <tr>
+                                                <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto (Ingresos)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PUE (Mes)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PPD (Mes)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">REP (Mes)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Suma Efectivo (Cobrado)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-orange-500 uppercase tracking-widest">Pendiente Final</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            <TableRow label="Base Gravable (Subtotal)" data={summary?.ingresos.subtotal} bucketPrefix="ingresos_subtotal" isMain={true} />
+                                            <TableRow label="IVA Facturado" data={summary?.ingresos.iva} bucketPrefix="ingresos_iva" />
+                                            <TableRow label="Retenciones" data={summary?.ingresos.retenciones} bucketPrefix="ingresos_retenciones" />
+                                            <TableRow label="Total Facturado" data={summary?.ingresos.total} bucketPrefix="ingresos_total" isMain={true} />
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
-                            {/* Tables Container */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
-                                {/* Ingresos Table */}
-                                <section className="space-y-6">
-                                    <div className="flex items-center justify-between px-4">
-                                        <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-3">
-                                            <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
-                                            Cuadro de Ingresos
-                                        </h2>
+                            {/* EGRESOS SECTION */}
+                            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-blue-500/5 overflow-hidden">
+                                <div className="bg-blue-600 p-8 md:p-10 text-white relative">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-2">Egresos Efectivizados (Deducciones Reales)</div>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-4xl md:text-5xl font-black tracking-tighter">
+                                                    {formatCurrency(summary?.egresos.total_efectivo || 0)}
+                                                </span>
+                                                <span className="text-xs font-bold opacity-60">MXN</span>
+                                            </div>
+                                        </div>
                                         <div className="flex gap-2">
-                                            <button onClick={() => setView('ppd_issued')} className="text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">PPD Explorer</button>
-                                            <button onClick={() => setView('rep_issued')} className="text-[10px] font-black text-gray-400 hover:text-blue-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">REP Explorer</button>
+                                            <button
+                                                onClick={() => setView('ppd_received')}
+                                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all backdrop-blur-md border border-white/10"
+                                            >
+                                                Explorador PPD
+                                            </button>
+                                            <button
+                                                onClick={() => setView('rep_received')}
+                                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all backdrop-blur-md border border-white/10"
+                                            >
+                                                Explorador REP
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden">
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="bg-gray-50/50 border-b border-gray-100">
-                                                    <th className="py-4 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PUE</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PPD</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">REP</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Efectivo</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-orange-500 uppercase tracking-widest">Pendiente</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                <TableRow label="Base (Subtotal)" data={summary?.ingresos.subtotal} bucketPrefix="ingresos_subtotal" isMain={true} />
-                                                <TableRow label="IVA (16%)" data={summary?.ingresos.iva} bucketPrefix="ingresos_iva" />
-                                                <TableRow label="Retenciones" data={summary?.ingresos.retenciones} bucketPrefix="ingresos_retenciones" />
-                                                <TableRow label="Total Facturado" data={summary?.ingresos.total} bucketPrefix="ingresos_total" isMain={true} />
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </section>
-
-                                {/* Egresos Table */}
-                                <section className="space-y-6">
-                                    <div className="flex items-center justify-between px-4">
-                                        <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-3">
-                                            <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
-                                            Cuadro de Gastos
-                                        </h2>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setView('ppd_received')} className="text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">PPD Explorer</button>
-                                            <button onClick={() => setView('rep_received')} className="text-[10px] font-black text-gray-400 hover:text-blue-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">REP Explorer</button>
-                                        </div>
-                                    </div>
-                                    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden">
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="bg-gray-50/50 border-b border-gray-100">
-                                                    <th className="py-4 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PUE</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PPD</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">REP</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-blue-600 uppercase tracking-widest">Deducible</th>
-                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-orange-500 uppercase tracking-widest">CxP</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                <TableRow label="Base (Subtotal)" data={summary?.egresos.subtotal} bucketPrefix="egresos_subtotal" isMain={true} />
-                                                <TableRow label="IVA (16%)" data={summary?.egresos.iva} bucketPrefix="egresos_iva" />
-                                                <TableRow label="Retenciones" data={summary?.egresos.retenciones} bucketPrefix="egresos_retenciones" />
-                                                <TableRow label="Total Gastado" data={summary?.egresos.total} bucketPrefix="egresos_total" isMain={true} />
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </section>
+                                </div>
+                                <div className="p-2 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[800px]">
+                                        <thead>
+                                            <tr>
+                                                <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto (Egresos)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PUE (Mes)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PPD (Mes)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">REP (Mes)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-blue-600 uppercase tracking-widest">Suma Efectivo (Deducible)</th>
+                                                <th className="py-6 px-8 text-right text-[10px] font-black text-orange-500 uppercase tracking-widest">Pendiente Final</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            <TableRow label="Base Deducible (Subtotal)" data={summary?.egresos.subtotal} bucketPrefix="egresos_subtotal" isMain={true} />
+                                            <TableRow label="IVA Acreditable (Facturado)" data={summary?.egresos.iva} bucketPrefix="egresos_iva" />
+                                            <TableRow label="Retenciones" data={summary?.egresos.retenciones} bucketPrefix="egresos_retenciones" />
+                                            <TableRow label="Total Facturado" data={summary?.egresos.total} bucketPrefix="egresos_total" isMain={true} />
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
-                            {/* No Deducibles & Alerts */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                                <section className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[3rem] p-10 text-white relative overflow-hidden group">
+                            {/* No Deducibles & Alerts (Side by Side) */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <section className="bg-gray-900 rounded-[2.5rem] p-8 md:p-10 text-white relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl -mr-32 -mt-32 transition-all duration-700 group-hover:bg-blue-500/20"></div>
                                     <div className="relative z-10">
-                                        <h3 className="text-xl font-black mb-10 tracking-tight flex items-center gap-3">
-                                            <span className="w-1.5 h-6 bg-blue-400 rounded-full"></span>
+                                        <h3 className="text-lg font-black mb-8 tracking-tight flex items-center gap-3 uppercase italic">
+                                            <span className="w-1.5 h-6 bg-blue-400 rounded-full not-italic"></span>
                                             Gastos No Deducibles
                                         </h3>
-                                        <div className="grid grid-cols-2 gap-10">
-                                            <button onClick={() => loadBucketDetail('egresos_nodeducibles')} className="text-left group/item">
-                                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Pagados (PUE/REP)</div>
-                                                <div className="text-3xl font-black group-hover/item:text-blue-300 transition-colors">{formatCurrency(summary?.no_deducibles.total_efectivo || 0)}</div>
+                                        <div className="grid grid-cols-2 gap-8">
+                                            <button onClick={() => loadBucketDetail('egresos_nodeducibles')} className="text-left group/item border-l-2 border-white/5 pl-6 hover:border-blue-400 transition-all">
+                                                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Pagados (PUE/REP)</div>
+                                                <div className="text-3xl font-black group-hover/item:text-blue-300 transition-colors tracking-tighter">{formatCurrency(summary?.no_deducibles.total_efectivo || 0)}</div>
                                             </button>
-                                            <button onClick={() => loadBucketDetail('egresos_nodeducibles_pendiente')} className="text-left group/item">
-                                                <div className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2">Pendientes (CxP)</div>
-                                                <div className="text-3xl font-black group-hover/item:text-orange-300 transition-colors">{formatCurrency(summary?.no_deducibles.total_pendiente || 0)}</div>
+                                            <button onClick={() => loadBucketDetail('egresos_nodeducibles_pendiente')} className="text-left group/item border-l-2 border-white/5 pl-6 hover:border-orange-400 transition-all">
+                                                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Pendientes (CxP)</div>
+                                                <div className="text-3xl font-black group-hover/item:text-orange-300 transition-colors tracking-tighter">{formatCurrency(summary?.no_deducibles.total_pendiente || 0)}</div>
                                             </button>
                                         </div>
                                     </div>
                                 </section>
 
-                                {summary?.alertas && summary.alertas.length > 0 && (
-                                    <section className="bg-orange-50 rounded-[3rem] p-10 border border-orange-100">
-                                        <h3 className="text-xl font-black text-orange-900 mb-6 tracking-tight flex items-center gap-3">
-                                            <span className="w-1.5 h-6 bg-orange-400 rounded-full"></span>
+                                {summary?.alertas && summary.alertas.length > 0 ? (
+                                    <section className="bg-orange-50 rounded-[2.5rem] p-8 md:p-10 border border-orange-100">
+                                        <h3 className="text-lg font-black text-orange-900 mb-6 tracking-tight flex items-center gap-3 uppercase italic">
+                                            <span className="w-1.5 h-6 bg-orange-400 rounded-full not-italic"></span>
                                             Alertas de consistencia
                                         </h3>
                                         <div className="space-y-4">
                                             {summary.alertas.map((alerta, idx) => (
-                                                <div key={idx} className="flex gap-4 items-start bg-white/50 p-5 rounded-2xl border border-orange-100">
-                                                    <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
-                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                <div key={idx} className="flex gap-4 items-start bg-white/50 p-4 rounded-2xl border border-orange-100">
+                                                    <div className="p-2 bg-orange-100 rounded-lg text-orange-600 flex-shrink-0">
+                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                                         </svg>
                                                     </div>
-                                                    <div className="text-sm font-semibold text-orange-800 leading-relaxed">{alerta.message}</div>
+                                                    <div className="text-[11px] font-bold text-orange-800 leading-tight uppercase tracking-tight">{alerta.message}</div>
                                                 </div>
                                             ))}
                                         </div>
                                     </section>
+                                ) : (
+                                    <div className="bg-emerald-50 rounded-[2.5rem] p-10 flex flex-col items-center justify-center text-center border border-emerald-100">
+                                        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-4">
+                                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                        <div className="text-sm font-black text-emerald-900 uppercase tracking-widest">Información Consistente</div>
+                                        <div className="text-[10px] font-bold text-emerald-600 mt-2 opacity-70">NO SE HAN DETECTADO DISCREPANCIAS EN ESTE PERIODO.</div>
+                                    </div>
                                 )}
                             </div>
                         </>
@@ -456,7 +457,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                     <span className="w-1.5 h-6 bg-emerald-500 rounded-full not-italic"></span>
                                     Detalle del Bucket
                                 </h3>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{detailBucket.replace(/_/g, ' ')}</p>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1 italic">{detailBucket.replace(/_/g, ' ')}</p>
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
@@ -500,7 +501,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
 
                                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                    <div className="flex items-center gap-3 mb-2 flex-wrap text-emerald-600">
                                                         <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg flex-shrink-0 tracking-widest">
                                                             {item.fecha}
                                                         </span>
@@ -511,7 +512,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                             UUID: {item.uuid}
                                                         </span>
                                                     </div>
-                                                    <div className="text-base font-black text-gray-900 truncate mb-1">{item.nombre}</div>
+                                                    <div className="text-base font-black text-gray-900 truncate mb-1 uppercase tracking-tight">{item.nombre}</div>
                                                     <div className="flex items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
                                                         <span>{USO_CFDI[item.uso_cfdi] || item.uso_cfdi}</span>
                                                         <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
@@ -520,7 +521,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                 </div>
                                                 <div className="flex flex-col md:items-end gap-1 flex-shrink-0">
                                                     <div className="text-2xl font-black text-gray-900 tracking-tighter">{formatCurrency(item.total)}</div>
-                                                    <div className="flex gap-4 text-[10px] font-black">
+                                                    <div className="flex gap-4 text-[10px] font-black uppercase tracking-widest">
                                                         <span className="text-gray-400">SUB: {formatCurrency(item.subtotal)}</span>
                                                         <span className="text-emerald-500">IVA: {formatCurrency(item.iva)}</span>
                                                     </div>
@@ -558,8 +559,8 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                         <div className="absolute bottom-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mb-20"></div>
                                         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
                                             <div>
-                                                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">Resumen Dinámico</div>
-                                                <div className="text-base font-bold text-gray-400 leading-relaxed">
+                                                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2 italic">Resumen Dinámico</div>
+                                                <div className="text-sm font-bold text-gray-400 leading-relaxed uppercase tracking-tight">
                                                     Has seleccionado <span className="text-white">{detailData.length}</span> registros que suman un total de <span className="text-white">{formatCurrency(detailData.reduce((acc, curr) => acc + curr.total, 0))}</span>.
                                                 </div>
                                             </div>

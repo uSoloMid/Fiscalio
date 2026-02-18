@@ -100,6 +100,7 @@ Route::get('/provisional/rep-explorer', [\App\Http\Controllers\ProvisionalContro
 Route::get('/provisional/bucket-details', [\App\Http\Controllers\ProvisionalControlController::class , 'getBucketDetails']);
 Route::post('/cfdis/{uuid}/update-deductibility', [\App\Http\Controllers\ProvisionalControlController::class , 'updateDeductibility']);
 Route::get('/provisional/export-pdf', [\App\Http\Controllers\ProvisionalControlController::class , 'exportDetailedBucketPdf']);
+Route::get('/provisional/export-pdf-summary', [\App\Http\Controllers\ProvisionalControlController::class , 'exportPdfSummary']);
 Route::post('/provisional/download-xml', [\App\Http\Controllers\DownloadController::class , 'downloadXmlZip']);
 
 // Client routes
