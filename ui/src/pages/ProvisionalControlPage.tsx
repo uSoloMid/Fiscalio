@@ -5,7 +5,8 @@ import {
     updateDeductibility,
     exportDetailedBucketPdf,
     exportCfdiPdf,
-    exportProvisionalExcel
+    exportProvisionalExcel,
+    exportProvisionalPdfSummary
 } from '../services';
 import { PpdExplorer, RepExplorer } from './ProvisionalExplorers';
 
@@ -148,11 +149,11 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
     };
 
     const exportSummaryPdf = () => {
-        const query = new URLSearchParams();
-        query.append('rfc', activeRfc);
-        query.append('year', period.year.toString());
-        query.append('month', period.month.toString());
-        window.open(`/api/provisional/export-pdf-summary?${query.toString()}`, '_blank');
+        exportProvisionalPdfSummary({
+            rfc: activeRfc,
+            year: period.year,
+            month: period.month
+        });
     };
 
     const formatCurrency = (amount: number) => {

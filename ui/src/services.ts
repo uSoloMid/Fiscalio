@@ -263,3 +263,11 @@ export function exportProvisionalExcel(params: { rfc: string, year: number, mont
     query.append('month', params.month.toString());
     window.open(`${API_BASE_URL}/api/provisional/export-excel?${query.toString()}`, '_blank');
 }
+
+export function exportProvisionalPdfSummary(params: { rfc: string, year: number, month: number }) {
+    const query = new URLSearchParams();
+    query.append('rfc', params.rfc);
+    query.append('year', params.year.toString());
+    query.append('month', params.month.toString());
+    window.open(`${API_BASE_URL}/api/provisional/export-pdf-summary?${query.toString()}`, '_blank');
+}
