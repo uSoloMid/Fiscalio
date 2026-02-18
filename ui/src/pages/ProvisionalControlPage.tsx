@@ -4,7 +4,8 @@ import {
     getBucketDetails,
     updateDeductibility,
     exportDetailedBucketPdf,
-    exportCfdiPdf
+    exportCfdiPdf,
+    exportProvisionalExcel
 } from '../services';
 import { PpdExplorer, RepExplorer } from './ProvisionalExplorers';
 
@@ -51,84 +52,59 @@ const USO_CFDI: Record<string, string> = {
     'I06': 'Comunicaciones telefónicas',
     'I07': 'Comunicaciones satelitales',
     'I08': 'Otra maquinaria y equipo',
-    'D01': 'Honorarios médicos/dentales',
-    'D02': 'Gastos médicos incapacidad',
+    'D01': 'Honorarios médicos, dentales y gastos hospitalarios',
+    'D02': 'Gastos médicos por incapacidad o discapacidad',
     'D03': 'Gastos funerales',
     'D04': 'Donativos',
-    'D05': 'Intereses hipotecarios',
-    'D06': 'Aportaciones SAR',
-    'D07': 'Primas seguros médicos',
-    'D08': 'Gastos transporte escolar',
-    'D09': 'Depósitos cuentas ahorro',
-    'D10': 'Colegiaturas',
+    'D05': 'Intereses reales efectivamente pagados por créditos hipotecarios (casa habitación)',
+    'D06': 'Aportaciones voluntarias al SAR',
+    'D07': 'Primas por seguros de gastos médicos',
+    'D08': 'Gastos de transportación escolar obligatoria',
+    'D09': 'Depósitos en cuentas especiales para el ahorro, primas que tengan como base planes de pensiones',
+    'D10': 'Pagos por servicios educativos (colegiaturas)',
+    'P01': 'Por definir',
     'S01': 'Sin efectos fiscales',
     'CP01': 'Pagos'
 };
 
-const FORMA_PAGO: Record<string, string> = {
-    '01': 'Efectivo',
-    '02': 'Cheque nominativo',
-    '03': 'Transferencia (SPEI)',
-    '04': 'Tarjeta de crédito',
-    '05': 'Monedero electrónico',
-    '06': 'Dinero electrónico',
-    '08': 'Vales de despensa',
-    '12': 'Dación en pago',
-    '28': 'Tarjeta de débito',
-    '29': 'Tarjeta de servicios',
-    '99': 'Por definir'
-};
+interface ProvisionalControlPageProps {
+    activeRfc: string;
+    clientName: string;
+    onBack: () => void;
+    currentPeriod: { year: number, month: number };
+    onPeriodChange: (year: number, month: number) => void;
+}
 
-export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialYear, initialMonth, onPeriodChange }: {
-    activeRfc: string,
-    clientName: string,
-    onBack: () => void,
-    initialYear: number,
-    initialMonth: number,
-    onPeriodChange: (year: number, month: number) => void
-}) {
-    const [view, setView] = useState<'summary' | 'ppd_issued' | 'ppd_received' | 'rep_issued' | 'rep_received'>('summary');
+export function ProvisionalControlPage({ activeRfc, clientName, onBack, currentPeriod, onPeriodChange }: ProvisionalControlPageProps) {
     const [summary, setSummary] = useState<SummaryData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [period, setPeriod] = useState({
-        year: initialYear,
-        month: initialMonth
-    });
-
-    // Bucket Details State
     const [detailBucket, setDetailBucket] = useState<string | null>(null);
     const [detailData, setDetailData] = useState<any[]>([]);
-    const [detailLoading, setDetailLoading] = useState(false);
-    const [expandedCard, setExpandedCard] = useState<string | null>(null);
+    const [loadingDetail, setLoadingDetail] = useState(false);
+    const [view, setView] = useState<'summary' | 'ppd_issued' | 'ppd_received' | 'rep_issued' | 'rep_received'>('summary');
 
+    const [period, setPeriod] = useState(currentPeriod);
     const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
 
-    useEffect(() => {
-        setPeriod({ year: initialYear, month: initialMonth });
-    }, [initialYear, initialMonth]);
-
     const fetchSummary = async () => {
+        setLoading(true);
         try {
-            setLoading(true);
             const data = await getProvisionalSummary(activeRfc, period.year, period.month);
             setSummary(data);
         } catch (error) {
-            console.error('Error fetching provisional summary', error);
+            console.error("Error fetching provisional summary", error);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        if (activeRfc) {
-            fetchSummary();
-        }
+        fetchSummary();
     }, [activeRfc, period]);
 
     const loadBucketDetail = async (bucket: string) => {
         setDetailBucket(bucket);
-        setDetailLoading(true);
-        setExpandedCard(null);
+        setLoadingDetail(true);
         try {
             const data = await getBucketDetails({
                 rfc: activeRfc,
@@ -138,13 +114,14 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
             });
             setDetailData(data);
         } catch (error) {
-            console.error("Error loading bucket details", error);
+            console.error("Error fetching bucket details", error);
         } finally {
-            setDetailLoading(false);
+            setLoadingDetail(false);
         }
     };
 
-    const handleToggleDeductible = async (item: any) => {
+    const toggleDeductibility = async (item: any) => {
+        if (updatingUuid) return;
         setUpdatingUuid(item.uuid);
         try {
             await updateDeductibility(item.uuid, {
@@ -245,6 +222,16 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                     </div>
 
                     <div className="flex items-center gap-2 md:gap-4 w-full md:w-auto justify-end">
+                        <button
+                            onClick={() => exportProvisionalExcel({ rfc: activeRfc, year: period.year, month: period.month })}
+                            className="p-2 md:p-3 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-xl transition-all flex items-center gap-2"
+                            title="Exportar a Excel"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span className="text-xs md:text-sm font-bold hidden sm:inline">Excel</span>
+                        </button>
                         <select
                             value={period.month}
                             onChange={(e) => {
@@ -280,289 +267,318 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                         </div>
                     ) : (
                         <>
-                            {/* Ingresos Section */}
-                            <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                                <div className="bg-white rounded-[40px] p-1 shadow-sm border border-gray-100 overflow-hidden">
-                                    <div className="px-6 lg:px-10 py-8 bg-emerald-600">
-                                        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                                            <div className="min-w-0 flex-1">
-                                                <div className="text-[10px] font-black text-emerald-100 uppercase tracking-[0.2em] mb-1 truncate">Ingresos Efectivizados (Cobro Real)</div>
-                                                <div className="text-4xl lg:text-5xl font-black text-white tracking-tighter truncate">
-                                                    {formatCurrency(summary?.ingresos.total_efectivo || 0)}
-                                                    <span className="text-lg text-emerald-100/50 ml-2 font-medium tracking-normal">MXN</span>
-                                                </div>
+                            {/* Summary Totals Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 transition-all group">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="w-12 md:w-14 h-12 md:h-14 bg-emerald-50 rounded-2xl flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all duration-500">
+                                            <svg className="w-6 md:w-7 h-6 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 px-3 py-1.5 rounded-full">Efectivo</span>
+                                    </div>
+                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Ingresos del Mes</div>
+                                    <div className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">
+                                        {formatCurrency(summary?.ingresos.total_efectivo || 0)}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all group">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="w-12 md:w-14 h-12 md:h-14 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all duration-500">
+                                            <svg className="w-6 md:w-7 h-6 md:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                                            </svg>
+                                        </div>
+                                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50 px-3 py-1.5 rounded-full">Deducible</span>
+                                    </div>
+                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Gastos del Mes</div>
+                                    <div className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter">
+                                        {formatCurrency(summary?.egresos.total_efectivo || 0)}
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm transition-all group lg:col-span-2 overflow-hidden relative">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50/30 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+                                    <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between h-full gap-6 md:gap-0">
+                                        <div>
+                                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                                                Balance Operativo (Estimado)
                                             </div>
-                                            <div className="flex flex-wrap gap-2 lg:gap-4 w-full lg:w-auto">
-                                                <button onClick={() => setView('ppd_issued')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">Explorador PPD</button>
-                                                <button onClick={() => setView('rep_issued')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">Explorador REP</button>
+                                            <div className="text-3xl md:text-4xl font-black text-gray-900 tracking-tighter">
+                                                {formatCurrency((summary?.ingresos.total_efectivo || 0) - (summary?.egresos.total_efectivo || 0))}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-4 md:gap-8 border-l border-gray-100 pl-0 md:pl-8 w-full md:w-auto">
+                                            <div>
+                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">IVA Trasladado</div>
+                                                <div className="text-lg font-black text-emerald-600">{formatCurrency(summary?.ingresos.iva.suma_efectivo || 0)}</div>
+                                            </div>
+                                            <div>
+                                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">IVA Acreditable</div>
+                                                <div className="text-lg font-black text-blue-600">{formatCurrency(summary?.egresos.iva.suma_efectivo || 0)}</div>
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
 
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left border-collapse min-w-[1000px]">
+                            {/* Tables Container */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
+                                {/* Ingresos Table */}
+                                <section className="space-y-6">
+                                    <div className="flex items-center justify-between px-4">
+                                        <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-3">
+                                            <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+                                            Cuadro de Ingresos
+                                        </h2>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setView('ppd_issued')} className="text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">PPD Explorer</button>
+                                            <button onClick={() => setView('rep_issued')} className="text-[10px] font-black text-gray-400 hover:text-blue-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">REP Explorer</button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden">
+                                        <table className="w-full text-left border-collapse">
                                             <thead>
-                                                <tr className="border-b border-gray-100">
-                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto (Ingresos)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PUE (Mes)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PPD (Mes)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-blue-500 uppercase tracking-widest text-right">REP (Mes)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-right">Suma Efectivo (Cobrado)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-orange-500 uppercase tracking-widest text-right">Pendiente Final</th>
+                                                <tr className="bg-gray-50/50 border-b border-gray-100">
+                                                    <th className="py-4 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PUE</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PPD</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">REP</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-emerald-600 uppercase tracking-widest">Efectivo</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-orange-500 uppercase tracking-widest">Pendiente</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
-                                                {summary && (
-                                                    <>
-                                                        <TableRow label="Base Gravable (Subtotal)" data={summary.ingresos.subtotal} bucketPrefix="ingresos_subtotal" />
-                                                        <TableRow label="IVA Facturado" data={summary.ingresos.iva} bucketPrefix="ingresos_iva" />
-                                                        <TableRow label="Retenciones" data={summary.ingresos.retenciones} bucketPrefix="ingresos_retenciones" />
-                                                        <TableRow label="Total Facturado" data={summary.ingresos.total} bucketPrefix="ingresos_total" isMain />
-                                                    </>
-                                                )}
+                                                <TableRow label="Base (Subtotal)" data={summary?.ingresos.subtotal} bucketPrefix="ingresos_subtotal" isMain={true} />
+                                                <TableRow label="IVA (16%)" data={summary?.ingresos.iva} bucketPrefix="ingresos_iva" />
+                                                <TableRow label="Retenciones" data={summary?.ingresos.retenciones} bucketPrefix="ingresos_retenciones" />
+                                                <TableRow label="Total Facturado" data={summary?.ingresos.total} bucketPrefix="ingresos_total" isMain={true} />
                                             </tbody>
                                         </table>
                                     </div>
-                                </div>
-                            </section>
+                                </section>
 
-                            {/* Egresos Section */}
-                            <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 relative">
-                                <div className="bg-white rounded-[40px] p-1 shadow-sm border border-gray-100 overflow-hidden">
-                                    <div className="px-6 lg:px-10 py-8 bg-blue-600 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                                        <div className="min-w-0 flex-1">
-                                            <div className="text-[10px] font-black text-blue-100 uppercase tracking-[0.2em] mb-1 truncate">Egresos Efectivizados (Deducciones Reales)</div>
-                                            <div className="flex items-baseline gap-4">
-                                                <div className="text-4xl lg:text-5xl font-black text-white tracking-tighter truncate">
-                                                    {formatCurrency(summary?.egresos.total_efectivo || 0)}
-                                                    <span className="text-lg text-blue-100/50 ml-2 font-medium tracking-normal">MXN</span>
-                                                </div>
-                                                {summary && summary.no_deducibles?.total_efectivo > 0 && (
-                                                    <div className="bg-yellow-400/20 border border-yellow-400/30 px-3 py-1 rounded-full text-yellow-300 text-[10px] font-black uppercase tracking-widest">
-                                                        Excluidos: {formatCurrency(summary.no_deducibles.total_efectivo)}
+                                {/* Egresos Table */}
+                                <section className="space-y-6">
+                                    <div className="flex items-center justify-between px-4">
+                                        <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-3">
+                                            <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
+                                            Cuadro de Gastos
+                                        </h2>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setView('ppd_received')} className="text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">PPD Explorer</button>
+                                            <button onClick={() => setView('rep_received')} className="text-[10px] font-black text-gray-400 hover:text-blue-600 uppercase tracking-widest bg-white border border-gray-100 px-3 py-1.5 rounded-xl transition-all shadow-sm">REP Explorer</button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-gray-50/50 border-b border-gray-100">
+                                                    <th className="py-4 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PUE</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">PPD</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">REP</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-blue-600 uppercase tracking-widest">Deducible</th>
+                                                    <th className="py-4 px-8 text-right text-[10px] font-black text-orange-500 uppercase tracking-widest">CxP</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                <TableRow label="Base (Subtotal)" data={summary?.egresos.subtotal} bucketPrefix="egresos_subtotal" isMain={true} />
+                                                <TableRow label="IVA (16%)" data={summary?.egresos.iva} bucketPrefix="egresos_iva" />
+                                                <TableRow label="Retenciones" data={summary?.egresos.retenciones} bucketPrefix="egresos_retenciones" />
+                                                <TableRow label="Total Gastado" data={summary?.egresos.total} bucketPrefix="egresos_total" isMain={true} />
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </section>
+                            </div>
+
+                            {/* No Deducibles & Alerts */}
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                                <section className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-[3rem] p-10 text-white relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl -mr-32 -mt-32 transition-all duration-700 group-hover:bg-blue-500/20"></div>
+                                    <div className="relative z-10">
+                                        <h3 className="text-xl font-black mb-10 tracking-tight flex items-center gap-3">
+                                            <span className="w-1.5 h-6 bg-blue-400 rounded-full"></span>
+                                            Gastos No Deducibles
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-10">
+                                            <button onClick={() => loadBucketDetail('egresos_nodeducibles')} className="text-left group/item">
+                                                <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2">Pagados (PUE/REP)</div>
+                                                <div className="text-3xl font-black group-hover/item:text-blue-300 transition-colors">{formatCurrency(summary?.no_deducibles.total_efectivo || 0)}</div>
+                                            </button>
+                                            <button onClick={() => loadBucketDetail('egresos_nodeducibles_pendiente')} className="text-left group/item">
+                                                <div className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2">Pendientes (CxP)</div>
+                                                <div className="text-3xl font-black group-hover/item:text-orange-300 transition-colors">{formatCurrency(summary?.no_deducibles.total_pendiente || 0)}</div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {summary?.alertas && summary.alertas.length > 0 && (
+                                    <section className="bg-orange-50 rounded-[3rem] p-10 border border-orange-100">
+                                        <h3 className="text-xl font-black text-orange-900 mb-6 tracking-tight flex items-center gap-3">
+                                            <span className="w-1.5 h-6 bg-orange-400 rounded-full"></span>
+                                            Alertas de consistencia
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {summary.alertas.map((alerta, idx) => (
+                                                <div key={idx} className="flex gap-4 items-start bg-white/50 p-5 rounded-2xl border border-orange-100">
+                                                    <div className="p-2 bg-orange-100 rounded-lg text-orange-600">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                        </svg>
                                                     </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2 lg:gap-4 w-full lg:w-auto">
-                                            <button onClick={() => setView('ppd_received')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">Explorador PPD</button>
-                                            <button onClick={() => setView('rep_received')} className="flex-1 lg:flex-none bg-white/10 hover:bg-white/20 px-4 lg:px-6 py-3 rounded-2xl text-white text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">Explorador REP</button>
-                                        </div>
-                                    </div>
-
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left border-collapse min-w-[1000px]">
-                                            <thead>
-                                                <tr className="border-b border-gray-100">
-                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Concepto (Egresos)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PUE (Mes)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">PPD (Mes)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-blue-500 uppercase tracking-widest text-right">REP (Mes)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-emerald-600 uppercase tracking-widest text-right">Suma Efectivo (Deducible)</th>
-                                                    <th className="py-6 px-8 text-[10px] font-black text-orange-500 uppercase tracking-widest text-right">Pendiente Final</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                {summary && (
-                                                    <>
-                                                        <TableRow label="Base Deducible (Subtotal)" data={summary.egresos.subtotal} bucketPrefix="egresos_subtotal" />
-                                                        <TableRow label="IVA Acreditable (Facturado)" data={summary.egresos.iva} bucketPrefix="egresos_iva" />
-                                                        <TableRow label="Retenciones" data={summary.egresos.retenciones} bucketPrefix="egresos_retenciones" />
-                                                        <TableRow label="Total Facturado" data={summary.egresos.total} bucketPrefix="egresos_total" isMain />
-                                                    </>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* No Deducibles Summary Row */}
-                                    {summary && summary.no_deducibles?.total_efectivo > 0 && (
-                                        <div className="bg-orange-50/50 px-8 py-4 border-t border-orange-100 flex justify-between items-center">
-                                            <div className="text-[10px] font-black text-orange-600 uppercase tracking-widest">⚠️ Comprobantes marcados como No Deducibles o Personales</div>
-                                            <div className="flex gap-8 text-right">
-                                                <div>
-                                                    <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Total Excluido (Pagado)</div>
-                                                    <div className="text-sm font-black text-orange-600">{formatCurrency(summary.no_deducibles.total_efectivo)}</div>
+                                                    <div className="text-sm font-semibold text-orange-800 leading-relaxed">{alerta.message}</div>
                                                 </div>
-                                                <div>
-                                                    <div className="text-[9px] font-bold text-gray-400 uppercase mb-1">Total Pendiente (Excluido)</div>
-                                                    <div className="text-sm font-black text-gray-500">{formatCurrency(summary.no_deducibles.total_pendiente)}</div>
-                                                </div>
-                                            </div>
+                                            ))}
                                         </div>
-                                    )}
-                                </div>
-                            </section>
+                                    </section>
+                                )}
+                            </div>
                         </>
                     )}
                 </div>
             </main>
 
-            {/* Sidebar Details Drawer */}
+            {/* Slide-over Detail Panel */}
             {detailBucket && (
-                <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onClick={() => setDetailBucket(null)}></div>
-                    <div className="relative w-full max-w-2xl bg-white h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
-                        <div className="p-8 border-b border-gray-100 flex items-center justify-between">
+                <>
+                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm z-40 transition-opacity animate-in fade-in duration-300" onClick={() => setDetailBucket(null)}></div>
+                    <div className={`absolute top-0 right-0 h-full w-full max-w-4xl bg-white shadow-2xl z-50 transform transition-transform duration-500 ease-out animate-in slide-in-from-right flex flex-col`}>
+                        <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white flex-shrink-0">
                             <div>
-                                <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Desglose Detallado</h2>
+                                <h3 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-3 italic">
+                                    <span className="w-1.5 h-6 bg-emerald-500 rounded-full not-italic"></span>
+                                    Detalle del Bucket
+                                </h3>
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">{detailBucket.replace(/_/g, ' ')}</p>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex items-center gap-3">
                                 <button
                                     onClick={handleDownloadPdf}
-                                    title="Descargar PDF Detallado"
-                                    className="p-3 hover:bg-emerald-50 text-emerald-600 rounded-2xl transition-all group border border-emerald-100"
+                                    className="p-3 bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all group"
+                                    title="Descargar PDF"
                                 >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                     </svg>
                                 </button>
-                                <button onClick={() => setDetailBucket(null)} className="p-3 hover:bg-gray-50 rounded-2xl transition-all group">
-                                    <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                                <button onClick={() => setDetailBucket(null)} className="p-3 hover:bg-gray-100 rounded-2xl transition-colors text-gray-400">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gray-50/50">
-                            {detailLoading ? (
-                                <div className="flex flex-col items-center justify-center h-full space-y-4">
-                                    <div className="w-8 h-8 border-3 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cargando CFDIs...</div>
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gray-50/30">
+                            {loadingDetail ? (
+                                <div className="flex flex-col items-center justify-center h-64 space-y-4">
+                                    <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Trayendo facturas...</div>
                                 </div>
                             ) : detailData.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                        <svg className="w-8 h-8 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                <div className="text-center py-20">
+                                    <div className="w-20 h-20 bg-gray-100 rounded-3xl flex items-center justify-center mx-auto mb-6 text-gray-300">
+                                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
                                     </div>
-                                    <p className="text-sm font-bold text-gray-400">No se encontraron comprobantes para este rubro.</p>
+                                    <div className="text-sm font-black text-gray-400 uppercase tracking-widest">No hay registros en este periodo</div>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {detailData.map((item) => {
-                                        const isExpanded = expandedCard === item.uuid;
-                                        return (
-                                            <div
-                                                key={item.uuid}
-                                                onClick={() => setExpandedCard(isExpanded ? null : item.uuid)}
-                                                className={`p-5 bg-white transition-all border rounded-[24px] cursor-pointer group relative overflow-hidden ${!item.is_deductible ? 'border-orange-200 bg-orange-50/20 opacity-80' : 'border-transparent hover:shadow-xl hover:border-emerald-100 shadow-sm'} `}
-                                            >
-                                                {!item.is_deductible && (
-                                                    <div className="absolute top-0 right-10 bg-orange-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-b-lg">No Deducible</div>
-                                                )}
+                                    {detailData.map((item) => (
+                                        <div key={item.uuid} className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-all group/item overflow-hidden relative">
+                                            {/* Decoration */}
+                                            <div className={`absolute top-0 left-0 w-1.5 h-full ${item.is_deductible ? 'bg-emerald-500' : 'bg-red-400'}`}></div>
 
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div className="min-w-0 flex-1 pr-4">
-                                                        <div className="text-[9px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1">{item.uuid}</div>
-                                                        <div className="text-sm font-black text-gray-900 leading-tight group-hover:text-emerald-600 transition-colors uppercase">{item.nombre}</div>
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                        <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg flex-shrink-0 tracking-widest">
+                                                            {item.fecha}
+                                                        </span>
+                                                        <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg tracking-widest uppercase ${item.metodo_pago === 'PUE' ? 'bg-emerald-50 text-emerald-600' : item.metodo_pago === 'REP' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
+                                                            {item.metodo_pago}
+                                                        </span>
+                                                        <span className="text-[10px] font-black bg-gray-50 text-gray-400 px-3 py-1.5 rounded-lg truncate tracking-wider">
+                                                            UUID: {item.uuid}
+                                                        </span>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className="text-base font-black text-gray-900">{formatCurrency(item.total)}</div>
-                                                        <div className="text-[10px] font-bold text-gray-400 mt-0.5">{item.fecha}</div>
+                                                    <div className="text-base font-black text-gray-900 truncate mb-1">{item.nombre}</div>
+                                                    <div className="flex items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                                                        <span>{USO_CFDI[item.uso_cfdi] || item.uso_cfdi}</span>
+                                                        <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                                                        <span>F. Pago: {item.forma_pago}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col md:items-end gap-1 flex-shrink-0">
+                                                    <div className="text-2xl font-black text-gray-900 tracking-tighter">{formatCurrency(item.total)}</div>
+                                                    <div className="flex gap-4 text-[10px] font-black">
+                                                        <span className="text-gray-400">SUB: {formatCurrency(item.subtotal)}</span>
+                                                        <span className="text-emerald-500">IVA: {formatCurrency(item.iva)}</span>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex flex-wrap gap-4 border-t border-gray-100 pt-3 mt-3">
-                                                    <div className="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100/50">
-                                                        <span className="font-bold text-gray-400 text-[8px] uppercase tracking-tighter block mb-0.5">Subtotal</span>
-                                                        <span className="font-black text-gray-700 text-xs">{formatCurrency(item.subtotal)}</span>
-                                                    </div>
-                                                    <div className="bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100/50">
-                                                        <span className="font-bold text-gray-400 text-[8px] uppercase tracking-tighter block mb-0.5">IVA</span>
-                                                        <span className="font-black text-gray-700 text-xs">{formatCurrency(item.iva)}</span>
-                                                    </div>
-
-                                                    {isExpanded && (
-                                                        <>
-                                                            <div className="w-full h-px bg-gray-50 my-1"></div>
-                                                            <div className="flex flex-wrap gap-4 w-full">
-                                                                <div className="flex-1">
-                                                                    <span className="font-bold text-gray-400 text-[8px] uppercase tracking-tighter block mb-1">Método de Pago</span>
-                                                                    <div className="text-[10px] font-bold text-gray-800 bg-gray-100 px-2 py-1 rounded-lg inline-block uppercase">
-                                                                        {item.metodo_pago === 'PUE' ? 'PUE - Una sola exhibición' : 'PPD - Diferido / Parcialidades'}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex-1">
-                                                                    <span className="font-bold text-gray-400 text-[8px] uppercase tracking-tighter block mb-1">Uso de CFDI</span>
-                                                                    <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-lg inline-block uppercase whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title={USO_CFDI[item.uso_cfdi] || item.uso_cfdi}>
-                                                                        {item.uso_cfdi} - {USO_CFDI[item.uso_cfdi] || 'No especificado'}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex-1">
-                                                                    <span className="font-bold text-gray-400 text-[8px] uppercase tracking-tighter block mb-1">Forma de Pago</span>
-                                                                    <div className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg inline-block uppercase">
-                                                                        {item.forma_pago} - {FORMA_PAGO[item.forma_pago] || 'Otros / Por definir'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </>
+                                                <div className="flex items-center gap-2 pt-4 md:pt-0 md:pl-6 md:border-l md:border-gray-50 flex-shrink-0">
+                                                    {detailBucket.startsWith('egresos') && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); toggleDeductibility(item); }}
+                                                            disabled={!!updatingUuid}
+                                                            className={`p-3 rounded-2xl transition-all group/btn ${item.is_deductible ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}
+                                                            title={item.is_deductible ? "Marcar como No Deducible" : "Marcar como Deducible"}
+                                                        >
+                                                            {updatingUuid === item.uuid ? (
+                                                                <div className="w-5 h-5 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+                                                            ) : (
+                                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.is_deductible ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"} />
+                                                                </svg>
+                                                            )}
+                                                        </button>
                                                     )}
-                                                </div>
-
-                                                <div className="mt-4 flex justify-between items-center gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleToggleDeductible(item); }}
-                                                            disabled={updatingUuid === item.uuid}
-                                                            className={`text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-all ${item.is_deductible
-                                                                ? 'bg-orange-50 text-orange-600 border-orange-100 hover:bg-orange-600 hover:text-white'
-                                                                : 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white'
-                                                                }`}
-                                                        >
-                                                            {updatingUuid === item.uuid ? 'Procesando...' : (item.is_deductible ? 'Marcar No Deducible' : 'Hacer Deducible')}
-                                                        </button>
-
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); exportCfdiPdf(item.uuid); }}
-                                                            className="flex items-center gap-2 bg-gray-50 text-gray-600 border border-gray-100 hover:bg-gray-100 px-4 py-2 rounded-xl transition-all"
-                                                            title="Descargar PDF Individual"
-                                                        >
-                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                            </svg>
-                                                            <span className="text-[9px] font-black uppercase tracking-widest">Descargar PDF</span>
-                                                        </button>
-                                                    </div>
-                                                    <svg className={`w-4 h-4 text-gray-300 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                                                    </svg>
+                                                    <button onClick={() => exportCfdiPdf(item.uuid)} className="p-3 bg-gray-50 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-2xl transition-all" title="Ver PDF">
+                                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                        </svg>
+                                                    </button>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    ))}
+
+                                    <div className="mt-12 bg-gray-900 rounded-[2.5rem] p-10 text-white relative overflow-hidden">
+                                        <div className="absolute bottom-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mb-20"></div>
+                                        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                                            <div>
+                                                <div className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-2">Resumen Dinámico</div>
+                                                <div className="text-base font-bold text-gray-400 leading-relaxed">
+                                                    Has seleccionado <span className="text-white">{detailData.length}</span> registros que suman un total de <span className="text-white">{formatCurrency(detailData.reduce((acc, curr) => acc + curr.total, 0))}</span>.
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-4 w-full md:w-auto">
+                                                <div className="flex-1 md:flex-none bg-white/5 border border-white/10 p-5 rounded-3xl text-center">
+                                                    <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Items</div>
+                                                    <div className="text-xl font-black">{detailData.length}</div>
+                                                </div>
+                                                <div className="flex-1 md:flex-none bg-white/5 border border-white/10 p-5 rounded-3xl text-center">
+                                                    <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Promedio</div>
+                                                    <div className="text-xl font-black">{formatCurrency(detailData.length > 0 ? detailData.reduce((acc, curr) => acc + curr.total, 0) / detailData.length : 0)}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
-
-                        {/* Footer Totals */}
-                        {!detailLoading && detailData.length > 0 && (
-                            <div className="p-8 bg-gray-900 text-white rounded-t-[40px] shadow-[0_-20px_40px_rgba(0,0,0,0.2)]">
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">Balances de Selección</div>
-                                    <div className="text-[10px] font-bold text-gray-600 bg-gray-800 px-3 py-1 rounded-full">{detailData.length} Comprobantes</div>
-                                </div>
-                                <div className="grid grid-cols-3 gap-6">
-                                    <div className="opacity-80">
-                                        <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Deducible Subtotal</div>
-                                        <div className="text-lg font-black tracking-tight">{formatCurrency(detailData.filter(i => i.is_deductible).reduce((acc, curr) => acc + (curr.subtotal || 0), 0))}</div>
-                                    </div>
-                                    <div className="opacity-80">
-                                        <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Excluido total</div>
-                                        <div className="text-lg font-black tracking-tight text-orange-400">{formatCurrency(detailData.filter(i => !i.is_deductible).reduce((acc, curr) => acc + (curr.total || 0), 0))}</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1.5">Neto a Sumar (MXN)</div>
-                                        <div className="text-2xl font-black tracking-tighter text-emerald-400">{formatCurrency(detailData.filter(i => i.is_deductible).reduce((acc, curr) => acc + (curr.total || 0), 0))}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </div>
+                </>
             )}
         </div>
     );

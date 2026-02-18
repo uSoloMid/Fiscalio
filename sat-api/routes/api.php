@@ -94,6 +94,7 @@ Route::get('/sat/download/{packageId}', [Api\SatController::class , 'download'])
 
 // Provisional Control routes
 Route::get('/provisional/summary', [\App\Http\Controllers\ProvisionalControlController::class , 'getSummary']);
+Route::get('/provisional/export-excel', [\App\Http\Controllers\ProvisionalControlController::class , 'exportExcel']);
 Route::get('/provisional/ppd-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getPpdExplorer']);
 Route::get('/provisional/rep-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getRepExplorer']);
 Route::get('/provisional/bucket-details', [\App\Http\Controllers\ProvisionalControlController::class , 'getBucketDetails']);
