@@ -38,7 +38,9 @@ Cada vez que realices un cambio en el backend (`sat-api`), debes seguir este flu
 - **Exportación Excel**: Se implementó la funcionalidad de exportar facturas a Excel con selección de columnas personalizada.
 - **Base de Datos**: Se configuró `.gitignore` para ignorar la carpeta `Base_datos` y prevenir conflictos en despliegues.
 - **Vercel Deploy**: Se corrigió un error de TypeScript en `ProvisionalControlPage.tsx` que impedía el build en Vercel.
-- **Pendiente**: Verificar el re-procesamiento de facturas antiguas para corregir sus fechas contables.
+- **Corrección de Fechas**: Se ejecutó un script de reparación en el servidor (`fix_dates.php`) que corrigió 47 facturas (incluyendo las de "Público en General") para que coincidan estrictamente con su fecha de emisión.
+- **Corrección Exportación**: Se ajustó la prioridad de rutas en la API para corregir el error 404 al exportar Excel.
+- **Pendiente**: Monitorear que las nuevas facturas se inserten correctamente (validado por lógica actual).
 
 ---
 **IMPORTANTE**: Si eres una IA, lee este archivo antes de sugerir cualquier cambio. Al terminar tu tarea, actualiza la sección "ESTADO ACTUAL".
