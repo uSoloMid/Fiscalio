@@ -31,6 +31,7 @@
         }
         .section {
             margin-bottom: 30px;
+            page-break-inside: avoid;
         }
         .section-header {
             padding: 10px;
@@ -94,6 +95,17 @@
             background-color: #f3f4f6;
             padding: 15px;
             border-radius: 10px;
+            page-break-inside: avoid;
+        }
+        .page-break {
+            page-break-after: always;
+        }
+        .detail-section h2 {
+            font-size: 14px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+            margin-top: 20px;
+            color: #4b5563;
         }
     </style>
 </head>
@@ -104,10 +116,10 @@
         <div class="period">Periodo: {{ $periodName }} {{ $year }}</div>
     </div>
 
-    <!-- INGRESOS -->
+    <!-- RESUMEN -->
     <div class="section">
         <div class="section-header ingresos-header">
-            INGRESOS EFECTIVIZADOS (COBRO REAL)
+            RESUMEN DE INGRESOS (COBRO REAL)
         </div>
         <div class="total-box text-emerald" style="border: 1px solid #10b981; border-top: none;">
             $ {{ number_format($data['ingresos']['total_efectivo'], 2) }} <span style="font-size: 10px; opacity: 0.7;">MXN</span>
@@ -140,16 +152,6 @@
                     <td class="text-right text-emerald">$ {{ number_format($data['ingresos']['iva']['suma_efectivo'], 2) }}</td>
                     <td class="text-right text-orange">$ {{ number_format($data['ingresos']['iva']['pendiente'], 2) }}</td>
                 </tr>
-                @if($data['ingresos']['retenciones']['suma_devengado'] != 0)
-                <tr>
-                    <td>Retenciones</td>
-                    <td class="text-right">$ {{ number_format($data['ingresos']['retenciones']['pue'], 2) }}</td>
-                    <td class="text-right">$ {{ number_format($data['ingresos']['retenciones']['ppd'], 2) }}</td>
-                    <td class="text-right">$ {{ number_format($data['ingresos']['retenciones']['rep'], 2) }}</td>
-                    <td class="text-right text-emerald">$ {{ number_format($data['ingresos']['retenciones']['suma_efectivo'], 2) }}</td>
-                    <td class="text-right text-orange">$ {{ number_format($data['ingresos']['retenciones']['pendiente'], 2) }}</td>
-                </tr>
-                @endif
                 <tr style="background-color: #f9fafb;">
                     <td class="font-bold">Total Facturado</td>
                     <td class="text-right font-bold">$ {{ number_format($data['ingresos']['total']['pue'], 2) }}</td>
@@ -162,10 +164,9 @@
         </table>
     </div>
 
-    <!-- EGRESOS -->
     <div class="section">
         <div class="section-header egresos-header">
-            EGRESOS EFECTIVIZADOS (DEDUCCIONES REALES)
+            RESUMEN DE EGRESOS (DEDUCCIONES REALES)
         </div>
         <div class="total-box text-blue" style="border: 1px solid #2563eb; border-top: none;">
             $ {{ number_format($data['egresos']['total_efectivo'], 2) }} <span style="font-size: 10px; opacity: 0.7;">MXN</span>
@@ -198,16 +199,6 @@
                     <td class="text-right text-blue">$ {{ number_format($data['egresos']['iva']['suma_efectivo'], 2) }}</td>
                     <td class="text-right text-orange">$ {{ number_format($data['egresos']['iva']['pendiente'], 2) }}</td>
                 </tr>
-                @if($data['egresos']['retenciones']['suma_devengado'] != 0)
-                <tr>
-                    <td>Retenciones</td>
-                    <td class="text-right">$ {{ number_format($data['egresos']['retenciones']['pue'], 2) }}</td>
-                    <td class="text-right">$ {{ number_format($data['egresos']['retenciones']['ppd'], 2) }}</td>
-                    <td class="text-right">$ {{ number_format($data['egresos']['retenciones']['rep'], 2) }}</td>
-                    <td class="text-right text-blue">$ {{ number_format($data['egresos']['retenciones']['suma_efectivo'], 2) }}</td>
-                    <td class="text-right text-orange">$ {{ number_format($data['egresos']['retenciones']['pendiente'], 2) }}</td>
-                </tr>
-                @endif
                 <tr style="background-color: #f9fafb;">
                     <td class="font-bold">Total Facturado</td>
                     <td class="text-right font-bold">$ {{ number_format($data['egresos']['total']['pue'], 2) }}</td>
@@ -238,6 +229,75 @@
                 <td><strong>DIFERENCIA IVA (ESTIMADA):</strong></td>
                 <td class="text-right font-bold">$ {{ number_format($data['ingresos']['iva']['suma_efectivo'] - $data['egresos']['iva']['suma_efectivo'], 2) }}</td>
             </tr>
+        </table>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- DETALLE DE FACTURAS -->
+    <div class="detail-section">
+        <h2 class="text-emerald">RELACIÓN DE INGRESOS (EFECTIVIZADOS)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th width="12%">FECHA</th>
+                    <th width="40%">NOMBRE / CLIENTE</th>
+                    <th width="8%">METODO</th>
+                    <th width="12%">SUBTOTAL</th>
+                    <th width="12%">IVA</th>
+                    <th width="16%" class="text-right">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($details['ingresos'] as $item)
+                <tr>
+                    <td>{{ $item['fecha'] }}</td>
+                    <td>{{ $item['nombre'] }}<br><span style="font-size: 7px; color: #999;">{{ $item['uuid'] }}</span></td>
+                    <td>{{ $item['metodo_pago'] }}</td>
+                    <td>$ {{ number_format($item['subtotal'], 2) }}</td>
+                    <td>$ {{ number_format($item['iva'], 2) }}</td>
+                    <td class="text-right font-bold">$ {{ number_format($item['total'], 2) }}</td>
+                </tr>
+                @endforeach
+                @if(count($details['ingresos']) == 0)
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #999; padding: 20px;">No hay registros de ingresos para este periodo.</td>
+                </tr>
+                @endif
+            </tbody>
+        </table>
+
+        <div class="page-break"></div>
+
+        <h2 class="text-blue">RELACIÓN DE EGRESOS (DEDUCIBLES)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th width="12%">FECHA</th>
+                    <th width="40%">NOMBRE / PROVEEDOR</th>
+                    <th width="8%">METODO</th>
+                    <th width="12%">SUBTOTAL</th>
+                    <th width="12%">IVA</th>
+                    <th width="16%" class="text-right">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($details['egresos'] as $item)
+                <tr>
+                    <td>{{ $item['fecha'] }}</td>
+                    <td>{{ $item['nombre'] }}<br><span style="font-size: 7px; color: #999;">{{ $item['uuid'] }}</span></td>
+                    <td>{{ $item['metodo_pago'] }}</td>
+                    <td>$ {{ number_format($item['subtotal'], 2) }}</td>
+                    <td>$ {{ number_format($item['iva'], 2) }}</td>
+                    <td class="text-right font-bold">$ {{ number_format($item['total'], 2) }}</td>
+                </tr>
+                @endforeach
+                @if(count($details['egresos']) == 0)
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #999; padding: 20px;">No hay registros de egresos para este periodo.</td>
+                </tr>
+                @endif
+            </tbody>
         </table>
     </div>
 
