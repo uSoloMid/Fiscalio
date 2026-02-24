@@ -819,7 +819,12 @@ class InvoiceController extends Controller
                     break;
             }
 
-            return response()->json(['message' => 'Procesada con éxito', 'new_state' => $req->state, 'request' => $req]);
+            $message = 'Actualización manual: estado actual es ' . $req->state;
+            if (isset($status) && $status) {
+                $message .= ' | SAT dice: ' . $status->getValue();
+            }
+
+            return response()->json(['message' => $message, 'new_state' => $req->state, 'request' => $req]);
         }
         catch (\Exception $e) {
             $req->last_error = substr($e->getMessage(), 0, 500);

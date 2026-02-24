@@ -38,11 +38,13 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
         }
     };
 
-    const handleVerify = async (id: string) => {
+    const handleVerify = async (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
         try {
             setProcessingId(id);
-            await verifySatRequest(id);
+            const res = await verifySatRequest(id);
             await fetchRequests();
+            alert(res.message || 'Consulta completada');
         } catch (error: any) {
             alert(error.message || 'Error al verificar solicitud');
         } finally {
@@ -52,6 +54,8 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
 
     useEffect(() => {
         fetchRequests();
+        const interval = setInterval(fetchRequests, 10000); // Poll every 10s
+        return () => clearInterval(interval);
     }, [page]);
 
     const getStatusColor = (state: string) => {
@@ -167,7 +171,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                                         <td className="px-8 py-5 text-right">
                                             {req.state !== 'completed' && req.state !== 'error' && req.state !== 'failed' && req.state !== 'canceled' && (
                                                 <button
-                                                    onClick={() => handleVerify(req.id)}
+                                                    onClick={(e) => handleVerify(req.id, e)}
                                                     disabled={processingId === req.id}
                                                     className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                                     title="Verificar y procesar manualmente"
