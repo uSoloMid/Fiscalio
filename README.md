@@ -1,88 +1,70 @@
-# Fiscalio - Sistema de Gestión de CFDI
+# 🚀 Fiscalio - Sistema de Gestión de CFDI
 
-Este proyecto es una herramienta robusta para la descarga, gestión y análisis de facturas (CFDI) directamente desde el SAT.
+Este documento es la fuente de verdad definitiva y unificada para cualquier desarrollador o IA que trabaje en este repositorio. Contiene el contexto operativo, arquitectura, credenciales y reglas de flujo de trabajo.
 
-## 🚀 Guía de Inicio Rápido
+## 🏗️ 1. Arquitectura e Infraestructura
+Fiscalio se divide de forma híbrida para máxima disponibilidad y procesamiento seguro:
+- **Backend (API + Runner + Agent + DB)**: Alojado localmente en una **Mini PC Linux (Ubuntu)**.
+    - **Tecnología**: Laravel 10+, PHP 8.2+, SQLite.
+    - **Servicios Docker**: `api`, `runner` (extrae XMLs del SAT en bucle), `agent` (comunicación de credenciales CIEC/FIEL con extensión), `tunnel` (Cloudflared).
+    - **Base de Datos**: SQLite, archivo físico mapeado desde el host a los contenedores.
+- **Frontend (UI)**: Alojado y desplegado en la nube a través de **Vercel**.
+    - **Tecnología**: React, Vite, TS, Tailwind CSS.
 
-Para iniciar el sistema completo, debes abrir **tres terminales** diferentes y ejecutar los siguientes comandos:
+## 🔑 2. Conexión al Servidor (Mini PC)
+La Mini PC está accesible de forma remota y persistente a través de Tailscale y SSH. Todo el procesamiento duro ocurre aquí.
 
-### 1. Terminal 1: Backend (API Laravel)
-Inicia el núcleo del sistema y la base de datos.
-```powershell
-cd sat-api
-# Iniciar servidor en el puerto 3333 (requerido por el proxy de la UI)
-php artisan serve --port=3333
+- **IP Tailscale (Recomendada)**: `100.123.107.90`
+- **Usuario SSH**: `fiscalio` (o `root`, la password es la misma)
+- **Contraseña**: `Solomid8`
+- **Ruta del Proyecto**: `~/Fiscalio` (o `/var/www` si entras como root en algunos logs).
+
+**Comando de conexión:**
+```bash
+ssh fiscalio@100.123.107.90
 ```
+*(Si usas llaves SSH puedes omitir la contraseña una vez configuradas).*
 
-### 2. Terminal 2: Frontend (React + Vite)
-Inicia la interfaz gráfica de usuario.
-```powershell
-cd ui
-# Iniciar el servidor de desarrollo
-npm run dev
-```
-*Accede a través de `http://localhost:5173` (o la URL que indique la terminal).*
+## 🌿 3. Flujo de Ramas (Branches) y Deploy
+Usamos dos ramas principales para proteger el servidor del cliente:
 
-### 3. Terminal 3: Procesador SAT (Runner)
-**¡CRÍTICO!** Sin este comando, las facturas no se descargarán. Es el encargado de hablar con el SAT, esperar los paquetes y extraer los XMLs.
-```powershell
-cd sat-api
-# Ejecutar el procesador en bucle permanente
-php artisan sat:runner --loop
+1. **`dev` (Desarrollo / Staging)**
+   - Aquí se programa.
+   - Cada commit que haces a `dev` genera un despliegue automático de "Preview" en Vercel.
+   - **ADVERTENCIA**: La UI de preview de Vercel en `dev` apunta a los mismos datos de la Mini PC, ¡cualquier cambio manipula datos reales de la BD!
+2. **`main` (Producción)**
+   - Es sagrada. Solo se actualiza tras probar en `dev`.
+   - El código en `main` es el que corre en la Mini PC permanentemente.
+
+**Flujo de Deploy Backend a Producción:**
+Una vez integrados tus cambios a `main` en GitHub, entra a la Mini PC y ejecuta:
+```bash
+cd ~/Fiscalio
+git pull origin main
+docker exec api php artisan optimize:clear
+docker compose restart
 ```
+*(Puedes usar el script incluido `deploy_changes.py` si necesitas automatizar ésto en el futuro).*
+
+## ⚠️ 4. Comandos Frecuentes de Docker y Laravel (En Mini PC)
+Debes pararte en `~/Fiscalio` en el servidor:
+- **Ver contenedores**: `docker ps`
+- **Ver logs del Runner SAT**: `docker logs -f runner` (o revisar el archivo `runner.log`).
+- **Reiniciar contenedores**: `docker restart api runner agent`
+- **Limpiar cachés de Laravel**: `docker exec api php artisan optimize:clear`
+- **Forzar chequeo de sincronía SAT de todos los clientes**: `docker exec api php artisan sat:sync-all`
+
+## 📊 5. Capacidades del Sistema y Estado Actual
+El sistema descarga, extrae, clasifica y audita comprobantes fiscales del SAT (México). Acciones destacadas:
+- Detecta y extrae impuestos locales (ISH).
+- Permite forzar verificaciones manuales individuales o masivas de CFDI en el portal.
+- Los clientes se auditan cada **6 horas** de forma automática ("Sync Threshold").
+- Genera vistas contables: Control Provisional (PUE, PPD, REP, desgloses por tasa 16%, 8%, 0%, Exentos) y descarga masiva de XML/PDFs consolidados.
+
+**Resoluciones Recientes a Bugs Críticos (Feb 2026):**
+- Se removió un BOM hidden en `SatRunnerCommand.php` que rompía la ejecución PHP con el error de Namespace.
+- Se configuró el límite de memoria a infinito (`memory_limit = -1`) en el Runner para prevenir muertes súbitas al extraer miles de archivos.
+- Se agregó el botón de **Procesamiento Manual** directo en el Front-End (Historial de solicitudes SAT) para destrabar paquetes en estado "polling" o "downloading" a voluntad, sin depender exclusivamente del cron background.
 
 ---
-
-## 🛠️ Requisitos Técnicos
-- **Backend:** PHP 8.2 o superior, Composer.
-- **Frontend:** Node.js 18+, npm.
-- **Base de Datos:** SQLite (por defecto).
-
-## 💡 Notas Importantes
-- **Duplicados:** No te preocupes por procesar los mismos archivos varias veces; el sistema identifica los UUIDs y evita duplicados automáticamente.
-- **Nuevos Clientes:** Al añadir un cliente, el sistema inicia automáticamente una descarga de los últimos **5 años** de historial.
-- **Seguridad:** Asegúrate de mantener tu archivo `sat-api/.env` configurado correctamente.
-
-## 🔧 Comandos de Mantenimiento (Opcional)
-
-Si necesitas forzar una sincronización o verificar el estado de facturas antiguas manualmente, puedes usar estos comandos en la terminal del backend (`sat-api`):
-
-### Forzar Sincronización Masiva
-Dispara la revisión de todos los clientes activos (respetando el umbral de 12 horas).
-```powershell
-php artisan sat:sync-all
-```
-
-### Verificar facturas antiguas
-Revisa el estado en el SAT de facturas que no se han actualizado en 24 horas.
-```powershell
-php artisan sat:verify-past --limit=50
-```
-
----
-
-## ⚡ Inicio Automático (Recomendado)
-Para no tener que abrir 3 terminales manualmente, puedes usar el script de automatización.
-
-**Si usas CMD:**
-```cmd
-start.bat
-```
-
-**Si usas PowerShell:**
-```powershell
-.\start_dev.ps1
-```
-o también:
-```powershell
-.\start.bat
-```
-
----
-
-## 📖 Documentación Avanzada
-*   [🖥️ Guía de Administración del Servidor (Mini PC)](INSTRUCCIONES_SERVIDOR.md)
-*   [🌐 Guía para trabajar desde otras máquinas (Remoto)](GUIA_TRABAJO_REMOTO.md)
-
----
-*Desarrollado con el asistente Antigravity*
+**NOTA PARA ASISTENTES IA:** Si haces un cambio arquitectónico u operativo, actualiza este README para mantener la fuente de la verdad sincronizada.
