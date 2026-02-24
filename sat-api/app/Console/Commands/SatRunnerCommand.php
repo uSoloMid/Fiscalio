@@ -41,9 +41,11 @@ class SatRunnerCommand extends Command
         $this->info("--- DEBUG END ---");
 
         do {
+            \Illuminate\Support\Facades\Storage::put('runner.heartbeat', now()->toDateTimeString());
             $this->tick();
-            if ($this->option('loop'))
-                sleep(60);
+            if ($this->option('loop')) {
+                sleep(30);
+            }
         } while ($this->option('loop'));
         return 0;
     }
@@ -55,7 +57,7 @@ class SatRunnerCommand extends Command
             $query->whereNull('next_retry_at')->orWhere('next_retry_at', '<=', now());
         })
             ->orderBy('created_at', 'asc')
-            ->take(5)
+            ->take(10)
             ->get();
 
         foreach ($requests as $req) {

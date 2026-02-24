@@ -155,6 +155,12 @@ export async function getRecentRequests(): Promise<any[]> {
     return response.json();
 }
 
+export async function getRunnerStatus(): Promise<{ is_alive: boolean; last_activity: string | null }> {
+    const response = await fetch(`${API_BASE_URL}/api/sat/runner-status`);
+    if (!response.ok) throw new Error('Error fetching runner status');
+    return response.json();
+}
+
 export async function listSatRequests(params: any = {}): Promise<any> {
     const query = new URLSearchParams();
     if (params.rfc) query.append('rfc', params.rfc);

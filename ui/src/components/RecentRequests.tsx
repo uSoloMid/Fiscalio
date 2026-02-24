@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getRecentRequests, deleteSatRequest } from '../services';
+import { getRecentRequests, deleteSatRequest, getRunnerStatus, verifySatRequest } from '../services';
 
 interface SatRequest {
     id: string;
@@ -17,12 +17,16 @@ interface SatRequest {
 export function RecentRequests({ onViewHistory }: { onViewHistory: () => void }) {
     const [requests, setRequests] = useState<SatRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     const fetchRequests = async () => {
         try {
             const data = await getRecentRequests();
             // Show only last 4
             setRequests(data.slice(0, 4));
+            const rStatus = await getRunnerStatus();
+            setRunnerStatus(rStatus);
         } catch (error) {
             console.error('Error loading requests', error);
         } finally {
@@ -97,6 +101,19 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
         }
     };
 
+    const handleVerify = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            setProcessingId(id);
+            await verifySatRequest(id);
+            await fetchRequests();
+        } catch (error: any) {
+            alert(error.message || 'Error al verificar solicitud');
+        } finally {
+            setProcessingId(null);
+        }
+    };
+
     if (loading && requests.length === 0) {
         return <div className="p-4 text-center text-gray-500 font-medium">Cargando solicitudes...</div>;
     }
@@ -105,8 +122,21 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
         <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-white">
                 <div>
-                    <h3 className="text-xl font-black text-gray-900 tracking-tight">Últimas Solicitudes CFDI</h3>
-                    <p className="text-xs text-gray-400 font-medium mt-1">Sincronización automática con el SAT</p>
+                    <h3 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                        Últimas Solicitudes CFDI
+                        {runnerStatus && (
+                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-widest font-bold ${runnerStatus.is_alive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${runnerStatus.is_alive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                                {runnerStatus.is_alive ? 'Runner Activo' : 'Runner Detenido'}
+                            </div>
+                        )}
+                    </h3>
+                    <p className="text-xs text-gray-400 font-medium mt-1">
+                        Sincronización automática con el SAT
+                        {runnerStatus?.last_activity && (
+                            <span className="ml-2 text-gray-400">— Última actividad: {new Date(runnerStatus.last_activity).toLocaleTimeString()}</span>
+                        )}
+                    </p>
                 </div>
                 <button
                     onClick={onViewHistory}
@@ -173,6 +203,20 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                     <div className="flex justify-end gap-2">
+                                        {req.state !== 'completed' && req.state !== 'error' && req.state !== 'failed' && req.state !== 'canceled' && (
+                                            <button
+                                                onClick={(e) => handleVerify(req.id, e)}
+                                                disabled={processingId === req.id}
+                                                className="text-emerald-500 hover:text-emerald-700 p-1 transition-colors disabled:opacity-50"
+                                                title="Procesar Manualmente"
+                                            >
+                                                {processingId === req.id ? (
+                                                    <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                                                ) : (
+                                                    <span className="material-symbols-outlined text-sm">play_arrow</span>
+                                                )}
+                                            </button>
+                                        )}
                                         <button className="text-gray-400 hover:text-gray-600 p-1" title="Ver detalles">
                                             👁️
                                         </button>

@@ -22,8 +22,8 @@ class BusinessSyncService
      */
     public function syncIfNeeded(Business $business, bool $force = false)
     {
-        // Threshold: 6 hours since last sync check
-        $syncThreshold = now()->subHours(6);
+        // Threshold: 12 hours since last sync check
+        $syncThreshold = now()->subHours(11); // Usamos 11 para que caiga bien en los ciclos de 12 horas
 
         if ($business->is_syncing && !$force) {
             return ['status' => 'already_syncing'];

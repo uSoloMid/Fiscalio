@@ -558,9 +558,15 @@ class InvoiceController extends Controller
     public function getRunnerStatus()
     {
         $lastRequest = \App\Models\SatRequest::orderBy('updated_at', 'desc')->first();
+        $runnerHeartbeatStr = \Illuminate\Support\Facades\Storage::exists('runner.heartbeat') ? (string)\Illuminate\Support\Facades\Storage::get('runner.heartbeat') : null;
+        $runnerHeartbeat = $runnerHeartbeatStr ?\Carbon\Carbon::parse($runnerHeartbeatStr) : null;
+
+        $lastActivity = $runnerHeartbeat ?: ($lastRequest ? $lastRequest->updated_at : null);
+        $isAlive = $runnerHeartbeat ? $runnerHeartbeat->gt(now()->subMinutes(5)) : ($lastRequest ? $lastRequest->updated_at->gt(now()->subMinutes(10)) : false);
+
         return response()->json([
-            'last_activity' => $lastRequest ? $lastRequest->updated_at : null,
-            'is_alive' => $lastRequest ? $lastRequest->updated_at->gt(now()->subMinutes(10)) : false
+            'last_activity' => $lastActivity,
+            'is_alive' => $isAlive
         ]);
     }
 

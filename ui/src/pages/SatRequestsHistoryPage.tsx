@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listSatRequests, verifySatRequest } from '../services';
+import { listSatRequests, verifySatRequest, getRunnerStatus } from '../services';
 
 interface SatRequest {
     id: string;
@@ -19,6 +19,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
     const fetchRequests = async () => {
@@ -27,6 +28,9 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
             const data = await listSatRequests({ page });
             setRequests(data.data);
             setTotalPages(data.last_page);
+
+            const rStatus = await getRunnerStatus();
+            setRunnerStatus(rStatus);
         } catch (error) {
             console.error('Error loading requests', error);
         } finally {
@@ -97,8 +101,21 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                             <span className="material-symbols-outlined">arrow_back</span>
                         </button>
                         <div className="min-w-0">
-                            <h1 className="text-base md:text-xl font-bold text-gray-900 truncate">Historial Solicitudes SAT</h1>
-                            <p className="text-[10px] md:text-xs text-gray-500 font-medium truncate">Registro completo de descargas</p>
+                            <h1 className="text-base md:text-xl font-bold text-gray-900 truncate flex items-center gap-3">
+                                Historial Solicitudes SAT
+                                {runnerStatus && (
+                                    <div className={`hidden md:flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-widest font-bold ${runnerStatus.is_alive ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${runnerStatus.is_alive ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                                        {runnerStatus.is_alive ? 'Activo' : 'Detenido'}
+                                    </div>
+                                )}
+                            </h1>
+                            <p className="text-[10px] md:text-xs text-gray-500 font-medium truncate">
+                                Registro completo de descargas
+                                {runnerStatus?.last_activity && (
+                                    <span className="ml-2 text-gray-400">— Última actividad: {new Date(runnerStatus.last_activity).toLocaleTimeString()}</span>
+                                )}
+                            </p>
                         </div>
                     </div>
                 </div>
