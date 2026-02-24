@@ -99,6 +99,9 @@ echo "==> Port listening check:"
 grep -R "listen " -n /etc/nginx/conf.d/*.conf || true
 
 # 7. Despegue
+echo "==> Copiando Configuración Supervisor y Actualizando..."
+cp -f /var/www/docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf 2>/dev/null || true
+
 echo "==> Puertos escuchando (pre-supervisord):"
 ss -lntup || true
 
