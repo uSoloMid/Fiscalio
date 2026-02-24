@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y \
 ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 RUN chmod +x /usr/local/bin/install-php-extensions
 
-# ✅ Extensiones necesarias para Laravel + SQLite
-RUN install-php-extensions pdo pdo_sqlite sqlite3 mbstring bcmath gd soap zip intl pcntl
+# ✅ Extensiones necesarias para Laravel (SQLite + PostgreSQL)
+RUN install-php-extensions pdo pdo_sqlite pdo_pgsql pgsql sqlite3 mbstring bcmath gd soap zip intl pcntl
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

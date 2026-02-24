@@ -21,7 +21,35 @@ Route::get('/ping', function () {
 Route::get('/health', function () {
     return response()->json(['status' => 'ok']);
 });
+
+Route::get('/debug-files', function () {
+    return response()->json([
+    'public' => scandir(public_path()),
+    'storage_app' => is_dir(storage_path('app')) ? scandir(storage_path('app')) : 'not a dir',
+    'storage_logs' => is_dir(storage_path('logs')) ? scandir(storage_path('logs')) : 'not a dir',
+    ]);
+});
 Route::post('/tokens/login', [Api\TokensController::class , 'create'])->name('tokens.login');
+Route::get('/health', function () {
+    return response()->json(['ok' => true]);
+})->name('health');
+
+Route::get('/runner-debug', function () {
+    $pending = \App\Models\SatRequest::whereIn('state', ['created', 'polling', 'downloading'])
+        ->where(function ($q) {
+            $q->whereNull('next_retry_at')->orWhere('next_retry_at', '<=', now());
+        }
+        )->get();
+
+        return response()->json([
+        'now' => now()->toIso8601String(),
+        'pending_count' => $pending->count(),
+        'pending_sample' => $pending->take(3),
+        'total_requests' => \App\Models\SatRequest::count(),
+        'total_businesses' => \App\Models\Business::count(),
+        ]);
+    });
+
 Route::post('/initial-set-up', Api\InitialSetUp::class)
     ->middleware(SystemHasNotBeenSetUp::class)
     ->name('initial-set-up');
@@ -40,6 +68,7 @@ Route::middleware(['auth:sanctum'])->group(function (Router $route): void {
 
 // CFDI routes (Public for local usage)
 Route::get('/cfdis/periods', [InvoiceController::class , 'getPeriods']);
+Route::get('/cfdis/export', [InvoiceController::class , 'exportExcel']);
 Route::get('/cfdis', [InvoiceController::class , 'indexCfdis']);
 Route::get('/cfdis/{uuid}', [InvoiceController::class , 'showCfdi']);
 Route::post('/cfdis/{uuid}/refresh-status', [InvoiceController::class , 'refreshCfdiStatus']);
@@ -52,6 +81,7 @@ Route::post('/sat/verify-status', [InvoiceController::class , 'verifyStatus']);
 Route::get('/sat/active-requests', [InvoiceController::class , 'getActiveRequests']);
 Route::get('/sat/recent-requests', [InvoiceController::class , 'getRecentRequests']);
 Route::get('/sat/requests', [InvoiceController::class , 'indexSatRequests']);
+Route::post('/sat/requests/{id}/verify', [InvoiceController::class , 'verifySatRequest']);
 Route::delete('/sat/requests/{id}', [InvoiceController::class , 'deleteSatRequest']);
 Route::get('/sat/runner-status', [InvoiceController::class , 'getRunnerStatus']);
 Route::get('/sat/bulk-pdf', [InvoiceController::class , 'downloadBulkPdf']);
@@ -65,9 +95,13 @@ Route::get('/sat/download/{packageId}', [Api\SatController::class , 'download'])
 
 // Provisional Control routes
 Route::get('/provisional/summary', [\App\Http\Controllers\ProvisionalControlController::class , 'getSummary']);
+Route::get('/provisional/export-excel', [\App\Http\Controllers\ProvisionalControlController::class , 'exportExcel']);
 Route::get('/provisional/ppd-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getPpdExplorer']);
 Route::get('/provisional/rep-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getRepExplorer']);
 Route::get('/provisional/bucket-details', [\App\Http\Controllers\ProvisionalControlController::class , 'getBucketDetails']);
+Route::post('/cfdis/{uuid}/update-deductibility', [\App\Http\Controllers\ProvisionalControlController::class , 'updateDeductibility']);
+Route::get('/provisional/export-pdf', [\App\Http\Controllers\ProvisionalControlController::class , 'exportDetailedBucketPdf']);
+Route::get('/provisional/export-pdf-summary', [\App\Http\Controllers\ProvisionalControlController::class , 'exportPdfSummary']);
 Route::post('/provisional/download-xml', [\App\Http\Controllers\DownloadController::class , 'downloadXmlZip']);
 
 // Client routes
@@ -95,9 +129,12 @@ Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 // Account routes
 Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
 
-// Agent Synchro
-Route::get('/agent/sync-clients', [AgentController::class , 'syncClients']);
-
+// Agent routes
+Route::prefix('agent')->group(function () {
+    Route::get('sync-clients', [AgentController::class , 'syncClients']);
+    Route::post('confirm-credentials', [AgentController::class , 'confirmCredentials']);
+    Route::get('runner-tick', [AgentController::class , 'runnerTick']);
+});
 
 require __DIR__ . '/debug_routes.php';
 require __DIR__ . '/debug_cwd.php';

@@ -78,11 +78,11 @@ export async function createClient(data: FormData): Promise<any> {
     }
     return response.json();
 }
-export async function startSync(rfc: string): Promise<any> {
+export async function startSync(rfc: string, force: boolean = false): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/api/sat/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rfc })
+        body: JSON.stringify({ rfc, force })
     });
     if (!response.ok) throw new Error('Error starting sync');
     return response.json();
@@ -172,6 +172,18 @@ export async function deleteSatRequest(id: string): Promise<void> {
     if (!response.ok) throw new Error('Error deleting request');
 }
 
+export async function verifySatRequest(id: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/sat/requests/${id}/verify`, {
+        method: 'POST'
+    });
+    if (!response.ok) {
+        let err;
+        try { err = await response.json(); } catch (e) { }
+        throw new Error(err?.error || err?.message || 'Error al verificar solicitud');
+    }
+    return response.json();
+}
+
 export async function getProvisionalSummary(rfc: string, year: number, month: number): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
     if (!response.ok) throw new Error('Error fetching summary');
@@ -199,6 +211,24 @@ export async function getBucketDetails(params: any): Promise<any> {
     return response.json();
 }
 
+export async function updateDeductibility(uuid: string, data: { is_deductible: boolean, deduction_type?: string }): Promise<void> {
+    const response = await fetch(`/api/cfdis/${uuid}/update-deductibility`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error updating deductibility');
+}
+
+export function exportCfdiPdf(uuid: string) {
+    window.open(`/api/cfdis/${uuid}/pdf`, '_blank');
+}
+
+export function exportDetailedBucketPdf(params: any) {
+    const query = new URLSearchParams(params);
+    window.open('/api/provisional/export-pdf?' + query.toString(), '_blank');
+}
+
 export function exportInvoicesZip(params: any) {
     const query = new URLSearchParams();
     if (params.rfc_user) query.append('rfc_user', params.rfc_user);
@@ -221,4 +251,35 @@ export async function downloadProvisionalXmlZip(rfc: string, periods: { year: nu
         throw new Error(err.error || 'Error downloading XML ZIP');
     }
     return response.blob();
+}
+
+export function exportCfdisExcel(params: any, columns: string[]) {
+    const query = new URLSearchParams();
+    if (params.rfc_user) query.append('rfc_user', params.rfc_user);
+    if (params.year) query.append('year', params.year);
+    if (params.month) query.append('month', params.month);
+    if (params.tipo && params.tipo !== 'all') query.append('tipo', params.tipo);
+    if (params.q) query.append('q', params.q);
+    if (params.status) query.append('status', params.status);
+    if (params.cfdi_tipo) query.append('cfdi_tipo', params.cfdi_tipo);
+
+    query.append('columns', columns.join(','));
+
+    // Trigger download
+    window.open(`${API_BASE_URL}/api/cfdis/export?${query.toString()}`, '_blank');
+}
+export function exportProvisionalExcel(params: { rfc: string, year: number, month: number }) {
+    const query = new URLSearchParams();
+    query.append('rfc', params.rfc);
+    query.append('year', params.year.toString());
+    query.append('month', params.month.toString());
+    window.open(`${API_BASE_URL}/api/provisional/export-excel?${query.toString()}`, '_blank');
+}
+
+export function exportProvisionalPdfSummary(params: { rfc: string, year: number, month: number }) {
+    const query = new URLSearchParams();
+    query.append('rfc', params.rfc);
+    query.append('year', params.year.toString());
+    query.append('month', params.month.toString());
+    window.open(`${API_BASE_URL}/api/provisional/export-pdf-summary?${query.toString()}`, '_blank');
 }

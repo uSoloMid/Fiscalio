@@ -12,19 +12,66 @@ class AgentController extends Controller
      */
     public function syncClients()
     {
-        // Usamos Query Builder directo para evitar problemas de Eloquent/Modelos/Hidden
-        // Esto devuelve un array de objetos stdClass con TODAS las columnas
-        $clients = DB::table('businesses')->get();
+        try {
+            // Solo devolvemos los negocios que todavía tienen certificado pendiente de bajar
+            $clients = DB::table('businesses')
+                ->whereNotNull('certificate')
+                ->get();
 
-        return response()->json($clients->map(function ($c) {
-            return [
-                'rfc' => $c->rfc,
-                'legal_name' => $c->legal_name,
-                'certificate' => $c->certificate, // Base64
-                'private_key' => $c->private_key, // Base64
-                'passphrase' => $c->passphrase, // Base de datos (texto plano)
-                'ciec' => $c->ciec, // Base de datos (texto plano)
-            ];
-        }));
+            return response()->json($clients->map(function ($c) {
+                return [
+                    'rfc' => $c->rfc,
+                    'legal_name' => $c->legal_name,
+                    'certificate' => $c->certificate,
+                    'private_key' => $c->private_key,
+                    'passphrase' => $c->passphrase,
+                    'ciec' => $c->ciec ?? null,
+                ];
+            }));
+        }
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Borra las credenciales de la nube después de que el Agente confirma recepción.
+     */
+    public function confirmCredentials(\Illuminate\Http\Request $request)
+    {
+        $rfc = $request->input('rfc');
+        if (!$rfc)
+            return response()->json(['error' => 'RFC required'], 400);
+
+        // Limpiamos los campos sensibles de la base de datos en la nube
+        DB::table('businesses')->where('rfc', strtoupper($rfc))->update([
+            'certificate' => null,
+            'private_key' => null,
+            'passphrase' => null,
+            'ciec' => null,
+        ]);
+
+        return response()->json(['success' => true, 'message' => "Credenciales de $rfc eliminadas de la nube."]);
+    }
+
+    /**
+     * Ejecuta un ciclo del SAT Runner (Marcapasos)
+     */
+    public function runnerTick()
+    {
+        try {
+            // Ejecutamos el comando artisan sat:runner (solo una vez, sin loop)
+            \Illuminate\Support\Facades\Artisan::call('sat:runner');
+            $output = \Illuminate\Support\Facades\Artisan::output();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pulso del Runner completado',
+                'output' => $output
+            ]);
+        }
+        catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }

@@ -251,6 +251,14 @@
                 <!-- Left Column: Metadata and Seals -->
                 <td class="footer-left">
                     <table class="metadata-table">
+                        @if($cfdi['informacion_global'])
+                        <tr>
+                            <td class="metadata-label">INFORMACIÓN GLOBAL</td>
+                            <td class="metadata-value uppercase">
+                                {{ $cfdi['informacion_global']['periodicidad_desc'] }} / {{ $cfdi['informacion_global']['meses_desc'] }} / {{ $cfdi['informacion_global']['anio'] }}
+                            </td>
+                        </tr>
+                        @endif
                         <tr>
                             <td class="metadata-label">IMPORTE CON LETRA</td>
                             <td class="metadata-value uppercase">{{ $cfdi['total_letra'] }}</td>

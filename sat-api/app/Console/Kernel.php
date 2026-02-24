@@ -28,6 +28,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('sat:run-jobs')
             ->everyFifteenMinutes()
             ->withoutOverlapping();
+
+        // Respaldo de base de datos cada 12 horas
+        $schedule->command('db:backup')
+            ->twiceDaily(0, 12);
     }
 
     /**

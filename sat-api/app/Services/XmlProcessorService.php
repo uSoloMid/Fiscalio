@@ -31,14 +31,28 @@ class XmlProcessorService
 
         // Descomprimir
         $zip = new ZipArchive;
-        if ($zip->open($fullZipPath) === TRUE) {
+        $zipOpen = $zip->open($fullZipPath);
+
+        if ($zipOpen === TRUE) {
             $zip->extractTo($fullTmpDir);
             $zip->close();
         }
         else {
-            Log::error("No se pudo abrir el ZIP: $fullZipPath");
-            return;
+            // Intentar buscar carpeta ya extraida (Fallback de SatRunnerCommand)
+            $possibleExtractedPath = substr($fullZipPath, 0, -4); // Quitar .zip
+            if (is_dir($possibleExtractedPath)) {
+                Log::info("Usando carpeta pre-extraída: $possibleExtractedPath");
+                // Copiar archivos a tmpDir para uniformizar procesamiento y limpieza
+                // O simplemente moverlos? Copiar es mas seguro.
+                // Usaremos exec para rapidez.
+                exec("cp -r \"$possibleExtractedPath/.\" \"$fullTmpDir/\"");
+            }
+            else {
+                Log::error("No se pudo abrir el ZIP y no se encontró carpeta extraída: $fullZipPath (Código: $zipOpen)");
+                return;
+            }
         }
+
 
         $xmlsProcesados = 0;
         $files = Storage::allFiles($tmpDir);
@@ -128,6 +142,12 @@ class XmlProcessorService
         // Comprobante (Raíz)
         $comprobante = $dom->documentElement;
         $fechaStr = $comprobante->getAttribute('Fecha');
+
+        // Preferir Fecha de Timbrado (Certificación) para la contabilidad si está disponible
+        $tfd = $xpath->query('//tfd:TimbreFiscalDigital')->item(0);
+        if ($tfd && $tfd->getAttribute('FechaTimbrado')) {
+            $fechaStr = $tfd->getAttribute('FechaTimbrado');
+        }
         $total = $comprobante->getAttribute('Total');
         $subtotal = $comprobante->getAttribute('SubTotal');
         $descuento = $comprobante->getAttribute('Descuento') ?: 0;
@@ -198,30 +218,33 @@ class XmlProcessorService
             $trasladosLocales = $impLocalNode->getAttribute('TotaldeTraslados') ?: 0;
             $retencionesLocales = $impLocalNode->getAttribute('TotaldeRetenciones') ?: 0;
         }
-
         try {
             $fecha = new DateTimeImmutable($fechaStr);
             $fechaFiscal = $fecha;
 
-            // Si hay información global, la fecha fiscal de acumulación es la del periodo reportado
-            if ($globalYear && $globalMeses) {
-                // El campo Meses puede venir como '01'..'12' o '13'..'18' para bimestrales
-                // Mapeamos a un mes calendario real para la fecha fiscal (el primer mes del periodo)
-                $mesMapeado = (int)$globalMeses;
-                if ($mesMapeado > 12) {
-                    // 13: Ene-Feb, 14: Mar-Abr, etc.
-                    $mesMapeado = (($mesMapeado - 13) * 2) + 1;
-                }
+        // GLOBAL NODE LOGIC REMOVED UPON USER REQUEST (2026-02-17)
+        // The user wants the invoice to be reflected in the month of emission, regardless of the Global Information node.
 
-                // Asegurar que el año y mes sean válidos para crear la fecha fiscal
-                try {
-                    $fechaFiscal = $fechaFiscal->setDate($globalYear, $mesMapeado, 1)->setTime(0, 0, 0);
-                }
-                catch (\Exception $e) {
-                    // Fallback a fecha original si hay error en datos globales
-                    $fechaFiscal = $fecha;
-                }
-            }
+        /*
+         // Si hay información global, la fecha fiscal de acumulación es la del periodo reportado
+         if ($globalYear && $globalMeses) {
+         // El campo Meses puede venir como '01'..'12' o '13'..'18' para bimestrales
+         // Mapeamos a un mes calendario real para la fecha fiscal (el primer mes del periodo)
+         $mesMapeado = (int)$globalMeses;
+         if ($mesMapeado > 12) {
+         // 13: Ene-Feb, 14: Mar-Abr, etc.
+         $mesMapeado = (($mesMapeado - 13) * 2) + 1;
+         }
+         // Asegurar que el año y mes sean válidos para crear la fecha fiscal
+         try {
+         $fechaFiscal = $fechaFiscal->setDate($globalYear, $mesMapeado, 1)->setTime(0, 0, 0);
+         }
+         catch (\Exception $e) {
+         // Fallback a fecha original si hay error en datos globales
+         $fechaFiscal = $fecha;
+         }
+         }
+         */
         }
         catch (Exception $e) {
             $fecha = new DateTimeImmutable();

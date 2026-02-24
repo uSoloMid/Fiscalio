@@ -19,7 +19,14 @@ async function syncCredentials() {
     try {
         process.stdout.write(chalk.yellow('🔄 Sincronizando credenciales... '));
 
-        // Petición a la API
+        // 0. Pulsar el Runner (Marcapasos) para procesar solicitudes en la nube
+        try {
+            await axios.get(`${API_URL}/api/agent/runner-tick`);
+        } catch (tickErr) {
+            // Ignoramos si falla el pulso, puede ser timeout de Render
+        }
+
+        // Petición a la API de clientes
         const response = await axios.get(`${API_URL}/api/agent/sync-clients`);
         const clients = response.data;
 
@@ -65,7 +72,13 @@ async function syncCredentials() {
 
     } catch (error) {
         console.log(chalk.red('ERROR'));
-        console.error(chalk.red(`❌ Fallo al conectar con la API: ${error.message}`));
+        if (error.response) {
+            console.error(chalk.red(`❌ Error del Servidor (${error.response.status}):`));
+            console.error(chalk.gray(JSON.stringify(error.response.data, null, 2)));
+        } else {
+            console.error(chalk.red(`❌ Fallo al conectar con la API: ${error.message}`));
+        }
+
         if (error.code === 'ECONNREFUSED') {
             console.log(chalk.yellow('   Sugerencia: Revisa que la API esté corriendo o el internet funcione.'));
         }
@@ -75,8 +88,8 @@ async function syncCredentials() {
 // 1. Ejecutar inmediatamente al abrir
 syncCredentials();
 
-// 2. Programar revisión cada 5 minutos
-schedule.scheduleJob('*/5 * * * *', syncCredentials);
+// 2. Programar revisión cada minuto (Mantiene el servidor despierto y es reactivo)
+schedule.scheduleJob('* * * * *', syncCredentials);
 
 // Mantener vivo
-console.log(chalk.gray('⏱️  Agente activo. Revisando cambios cada 5 minutos...'));
+console.log(chalk.gray('⏱️  Agente activo. Revisando cambios cada minuto...'));

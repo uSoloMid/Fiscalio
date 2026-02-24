@@ -176,6 +176,30 @@ class InvoiceController extends Controller
             'exportacion' => $exportacionMap[$root->getAttribute('Exportacion')] ?? $root->getAttribute('Exportacion'),
         ];
 
+        $infoGlobal = $xpath->query("//$ns:InformacionGlobal")->item(0);
+        if ($infoGlobal) {
+            $periodicidadMap = [
+                '01' => 'Diario', '02' => 'Semanal', '03' => 'Quincenal', '04' => 'Mensual', '05' => 'Bimestral'
+            ];
+            $mesesMap = [
+                '01' => 'Enero', '02' => 'Febrero', '03' => 'Marzo', '04' => 'Abril', '05' => 'Mayo', '06' => 'Junio',
+                '07' => 'Julio', '08' => 'Agosto', '09' => 'Septiembre', '10' => 'Octubre', '11' => 'Noviembre', '12' => 'Diciembre',
+                '13' => 'Enero-Febrero', '14' => 'Marzo-Abril', '15' => 'Mayo-Junio', '16' => 'Julio-Agosto', '17' => 'Septiembre-Octubre', '18' => 'Noviembre-Diciembre'
+            ];
+            $p = $infoGlobal->getAttribute('Periodicidad');
+            $m = $infoGlobal->getAttribute('Meses');
+            $data['informacion_global'] = [
+                'periodicidad' => $p,
+                'periodicidad_desc' => $periodicidadMap[$p] ?? $p,
+                'meses' => $m,
+                'meses_desc' => $mesesMap[$m] ?? $m,
+                'anio' => $infoGlobal->getAttribute('Año')
+            ];
+        }
+        else {
+            $data['informacion_global'] = null;
+        }
+
         $emisor = $xpath->query("//$ns:Emisor")->item(0);
         $eReg = $emisor ? $emisor->getAttribute('RegimenFiscal') : '';
         $data['emisor'] = [
@@ -338,7 +362,9 @@ class InvoiceController extends Controller
                 'uuids' => []
             ];
             foreach ($xpath->query("./$ns:CfdiRelacionado", $cfdiRelacionados) as $rel) {
-                $relData['uuids'][] = $rel->getAttribute('UUID');
+                $ruuid = strtoupper($rel->getAttribute('UUID'));
+                $relData['uuids'][] = $ruuid;
+                $relatedUuids[] = $ruuid;
             }
             $data['relacionados'] = $relData;
         }
@@ -494,7 +520,9 @@ class InvoiceController extends Controller
         $rfc = $request->input('rfc');
         if (!$rfc)
             return response()->json(['error' => 'RFC required'], 400);
-        return response()->json($service->syncIfNeeded(\App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail()));
+
+        $force = (bool)$request->input('force', false);
+        return response()->json($service->syncIfNeeded(\App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail(), $force));
     }
     public function verifyStatus(Request $request, \App\Services\BusinessSyncService $service)
     {
@@ -533,6 +561,79 @@ class InvoiceController extends Controller
         return response()->json([
             'last_activity' => $lastRequest ? $lastRequest->updated_at : null,
             'is_alive' => $lastRequest ? $lastRequest->updated_at->gt(now()->subMinutes(10)) : false
+        ]);
+    }
+
+    public function exportExcel(Request $request)
+    {
+        $query = Cfdi::query();
+        if ($request->has('rfc_user')) {
+            $rfcUser = trim(strtoupper($request->input('rfc_user')));
+            $tipo = $request->input('tipo');
+            if ($tipo === 'emitidas') {
+                $query->where('rfc_emisor', 'like', "$rfcUser%");
+            }
+            elseif ($tipo === 'recibidas') {
+                $query->where('rfc_receptor', 'like', "$rfcUser%");
+            }
+            else {
+                $query->where(function ($q) use ($rfcUser) {
+                    $q->where('rfc_emisor', 'like', "$rfcUser%")->orWhere('rfc_receptor', 'like', "$rfcUser%");
+                });
+            }
+        }
+        if ($request->filled('year')) {
+            $query->whereYear('fecha_fiscal', $request->input('year'));
+        }
+        if ($request->filled('month')) {
+            $query->whereMonth('fecha_fiscal', $request->input('month'));
+        }
+        if ($request->filled('q')) {
+            $q = $request->input('q');
+            $query->where(function ($sub) use ($q) {
+                $sub->where('uuid', 'like', "%$q%")->orWhere('rfc_emisor', 'like', "%$q%")->orWhere('rfc_receptor', 'like', "%$q%");
+            });
+        }
+        if ($request->filled('cfdi_tipo')) {
+            $query->where('tipo', $request->input('cfdi_tipo'));
+        }
+        if ($request->filled('status')) {
+            if ($request->input('status') === 'cancelados') {
+                $query->where('es_cancelado', 1);
+            }
+            else {
+                $query->where('es_cancelado', 0);
+            }
+        }
+        $query->orderBy('fecha_fiscal', 'desc');
+
+        $rows = $query->get();
+
+        $columnsParam = $request->input('columns', 'uuid,fecha,rfc_emisor,name_emisor,rfc_receptor,name_receptor,total,moneda');
+        $columns = explode(',', $columnsParam);
+
+        $callback = function () use ($rows, $columns) {
+            $file = fopen('php://output', 'w');
+            // BOM for Excel
+            fputs($file, "\xEF\xBB\xBF");
+
+            fputcsv($file, $columns);
+            foreach ($rows as $cfdi) {
+                $data = [];
+                foreach ($columns as $col) {
+                    $data[] = $cfdi->{ $col} ?? '';
+                }
+                fputcsv($file, $data);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, [
+            "Content-type" => "text/csv",
+            "Content-Disposition" => "attachment; filename=export_cfdis_" . date('Y-m-d_H-i-s') . ".csv",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
         ]);
     }
 
@@ -617,5 +718,107 @@ class InvoiceController extends Controller
         $request = \App\Models\SatRequest::findOrFail($id);
         $request->delete();
         return response()->json(['message' => 'Solicitud eliminada correctamente']);
+    }
+
+    public function verifySatRequest($id)
+    {
+        $req = \App\Models\SatRequest::findOrFail($id);
+        if (in_array($req->state, ['completed', 'failed', 'error', 'canceled'])) {
+            return response()->json(['message' => 'La solicitud ya está en estado terminal: ' . $req->state], 400);
+        }
+
+        try {
+            $satService = new \App\Services\SatDescargaMasivaService($req->rfc);
+            $xmlProcessor = new \App\Services\XmlProcessorService();
+
+            switch ($req->state) {
+                case 'created':
+                    if ($req->request_id) {
+                        $req->state = 'polling';
+                        $req->save();
+                    }
+                    else {
+                        $requestId = $satService->createQuery(
+                            \DateTimeImmutable::createFromMutable($req->start_date),
+                            \DateTimeImmutable::createFromMutable($req->end_date),
+                            $req->type,
+                            'xml'
+                        );
+                        $req->request_id = $requestId;
+                        $req->state = 'polling';
+                        $req->save();
+                    }
+                    break;
+                case 'polling':
+                    $verify = $satService->verifyQuery($req->request_id);
+                    $status = $verify->getStatusRequest();
+                    if ($status->isFinished()) {
+                        $ids = $verify->getPackagesIds();
+                        if (count($ids) > 0) {
+                            $req->state = 'downloading';
+                        }
+                        else {
+                            $req->state = 'completed';
+                        }
+                        $req->save();
+                    }
+                    elseif ($status->isAccepted() || $status->isInProgress()) {
+                    // still polling
+                    }
+                    else {
+                        $req->state = 'failed';
+                        $req->save();
+                    }
+                    break;
+                case 'downloading':
+                    $verify = $satService->verifyQuery($req->request_id);
+                    $packageIds = $verify->getPackagesIds();
+
+                    foreach ($packageIds as $packageId) {
+                        $path = "sat/downloads/" . $req->rfc . "/{$req->request_id}/$packageId.zip";
+                        if (!\Illuminate\Support\Facades\Storage::exists($path)) {
+                            $satService->downloadPackage($req->request_id, $packageId, $path);
+                        }
+                        $zipFullPath = \Illuminate\Support\Facades\Storage::path($path);
+                        $extractPath = dirname($zipFullPath) . '/extracted_' . $packageId;
+
+                        $zip = new \ZipArchive();
+                        $opened = $zip->open($zipFullPath);
+                        if ($opened === TRUE) {
+                            if (!file_exists($extractPath))
+                                mkdir($extractPath, 0777, true);
+                            $zip->extractTo($extractPath);
+                            $zip->close();
+                        }
+                        else {
+                            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                                exec("powershell -command \"Expand-Archive -Path '$zipFullPath' -DestinationPath '$extractPath' -Force\"");
+                            }
+                            else {
+                                exec("unzip -o \"$zipFullPath\" -d \"$extractPath\"");
+                            }
+                        }
+                    }
+
+                    foreach ($packageIds as $packageId) {
+                        $path = "sat/downloads/" . $req->rfc . "/{$req->request_id}/$packageId.zip";
+                        $xmlProcessor->processPackage($path, $req->rfc, $req->request_id);
+                    }
+
+                    $req->refresh();
+                    if ($req->state !== 'completed') {
+                        $req->state = 'completed';
+                        $req->save();
+                    }
+                    break;
+            }
+
+            return response()->json(['message' => 'Procesada con éxito', 'new_state' => $req->state, 'request' => $req]);
+        }
+        catch (\Exception $e) {
+            $req->last_error = substr($e->getMessage(), 0, 500);
+            $req->save();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 }
