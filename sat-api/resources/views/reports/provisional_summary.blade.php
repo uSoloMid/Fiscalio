@@ -249,7 +249,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($details['ingresos'] as $item)
+                @foreach($details['ingresos_considerados'] as $item)
                 <tr>
                     <td>{{ $item['fecha'] }}</td>
                     <td>{{ $item['nombre'] }}<br><span style="font-size: 7px; color: #999;">{{ $item['uuid'] }}</span></td>
@@ -259,7 +259,7 @@
                     <td class="text-right font-bold">$ {{ number_format($item['total'], 2) }}</td>
                 </tr>
                 @endforeach
-                @if(count($details['ingresos']) == 0)
+                @if(count($details['ingresos_considerados']) == 0)
                 <tr>
                     <td colspan="6" style="text-align: center; color: #999; padding: 20px;">No hay registros de ingresos para este periodo.</td>
                 </tr>
@@ -282,7 +282,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($details['egresos'] as $item)
+                @foreach($details['egresos_considerados'] as $item)
                 <tr>
                     <td>{{ $item['fecha'] }}</td>
                     <td>{{ $item['nombre'] }}<br><span style="font-size: 7px; color: #999;">{{ $item['uuid'] }}</span></td>
@@ -292,9 +292,76 @@
                     <td class="text-right font-bold">$ {{ number_format($item['total'], 2) }}</td>
                 </tr>
                 @endforeach
-                @if(count($details['egresos']) == 0)
+                @if(count($details['egresos_considerados']) == 0)
                 <tr>
                     <td colspan="6" style="text-align: center; color: #999; padding: 20px;">No hay registros de egresos para este periodo.</td>
+                </tr>
+                @endif
+            </tbody>
+        </table>
+        
+        <div class="page-break"></div>
+
+        <h2 class="text-orange">RELACIÓN DE PENDIENTES (CXP / CXC)</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th width="12%">FECHA</th>
+                    <th width="40%">NOMBRE / RAZÓN SOCIAL</th>
+                    <th width="8%">TIPO</th>
+                    <th width="12%">SUBTOTAL</th>
+                    <th width="12%">IVA</th>
+                    <th width="16%" class="text-right">TOTAL PENDIENTE</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($details['ingresos_pendientes'] as $item)
+                <tr>
+                    <td>{{ $item['fecha'] }}</td>
+                    <td>{{ $item['nombre'] }} <span style="font-size: 8px; color:#d97706;">(Ingreso)</span><br><span style="font-size: 7px; color: #999;">{{ $item['uuid'] }}</span></td>
+                    <td>PPD</td>
+                    <td>$ {{ number_format($item['subtotal'], 2) }}</td>
+                    <td>$ {{ number_format($item['iva'], 2) }}</td>
+                    <td class="text-right font-bold text-orange">$ {{ number_format($item['total'], 2) }}</td>
+                </tr>
+                @endforeach
+                @foreach($details['egresos_pendientes'] as $item)
+                <tr>
+                    <td>{{ $item['fecha'] }}</td>
+                    <td>{{ $item['nombre'] }} <span style="font-size: 8px; color:#2563eb;">(Egreso)</span><br><span style="font-size: 7px; color: #999;">{{ $item['uuid'] }}</span></td>
+                    <td>PPD</td>
+                    <td>$ {{ number_format($item['subtotal'], 2) }}</td>
+                    <td>$ {{ number_format($item['iva'], 2) }}</td>
+                    <td class="text-right font-bold text-orange">$ {{ number_format($item['total'], 2) }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <h2 style="color: #ef4444; margin-top: 30px;">RELACIÓN DE GASTOS NO DEDUCIBLES</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th width="12%">FECHA</th>
+                    <th width="40%">NOMBRE / PROVEEDOR</th>
+                    <th width="12%">METODO</th>
+                    <th width="20%">MOTIVO</th>
+                    <th width="16%" class="text-right">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($details['no_deducibles'] as $item)
+                <tr>
+                    <td>{{ $item['fecha'] }}</td>
+                    <td>{{ $item['nombre'] }}<br><span style="font-size: 7px; color: #999;">{{ $item['uuid'] }}</span></td>
+                    <td>{{ $item['metodo_pago'] }}</td>
+                    <td style="color:#ef4444; font-size:9px; font-weight:bold;">{{ $item['reason'] ?? 'No deducible manual' }}</td>
+                    <td class="text-right font-bold">$ {{ number_format($item['total'], 2) }}</td>
+                </tr>
+                @endforeach
+                @if(count($details['no_deducibles']) == 0)
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #999; padding: 20px;">No hay registros no deducibles para este periodo.</td>
                 </tr>
                 @endif
             </tbody>

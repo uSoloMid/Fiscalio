@@ -218,7 +218,7 @@ export async function getBucketDetails(params: any): Promise<any> {
 }
 
 export async function updateDeductibility(uuid: string, data: { is_deductible: boolean, deduction_type?: string }): Promise<void> {
-    const response = await fetch(`/api/cfdis/${uuid}/update-deductibility`, {
+    const response = await fetch(`${API_BASE_URL}/api/cfdis/${uuid}/update-deductibility`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -227,12 +227,12 @@ export async function updateDeductibility(uuid: string, data: { is_deductible: b
 }
 
 export function exportCfdiPdf(uuid: string) {
-    window.open(`/api/cfdis/${uuid}/pdf`, '_blank');
+    window.open(`${API_BASE_URL}/api/cfdis/${uuid}/pdf`, '_blank');
 }
 
 export function exportDetailedBucketPdf(params: any) {
     const query = new URLSearchParams(params);
-    window.open('/api/provisional/export-pdf?' + query.toString(), '_blank');
+    window.open(`${API_BASE_URL}/api/provisional/export-pdf?` + query.toString(), '_blank');
 }
 
 export function exportInvoicesZip(params: any) {
