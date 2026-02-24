@@ -81,6 +81,7 @@ Route::post('/sat/verify-status', [InvoiceController::class , 'verifyStatus']);
 Route::get('/sat/active-requests', [InvoiceController::class , 'getActiveRequests']);
 Route::get('/sat/recent-requests', [InvoiceController::class , 'getRecentRequests']);
 Route::get('/sat/requests', [InvoiceController::class , 'indexSatRequests']);
+Route::post('/sat/requests/{id}/verify', [InvoiceController::class , 'verifySatRequest']);
 Route::delete('/sat/requests/{id}', [InvoiceController::class , 'deleteSatRequest']);
 Route::get('/sat/runner-status', [InvoiceController::class , 'getRunnerStatus']);
 Route::get('/sat/bulk-pdf', [InvoiceController::class , 'downloadBulkPdf']);

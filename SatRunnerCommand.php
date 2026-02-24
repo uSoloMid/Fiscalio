@@ -19,7 +19,7 @@ class SatRunnerCommand extends Command
 
     public function handle()
     {
-        ini_set('memory_limit', '-1');
+        ini_set('memory_limit', '512M');
         $this->info("Iniciando SAT Runner... (VERSION FINALISIMA v2.1 - Memory Fix)");
 
         // DEBUG INFO

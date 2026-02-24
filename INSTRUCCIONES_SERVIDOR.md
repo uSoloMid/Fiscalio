@@ -7,7 +7,7 @@ Para entrar al sistema de la Mini PC desde tu terminal de Windows (PowerShell o 
 
 1. **Comando Principal:**
    ```bash
-   ssh fiscalio@192.168.1.89
+   ssh fiscalio@100.123.107.90
    ```
 
 2. **¿Cómo saber la IP si cambia? (Escribir esto en la Mini PC):**

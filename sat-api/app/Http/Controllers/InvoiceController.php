@@ -719,4 +719,106 @@ class InvoiceController extends Controller
         $request->delete();
         return response()->json(['message' => 'Solicitud eliminada correctamente']);
     }
+
+    public function verifySatRequest($id)
+    {
+        $req = \App\Models\SatRequest::findOrFail($id);
+        if (in_array($req->state, ['completed', 'failed', 'error', 'canceled'])) {
+            return response()->json(['message' => 'La solicitud ya está en estado terminal: ' . $req->state], 400);
+        }
+
+        try {
+            $satService = new \App\Services\SatDescargaMasivaService($req->rfc);
+            $xmlProcessor = new \App\Services\XmlProcessorService();
+
+            switch ($req->state) {
+                case 'created':
+                    if ($req->request_id) {
+                        $req->state = 'polling';
+                        $req->save();
+                    }
+                    else {
+                        $requestId = $satService->createQuery(
+                            \DateTimeImmutable::createFromMutable($req->start_date),
+                            \DateTimeImmutable::createFromMutable($req->end_date),
+                            $req->type,
+                            'xml'
+                        );
+                        $req->request_id = $requestId;
+                        $req->state = 'polling';
+                        $req->save();
+                    }
+                    break;
+                case 'polling':
+                    $verify = $satService->verifyQuery($req->request_id);
+                    $status = $verify->getStatusRequest();
+                    if ($status->isFinished()) {
+                        $ids = $verify->getPackagesIds();
+                        if (count($ids) > 0) {
+                            $req->state = 'downloading';
+                        }
+                        else {
+                            $req->state = 'completed';
+                        }
+                        $req->save();
+                    }
+                    elseif ($status->isAccepted() || $status->isInProgress()) {
+                    // still polling
+                    }
+                    else {
+                        $req->state = 'failed';
+                        $req->save();
+                    }
+                    break;
+                case 'downloading':
+                    $verify = $satService->verifyQuery($req->request_id);
+                    $packageIds = $verify->getPackagesIds();
+
+                    foreach ($packageIds as $packageId) {
+                        $path = "sat/downloads/" . $req->rfc . "/{$req->request_id}/$packageId.zip";
+                        if (!\Illuminate\Support\Facades\Storage::exists($path)) {
+                            $satService->downloadPackage($req->request_id, $packageId, $path);
+                        }
+                        $zipFullPath = \Illuminate\Support\Facades\Storage::path($path);
+                        $extractPath = dirname($zipFullPath) . '/extracted_' . $packageId;
+
+                        $zip = new \ZipArchive();
+                        $opened = $zip->open($zipFullPath);
+                        if ($opened === TRUE) {
+                            if (!file_exists($extractPath))
+                                mkdir($extractPath, 0777, true);
+                            $zip->extractTo($extractPath);
+                            $zip->close();
+                        }
+                        else {
+                            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+                                exec("powershell -command \"Expand-Archive -Path '$zipFullPath' -DestinationPath '$extractPath' -Force\"");
+                            }
+                            else {
+                                exec("unzip -o \"$zipFullPath\" -d \"$extractPath\"");
+                            }
+                        }
+                    }
+
+                    foreach ($packageIds as $packageId) {
+                        $path = "sat/downloads/" . $req->rfc . "/{$req->request_id}/$packageId.zip";
+                        $xmlProcessor->processPackage($path, $req->rfc, $req->request_id);
+                    }
+
+                    $req->refresh();
+                    if ($req->state !== 'completed') {
+                        $req->state = 'completed';
+                        $req->save();
+                    }
+                    break;
+            }
+
+            return response()->json(['message' => 'Procesada con éxito', 'new_state' => $req->state, 'request' => $req]);
+        }
+        catch (\Exception $e) {
+            $req->last_error = substr($e->getMessage(), 0, 500);
+            $req->save();
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }

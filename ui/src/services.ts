@@ -172,6 +172,18 @@ export async function deleteSatRequest(id: string): Promise<void> {
     if (!response.ok) throw new Error('Error deleting request');
 }
 
+export async function verifySatRequest(id: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/sat/requests/${id}/verify`, {
+        method: 'POST'
+    });
+    if (!response.ok) {
+        let err;
+        try { err = await response.json(); } catch (e) { }
+        throw new Error(err?.error || err?.message || 'Error al verificar solicitud');
+    }
+    return response.json();
+}
+
 export async function getProvisionalSummary(rfc: string, year: number, month: number): Promise<any> {
     const response = await fetch(`${API_BASE_URL}/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
     if (!response.ok) throw new Error('Error fetching summary');

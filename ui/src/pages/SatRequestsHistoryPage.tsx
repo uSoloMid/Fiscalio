@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listSatRequests } from '../services';
+import { listSatRequests, verifySatRequest } from '../services';
 
 interface SatRequest {
     id: string;
@@ -19,6 +19,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     const fetchRequests = async () => {
         try {
@@ -30,6 +31,18 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
             console.error('Error loading requests', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleVerify = async (id: string) => {
+        try {
+            setProcessingId(id);
+            await verifySatRequest(id);
+            await fetchRequests();
+        } catch (error: any) {
+            alert(error.message || 'Error al verificar solicitud');
+        } finally {
+            setProcessingId(null);
         }
     };
 
@@ -103,6 +116,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                                     <th className="px-8 py-5">Estado</th>
                                     <th className="px-8 py-5">Paquetes</th>
                                     <th className="px-8 py-5">Fecha Solicitud</th>
+                                    <th className="px-8 py-5 text-right">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
@@ -122,7 +136,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                                         </td>
                                         <td className="px-8 py-5">
                                             <div className={`flex items-center gap-2 px-3 py-1 rounded-full w-fit ${getStatusColor(req.state)}`}>
-                                                <div className={`w-1.5 h-1.5 rounded-full bg-current ${req.state !== 'completed' && req.state !== 'error' ? 'animate-pulse' : ''}`} />
+                                                <div className={`w-1.5 h-1.5 rounded-full bg-current ${req.state !== 'completed' && req.state !== 'error' && req.state !== 'failed' && req.state !== 'canceled' ? 'animate-pulse' : ''}`} />
                                                 <span className="font-bold text-[10px] uppercase tracking-wider">{getStatusLabel(req.state)}</span>
                                             </div>
                                         </td>
@@ -133,11 +147,28 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                                         <td className="px-8 py-5 text-gray-500 text-xs">
                                             {new Date(req.created_at).toLocaleString()}
                                         </td>
+                                        <td className="px-8 py-5 text-right">
+                                            {req.state !== 'completed' && req.state !== 'error' && req.state !== 'failed' && req.state !== 'canceled' && (
+                                                <button
+                                                    onClick={() => handleVerify(req.id)}
+                                                    disabled={processingId === req.id}
+                                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    title="Verificar y procesar manualmente"
+                                                >
+                                                    {processingId === req.id ? (
+                                                        <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                                                    ) : (
+                                                        <span className="material-symbols-outlined text-sm">play_arrow</span>
+                                                    )}
+                                                    Procesar
+                                                </button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                                 {requests.length === 0 && !loading && (
                                     <tr>
-                                        <td colSpan={6} className="px-8 py-20 text-center">
+                                        <td colSpan={7} className="px-8 py-20 text-center">
                                             <span className="material-symbols-outlined text-gray-200 text-6xl mb-4">history</span>
                                             <p className="text-gray-400 font-medium">No se han encontrado solicitudes en el historial.</p>
                                         </td>
