@@ -201,7 +201,7 @@ class ProvisionalControlController extends Controller
                         'uuid' => $c->uuid, 'fecha' => substr($c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
                         'subtotal' => (float)$c->subtotal * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
                         'total' => (float)$c->total * $tc, 'metodo_pago' => $c->metodo_pago,
-                        'forma_pago' => $c->forma_pago, 'is_deductible' => (bool)($c->is_deductible ?? true), 'uso_cfdi' => $c->uso_cfdi ?? 'G03'
+                        'forma_pago' => $c->forma_pago, 'is_deductible' => isset($c->is_deductible) ? (bool)$c->is_deductible : !(str_starts_with($c->uso_cfdi ?? '', 'D')), 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 'reason' => $c->deduction_type ?? ((str_starts_with($c->uso_cfdi ?? '', 'D')) ? 'Gasto Personal (Anual)' : 'No deducible')
                     ];
                 });
                 $results = $results->concat($resInvoices);
@@ -224,7 +224,7 @@ class ProvisionalControlController extends Controller
                         return [
                             'uuid' => $p->uuid_pago, 'fecha' => substr($p->fecha_pago, 0, 10), 'nombre' => $nombre,
                             'subtotal' => (float)($p->ppd_sub ?? 0) * $ratio * $tc, 'iva' => (float)($p->ppd_iva ?? 0) * $ratio * $tc,
-                            'total' => (float)$p->monto_pagado, 'metodo_pago' => 'REP', 'forma_pago' => $p->forma_pago ?? '99', 'is_deductible' => (bool)($p->is_deductible ?? true), 'uso_cfdi' => $p->uso_cfdi ?? 'G03'
+                            'total' => (float)$p->monto_pagado, 'metodo_pago' => 'REP', 'forma_pago' => $p->forma_pago ?? '99', 'is_deductible' => isset($p->is_deductible) ? (bool)$p->is_deductible : !(str_starts_with($p->uso_cfdi ?? '', 'D')), 'uso_cfdi' => $p->uso_cfdi ?? 'G03', 'reason' => $p->deduction_type ?? ((str_starts_with($p->uso_cfdi ?? '', 'D')) ? 'Gasto Personal (Anual)' : 'No deducible')
                         ];
                     });
                 $results = $results->concat($resReps);
@@ -242,10 +242,18 @@ class ProvisionalControlController extends Controller
                     if ($bal < 0.05) return null;
                     $ratio = $c->total > 0 ? ($bal / (float)$c->total) : 0;
                     $nombre = ($dir === 'ingresos') ? $c->name_receptor : $c->name_emisor;
+                    
+                    $isDeductible = isset($c->is_deductible) ? (bool)$c->is_deductible : !(str_starts_with($c->uso_cfdi ?? '', 'D'));
+                    $reason = null;
+                    if (!$isDeductible) {
+                        $uso = $c->uso_cfdi ?? '';
+                        $reason = $c->deduction_type ?? ((str_starts_with($uso, 'D')) ? 'Gasto Personal (Anual)' : 'No deducible');
+                    }
+                    
                     return [
                         'uuid' => $c->uuid, 'fecha' => substr($c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
                         'subtotal' => (float)$c->subtotal * $ratio * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
-                        'total' => $bal * $tc, 'metodo_pago' => $c->metodo_pago, 'is_deductible' => (bool)($c->is_deductible ?? true), 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 'forma_pago' => $c->forma_pago
+                        'total' => $bal * $tc, 'metodo_pago' => $c->metodo_pago, 'is_deductible' => $isDeductible, 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 'forma_pago' => $c->forma_pago, 'reason' => $reason
                     ];
                 })->filter()->values();
                 $results = $results->concat($resPend);
@@ -260,7 +268,7 @@ class ProvisionalControlController extends Controller
     public function updateDeductibility($uuid, Request $request)
     {
         try {
-            $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
+            $cfdi = \App\Models\Cfdi::where('uuid', $uuid)->firstOrFail();
             $cfdi->update(['is_deductible' => $request->input('is_deductible'), 'deduction_type' => $request->input('deduction_type', $cfdi->deduction_type)]);
             return response()->json(['ok' => true]);
         } catch (Throwable $e) {
@@ -467,16 +475,37 @@ class ProvisionalControlController extends Controller
             $data = json_decode($summaryResponse->getContent(), true);
 
             // Fetch details to include in the PDF
+// Fetch details to include in the PDF
             $details = [
-                'ingresos' => collect(),
-                'egresos' => collect(),
+                'ingresos_considerados' => collect(),
+                'egresos_considerados' => collect(),
+                'ingresos_pendientes' => collect(),
+                'egresos_pendientes' => collect(),
+                'no_deducibles' => collect()
             ];
 
-            foreach(['ingresos_total_pue', 'ingresos_total_rep'] as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
-                $items = collect($this->getBucketDetails($req)->original);
-                $details['ingresos'] = $details['ingresos']->concat($items);
-            }
+            // Ingresos Considerados
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'ingresos_total']);
+            $details['ingresos_considerados'] = collect($this->getBucketDetails($req)->original);
+
+            // Egresos Considerados
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_total']);
+            $details['egresos_considerados'] = collect($this->getBucketDetails($req)->original);
+
+            // Pendientes Ingresos
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'ingresos_pendiente']);
+            $details['ingresos_pendientes'] = collect($this->getBucketDetails($req)->original);
+
+            // Pendientes Egresos
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_pendiente']);
+            $details['egresos_pendientes'] = collect($this->getBucketDetails($req)->original);
+
+            // No deducibles 
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_nodeducibles']);
+            $nd1 = collect($this->getBucketDetails($req)->original);
+            $req2 = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_nodeducibles_pendiente']);
+            $nd2 = collect($this->getBucketDetails($req2)->original);
+            $details['no_deducibles'] = $nd1->concat($nd2);
 
             foreach(['egresos_total_pue', 'egresos_total_rep'] as $b) {
                 $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
@@ -485,7 +514,7 @@ class ProvisionalControlController extends Controller
             }
 
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
-            $clientName = $client ? $client->name : $rfc;
+            $clientName = $client ? $client->legal_name : $rfc;
 
             $months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             $periodName = $months[$month - 1];
@@ -517,7 +546,7 @@ class ProvisionalControlController extends Controller
             $items = $this->getBucketDetails($request)->original;
 
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
-            $clientName = $client ? $client->name : $rfc;
+            $clientName = $client ? $client->legal_name : $rfc;
 
             $months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             $periodName = $months[$month - 1];
