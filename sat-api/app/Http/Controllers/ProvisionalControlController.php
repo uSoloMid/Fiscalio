@@ -36,13 +36,10 @@ class ProvisionalControlController extends Controller
                     ->where('es_cancelado', false)
                     ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
                 
-<<<<<<< ours
-=======
                 if ($direction === 'egresos') {
                     $query->where('is_deductible', $onlyDeductible);
                 }
 
->>>>>>> theirs
                 return $query->select(
                         DB::raw("SUM(subtotal * $tcSql) as subtotal"),
                         DB::raw("SUM(iva * $tcSql) as iva"),
@@ -62,13 +59,10 @@ class ProvisionalControlController extends Controller
                     ->where('reps.es_cancelado', false)
                     ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
-<<<<<<< ours
-=======
                 if ($direction === 'egresos') {
                     $query->where('ppds.is_deductible', $onlyDeductible);
                 }
 
->>>>>>> theirs
                 return $query->select(
                         DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.subtotal / NULLIF(ppds.total, 0)) * $tcPago) as subtotal"),
                         DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.iva / NULLIF(ppds.total, 0)) * $tcPago) as iva"),
@@ -86,13 +80,10 @@ class ProvisionalControlController extends Controller
                     ->where('es_cancelado', false)
                     ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
 
-<<<<<<< ours
-=======
                 if ($direction === 'egresos') {
                     $query->where('is_deductible', $onlyDeductible);
                 }
 
->>>>>>> theirs
                 $invoices = $query->get();
 
                 $res = ['subtotal' => 0, 'iva' => 0, 'retenciones' => 0, 'total' => 0];
@@ -175,123 +166,14 @@ class ProvisionalControlController extends Controller
             $rfc = (string)$request->query('rfc');
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
-<<<<<<< ours
-            $bucket = (string)$request->query('bucket');
-
-            if (!$rfc || !$year || !$month || !$bucket) {
-                return response()->json(['error' => 'Missing parameters'], 400);
-            }
-
-=======
             $bucket = (string)$request->query('bucket'); 
             
->>>>>>> theirs
             $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
             $startDate = "{$year}-{$strMonth}-01 00:00:00";
             $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
             $endDate = $carbonEnd->format('Y-m-d 23:59:59');
 
             $parts = explode('_', $bucket);
-<<<<<<< ours
-            if (count($parts) < 3) return response()->json([]);
-
-            $direction = $parts[0];
-            $category = end($parts);
-            $fieldRfc = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
-
-            if ($category === 'pue' || $category === 'ppd') {
-                $metodo = strtoupper($category);
-                $query = DB::table('cfdis')
-                    ->where($fieldRfc, $rfc)
-                    ->where('tipo', 'I')
-                    ->where('metodo_pago', $metodo)
-                    ->where('es_cancelado', false)
-                    ->whereBetween('fecha', [$startDate, $endDate])
-                    ->orderBy('fecha', 'desc');
-                
-                $data = $query->get()->map(function($item) use ($direction) {
-                    $tc = ($item->moneda === 'MXN' || !$item->moneda) ? 1.0 : (float)($item->tipo_cambio ?: 1.0);
-                    $item->nombre = ($direction === 'ingresos') ? $item->name_receptor : $item->name_emisor;
-                    $item->subtotal = (float)$item->subtotal * $tc;
-                    $item->iva = (float)$item->iva * $tc;
-                    $item->retenciones = (float)$item->retenciones * $tc;
-                    $item->total = (float)$item->total * $tc;
-                    return $item;
-                });
-                return response()->json($data);
-            }
-
-            if ($category === 'rep') {
-                $query = DB::table('cfdi_payments')
-                    ->join('cfdis as reps', 'cfdi_payments.uuid_pago', '=', 'reps.uuid')
-                    ->join('cfdis as ppds', 'cfdi_payments.uuid_relacionado', '=', 'ppds.uuid')
-                    ->where('reps.' . $fieldRfc, $rfc)
-                    ->where('reps.es_cancelado', false)
-                    ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate])
-                    ->select(
-                        'reps.uuid',
-                        'cfdi_payments.fecha_pago as fecha',
-                        'reps.name_emisor',
-                        'reps.name_receptor',
-                        'cfdi_payments.monto_pagado',
-                        'cfdi_payments.tipo_cambio_pago',
-                        'ppds.subtotal as base_subtotal',
-                        'ppds.iva as base_iva',
-                        'ppds.retenciones as base_ret',
-                        'ppds.total as base_total'
-                    )
-                    ->orderBy('cfdi_payments.fecha_pago', 'desc');
-
-                $data = $query->get()->map(function($item) use ($direction) {
-                    $tc = (float)($item->tipo_cambio_pago ?: 1.0);
-                    $ratio = $item->base_total > 0 ? ($item->monto_pagado / $item->base_total) : 0;
-                    
-                    $res = new \stdClass();
-                    $res->uuid = $item->uuid;
-                    $res->fecha = $item->fecha;
-                    $res->nombre = ($direction === 'ingresos') ? $item->name_receptor : $item->name_emisor;
-                    $res->subtotal = (float)$item->base_subtotal * $ratio * $tc;
-                    $res->iva = (float)$item->base_iva * $ratio * $tc;
-                    $res->retenciones = (float)$item->base_ret * $ratio * $tc;
-                    $res->total = (float)$item->monto_pagado * $tc;
-                    return $res;
-                });
-                return response()->json($data);
-            }
-
-            if ($category === 'pendiente') {
-                $query = DB::table('cfdis')
-                    ->where($fieldRfc, $rfc)
-                    ->where('tipo', 'I')
-                    ->where('metodo_pago', 'PPD')
-                    ->where('es_cancelado', false)
-                    ->whereBetween('fecha', [$startDate, $endDate]);
-
-                $invoices = $query->get();
-                $result = [];
-                foreach ($invoices as $c) {
-                    $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->where('fecha_pago', '<=', $endDate)->sum('monto_pagado');
-                    $balance = max(0, (float)$c->total - (float)$pagado);
-                    if ($balance < 0.05) continue;
-                    
-                    $tc = ($c->moneda === 'MXN' || !$c->moneda) ? 1.0 : (float)($c->tipo_cambio ?: 1.0);
-                    $ratio = $c->total > 0 ? ($balance / (float)$c->total) : 0;
-
-                    $res = new \stdClass();
-                    $res->uuid = $c->uuid;
-                    $res->fecha = $c->fecha;
-                    $res->nombre = ($direction === 'ingresos') ? $c->name_receptor : $c->name_emisor;
-                    $res->subtotal = (float)$c->subtotal * $ratio * $tc;
-                    $res->iva = (float)$c->iva * $ratio * $tc;
-                    $res->retenciones = (float)$c->retenciones * $ratio * $tc;
-                    $res->total = (float)$c->total * $ratio * $tc;
-                    $result[] = $res;
-                }
-                return response()->json($result);
-            }
-
-            return response()->json([]);
-=======
             if (count($parts) < 2) return response()->json([]);
             
             $dir = $parts[0]; 
@@ -381,7 +263,6 @@ class ProvisionalControlController extends Controller
             $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
             $cfdi->update(['is_deductible' => $request->input('is_deductible'), 'deduction_type' => $request->input('deduction_type', $cfdi->deduction_type)]);
             return response()->json(['ok' => true]);
->>>>>>> theirs
         } catch (Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -390,38 +271,6 @@ class ProvisionalControlController extends Controller
     public function getPpdExplorer(Request $request)
     {
         try {
-<<<<<<< ours
-            $rfc = (string)$request->query('rfc');
-            $year = (int)$request->query('year');
-            $month = (int)$request->query('month');
-            $tipo = (string)$request->query('tipo'); 
-
-            if (!$rfc || !$year || !$month) return response()->json(['data' => []]);
-
-            $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
-            $startDate = "{$year}-{$strMonth}-01 00:00:00";
-            $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
-            $endDate = $carbonEnd->format('Y-m-d 23:59:59');
-
-            $field = ($tipo === 'issued' || $tipo === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
-
-            $invoices = DB::table('cfdis')
-                ->where($field, $rfc)
-                ->where('tipo', 'I')
-                ->where('metodo_pago', 'PPD')
-                ->where('es_cancelado', false)
-                ->whereBetween('fecha', [$startDate, $endDate])
-                ->orderBy('fecha', 'desc')
-                ->get();
-
-            foreach ($invoices as $c) {
-                $c->monto_pagado = (float)DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->sum('monto_pagado');
-                $c->saldo_pendiente = max(0, (float)$c->total - $c->monto_pagado);
-                $c->status_pago = ($c->saldo_pendiente < 0.05) ? 'Liquidada' : ($c->monto_pagado > 0.05 ? 'Parcial' : 'Pendiente');
-            }
-
-            return response()->json(['data' => $invoices]);
-=======
             $rfc = $request->query('rfc');
             $tipo = $request->query('tipo');
             $year = $request->query('year');
@@ -602,48 +451,17 @@ class ProvisionalControlController extends Controller
                 ->header('Content-Type', 'application/vnd.ms-excel')
                 ->header('Content-Disposition', 'attachment; filename="ControlProvisional_'.$rfc.'_'.$month.'_'.$year.'.xls"');
 
->>>>>>> theirs
         } catch (Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
-<<<<<<< ours
-    public function getRepExplorer(Request $request)
-=======
     public function exportPdfSummary(Request $request)
->>>>>>> theirs
     {
         try {
             $rfc = (string)$request->query('rfc');
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
-<<<<<<< ours
-            $tipo = (string)$request->query('tipo'); 
-
-            if (!$rfc || !$year || !$month) return response()->json(['data' => []]);
-
-            $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
-            $startDate = "{$year}-{$strMonth}-01 00:00:00";
-            $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
-            $endDate = $carbonEnd->format('Y-m-d 23:59:59');
-
-            $field = ($tipo === 'issued' || $tipo === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
-
-            $reps = DB::table('cfdis')
-                ->where($field, $rfc)
-                ->where('tipo', 'P')
-                ->where('es_cancelado', false)
-                ->whereBetween('fecha', [$startDate, $endDate])
-                ->orderBy('fecha', 'desc')
-                ->get();
-
-            foreach ($reps as $r) {
-                $r->relacionados = DB::table('cfdi_payments')->where('uuid_pago', $r->uuid)->get();
-            }
-
-            return response()->json(['data' => $reps]);
-=======
 
             $summaryResponse = $this->getSummary($request);
             $data = json_decode($summaryResponse->getContent(), true);
@@ -726,7 +544,6 @@ class ProvisionalControlController extends Controller
             $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
             return $pdf->download("Detalle_{$bucket}_{$rfc}_{$month}_{$year}.pdf");
 
->>>>>>> theirs
         } catch (Throwable $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }

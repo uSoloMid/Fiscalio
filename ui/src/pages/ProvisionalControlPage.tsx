@@ -483,6 +483,12 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                         <span className="text-[9px] font-bold text-gray-300 truncate tracking-wider">
                                                             UUID: {item.uuid}
                                                         </span>
+                                                        {!item.is_deductible && item.reason && (
+                                                            <span className="text-[9px] font-black px-2 py-1 rounded-lg tracking-widest uppercase bg-red-50 text-red-600 border border-red-100 flex items-center gap-1">
+                                                                <span className="material-symbols-outlined text-[10px]">error</span>
+                                                                {item.reason}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="text-base font-black text-gray-900 truncate mb-1 uppercase tracking-tight">{item.nombre}</div>
                                                     <div className="flex items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
