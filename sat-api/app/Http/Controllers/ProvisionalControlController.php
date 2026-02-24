@@ -41,7 +41,7 @@ class ProvisionalControlController extends Controller
                 }
 
                 return $query->select(
-                        DB::raw("SUM(subtotal * $tcSql) as subtotal"),
+                        DB::raw("SUM((subtotal - COALESCE(descuento, 0)) * $tcSql) as subtotal"),
                         DB::raw("SUM(iva * $tcSql) as iva"),
                         DB::raw("SUM(retenciones * $tcSql) as retenciones"),
                         DB::raw("SUM(total * $tcSql) as total")
@@ -64,7 +64,7 @@ class ProvisionalControlController extends Controller
                 }
 
                 return $query->select(
-                        DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.subtotal / NULLIF(ppds.total, 0)) * $tcPago) as subtotal"),
+                        DB::raw("SUM(cfdi_payments.monto_pagado * ((ppds.subtotal - COALESCE(ppds.descuento, 0)) / NULLIF(ppds.total, 0)) * $tcPago) as subtotal"),
                         DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.iva / NULLIF(ppds.total, 0)) * $tcPago) as iva"),
                         DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.retenciones / NULLIF(ppds.total, 0)) * $tcPago) as retenciones"),
                         DB::raw("SUM(cfdi_payments.monto_pagado * $tcPago) as total")
@@ -97,7 +97,7 @@ class ProvisionalControlController extends Controller
                     if ($balance < 0.05) continue;
                     $ratio = $c->total > 0 ? ($balance / (float)$c->total) : 0;
                     
-                    $res['subtotal'] += (float)$c->subtotal * $ratio * $tc;
+                    $res['subtotal'] += ((float)$c->subtotal - (float)($c->descuento ?? 0)) * $ratio * $tc;
                     $res['iva'] += (float)$c->iva * $ratio * $tc;
                     $res['retenciones'] += (float)$c->retenciones * $ratio * $tc;
                     $res['total'] += (float)$c->total * $ratio * $tc;
@@ -199,7 +199,7 @@ class ProvisionalControlController extends Controller
                     $nombre = ($dir === 'ingresos') ? $c->name_receptor : $c->name_emisor;
                     return [
                         'uuid' => $c->uuid, 'fecha' => substr($c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
-                        'subtotal' => (float)$c->subtotal * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
+                        'subtotal' => ((float)$c->subtotal - (float)($c->descuento ?? 0)) * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
                         'total' => (float)$c->total * $tc, 'metodo_pago' => $c->metodo_pago,
                         'forma_pago' => $c->forma_pago, 'is_deductible' => isset($c->is_deductible) ? (bool)$c->is_deductible : !(str_starts_with($c->uso_cfdi ?? '', 'D')), 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 'reason' => $c->deduction_type ?? ((str_starts_with($c->uso_cfdi ?? '', 'D')) ? 'Gasto Personal (Anual)' : 'No deducible')
                     ];
@@ -216,14 +216,14 @@ class ProvisionalControlController extends Controller
                 if ($onlyDeductible) $query->where('ppds.is_deductible', true);
                 if ($onlyNonDeductible) $query->where('ppds.is_deductible', false);
 
-                $resReps = $query->select('cfdi_payments.*', 'ppds.name_receptor', 'ppds.name_emisor', 'ppds.subtotal as ppd_sub', 'ppds.iva as ppd_iva', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc', 'ppds.forma_pago', 'ppds.is_deductible', 'ppds.uso_cfdi')
+                $resReps = $query->select('cfdi_payments.*', 'ppds.name_receptor', 'ppds.name_emisor', 'ppds.subtotal as ppd_sub', 'ppds.iva as ppd_iva', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc', 'ppds.forma_pago', 'ppds.is_deductible', 'ppds.uso_cfdi', 'ppds.descuento as ppd_desc')
                     ->get()->map(function($p) use ($dir) {
                         $ratio = $p->ppd_tot > 0 ? ($p->monto_pagado / $p->ppd_tot) : 0;
                         $tc = (strtoupper($p->ppd_mon ?? 'MXN') === 'MXN') ? 1 : ($p->ppd_tc ?: 1);
                         $nombre = ($dir === 'ingresos') ? $p->name_receptor : $p->name_emisor;
                         return [
                             'uuid' => $p->uuid_pago, 'fecha' => substr($p->fecha_pago, 0, 10), 'nombre' => $nombre,
-                            'subtotal' => (float)($p->ppd_sub ?? 0) * $ratio * $tc, 'iva' => (float)($p->ppd_iva ?? 0) * $ratio * $tc,
+                            'subtotal' => ((float)($p->ppd_sub ?? 0) - (float)($p->ppd_desc ?? 0)) * $ratio * $tc, 'iva' => (float)($p->ppd_iva ?? 0) * $ratio * $tc,
                             'total' => (float)$p->monto_pagado, 'metodo_pago' => 'REP', 'forma_pago' => $p->forma_pago ?? '99', 'is_deductible' => isset($p->is_deductible) ? (bool)$p->is_deductible : !(str_starts_with($p->uso_cfdi ?? '', 'D')), 'uso_cfdi' => $p->uso_cfdi ?? 'G03', 'reason' => $p->deduction_type ?? ((str_starts_with($p->uso_cfdi ?? '', 'D')) ? 'Gasto Personal (Anual)' : 'No deducible')
                         ];
                     });
@@ -252,7 +252,7 @@ class ProvisionalControlController extends Controller
                     
                     return [
                         'uuid' => $c->uuid, 'fecha' => substr($c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
-                        'subtotal' => (float)$c->subtotal * $ratio * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
+                        'subtotal' => ((float)$c->subtotal - (float)($c->descuento ?? 0)) * $ratio * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
                         'total' => $bal * $tc, 'metodo_pago' => $c->metodo_pago, 'is_deductible' => $isDeductible, 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 'forma_pago' => $c->forma_pago, 'reason' => $reason
                     ];
                 })->filter()->values();
