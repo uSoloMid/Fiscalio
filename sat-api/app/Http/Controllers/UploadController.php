@@ -39,14 +39,16 @@ class UploadController extends Controller
 
                     if ($res['success']) {
                         $results['success']++;
+                        $msg = 'Procesado: ' . strtoupper($res['tipo']) . ' (' . $res['uuid'] . ')';
                     }
                     else {
                         $results['failed']++;
+                        $msg = $res['message'];
                     }
                     $results['details'][] = [
                         'file' => $originalName,
                         'status' => $res['success'] ? 'success' : 'error',
-                        'message' => $res['message']
+                        'message' => $msg
                     ];
                 }
                 elseif ($extension === 'zip') {
@@ -68,14 +70,16 @@ class UploadController extends Controller
 
                                 if ($res['success']) {
                                     $results['success']++;
+                                    $msg = 'Procesado: ' . strtoupper($res['tipo']) . ' (' . $res['uuid'] . ')';
                                 }
                                 else {
                                     $results['failed']++;
+                                    $msg = $res['message'];
                                 }
                                 $results['details'][] = [
                                     'file' => $originalName . ' -> ' . basename($extFile),
                                     'status' => $res['success'] ? 'success' : 'error',
-                                    'message' => $res['message']
+                                    'message' => $msg
                                 ];
                             }
                         }

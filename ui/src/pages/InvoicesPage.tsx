@@ -41,6 +41,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
 
     const [isUploading, setIsUploading] = useState(false);
     const [uploadResult, setUploadResult] = useState<any>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
 
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportColumns, setExportColumns] = useState<string[]>([
@@ -336,8 +337,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
         );
     }
 
-    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
+    const processFiles = async (files: FileList | File[]) => {
         if (!files || files.length === 0) return;
         setIsUploading(true);
         setUploadResult(null);
@@ -352,7 +352,34 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
             setUploadResult({ success: false, message: error.message });
         } finally {
             setIsUploading(false);
-            if (event.target) event.target.value = '';
+        }
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (event.target.files) {
+            await processFiles(event.target.files);
+            event.target.value = '';
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDragOver) setIsDragOver(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+    };
+
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            await processFiles(e.dataTransfer.files);
         }
     };
 
@@ -731,7 +758,21 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                     {/* Table & Drawer Container */}
                     <div className="flex-1 flex overflow-hidden">
                         {/* Main List Column */}
-                        <div className="flex-1 flex flex-col min-w-0 bg-white">
+                        <div
+                            className="flex-1 flex flex-col min-w-0 bg-white relative"
+                            onDragOver={handleDragOver}
+                            onDragLeave={handleDragLeave}
+                            onDrop={handleDrop}
+                        >
+                            {/* Drag overlay */}
+                            {isDragOver && (
+                                <div className="absolute inset-0 z-50 bg-indigo-50/90 border-4 border-dashed border-indigo-400 rounded-xl flex flex-col items-center justify-center backdrop-blur-sm pointer-events-none transition-all">
+                                    <span className="material-symbols-outlined text-6xl text-indigo-500 mb-4 animate-bounce">cloud_upload</span>
+                                    <h3 className="text-2xl font-black text-indigo-900 tracking-tight">Suelta tus archivos aquí</h3>
+                                    <p className="text-indigo-600 font-medium mt-2">Puedes soltar archivos .xml o .zip de facturas</p>
+                                </div>
+                            )}
+
                             <div className="flex-1 overflow-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50 sticky top-0 z-20">
