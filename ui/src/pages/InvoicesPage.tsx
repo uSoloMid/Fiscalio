@@ -385,8 +385,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                         Control Prov.
                     </button>
                 </nav>
-                <div className="p-4 border-t border-gray-100">
-                    <button onClick={() => logout()} title="Cerrar sesión" className="w-full flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 text-sm font-medium transition-all">
+                <div className="p-4 border-t border-gray-100 mt-auto">
+                    <button onClick={() => logout()} title="Cerrar sesión" className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 text-sm font-medium transition-all">
                         <span className="material-symbols-outlined text-xl">logout</span>
                         Cerrar Sesión
                     </button>
