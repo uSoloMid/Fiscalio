@@ -66,7 +66,7 @@ class XmlProcessorService
                 }
 
                 try {
-                    $content = Storage::get($file);
+                    $content = (string)Storage::get($file);
                     $data = $this->parseCfdi($content);
 
                     if (!$data) {
@@ -113,6 +113,52 @@ class XmlProcessorService
         $this->updateRequestStats($requestId, $xmlsProcesados);
 
         Log::info("Procesamiento completado para Request $requestId. XMLs: $xmlsProcesados");
+    }
+
+    public function processManualFile(string $content, string $rfcCliente): array
+    {
+        $rfcCliente = strtoupper($rfcCliente);
+        try {
+            $data = $this->parseCfdi($content);
+            if (!$data) {
+                return ['success' => false, 'message' => 'El archivo no es un XML válido o no se pudo extraer el UUID'];
+            }
+
+            // Validar si pertenece al RFC del cliente
+            $esValido = strtoupper($data['rfc_emisor']) === $rfcCliente || strtoupper($data['rfc_receptor']) === $rfcCliente;
+
+            // Allow uploading even if it doesn't match perfectly? The user said "cargarlas en el cliente" (upload to the client).
+            // It's safer to ensure it belongs to the client or at least warn. Let's force classification.
+            $tipo = 'otros';
+            if (strtoupper($data['rfc_emisor']) === $rfcCliente) {
+                $tipo = 'emitidas';
+            }
+            elseif (strtoupper($data['rfc_receptor']) === $rfcCliente) {
+                $tipo = 'recibidas';
+            }
+
+            $year = $data['fecha']->format('Y');
+            $month = $data['fecha']->format('m');
+            $finalPath = "sat/xml/$rfcCliente/$year/$tipo/$month/" . $data['uuid'] . ".xml";
+
+            // Guardar XML
+            Storage::put($finalPath, $content);
+
+            // Indexar
+            $this->indexCfdi($data, $finalPath, 'manual_upload');
+
+            return [
+                'success' => true,
+                'uuid' => $data['uuid'],
+                'tipo' => $tipo,
+                'message' => 'Procesada correctamente: ' . $data['uuid']
+            ];
+
+        }
+        catch (Exception $e) {
+            Log::error("Error procesando XML manual: " . $e->getMessage());
+            return ['success' => false, 'message' => 'Error de procesamiento: ' . $e->getMessage()];
+        }
     }
 
     public function parseCfdi(string $xmlContent): ?array

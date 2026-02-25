@@ -12,9 +12,11 @@ use App\Http\Controllers\AgentController;
 use App\Http\Controllers\AuthController;
 
 Route::get('/ping', function () {
-    return 'pong'; });
+    return 'pong';
+});
 Route::get('/health', function () {
-    return response()->json(['status' => 'ok', 'ok' => true]); })->name('health');
+    return response()->json(['status' => 'ok', 'ok' => true]);
+})->name('health');
 
 Route::post('/login', [AuthController::class , 'login']);
 
@@ -30,6 +32,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', [AuthController::class , 'user']);
 
     // UI Routes
+    Route::post('/cfdis/upload', [\App\Http\Controllers\UploadController::class , 'uploadManual']);
     Route::get('/cfdis/periods', [InvoiceController::class , 'getPeriods']);
     Route::get('/cfdis/export', [InvoiceController::class , 'exportExcel']);
     Route::get('/cfdis', [InvoiceController::class , 'indexCfdis']);

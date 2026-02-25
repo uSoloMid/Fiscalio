@@ -268,6 +268,22 @@ export async function updateDeductibility(uuid: string, data: { is_deductible: b
     if (!response.ok) throw new Error('Error updating deductibility');
 }
 
+export async function uploadCfdis(files: FileList | File[], rfcUser: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('rfc_user', rfcUser);
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files[]', files[i]);
+    }
+    const res = await authFetch(`${API_BASE_URL}/api/cfdis/upload`, {
+        method: 'POST',
+        body: formData,
+    });
+    if (!res.ok) {
+        throw new Error('Error al subir los archivos');
+    }
+    return res.json();
+}
+
 export async function exportCfdiPdf(uuid: string) { await downloadBlob(`${API_BASE_URL}/api/cfdis/${uuid}/pdf`, `CFDI_${uuid}.pdf`); }
 export async function exportCfdiXml(uuid: string) { await downloadBlob(`${API_BASE_URL}/api/cfdis/${uuid}/xml`, `CFDI_${uuid}.xml`); }
 export async function exportCfdiZip(uuid: string) { await downloadBlob(`${API_BASE_URL}/api/cfdis/${uuid}/zip`, `CFDI_${uuid}.zip`); }

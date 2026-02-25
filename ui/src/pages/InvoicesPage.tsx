@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
@@ -38,6 +38,9 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const [downloadTypes, setDownloadTypes] = useState<string[]>(['emitidas', 'recibidas']);
     const [selectedDownloadPeriods, setSelectedDownloadPeriods] = useState<string[]>([]);
     const [isDownloadingXml, setIsDownloadingXml] = useState(false);
+
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadResult, setUploadResult] = useState<any>(null);
 
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportColumns, setExportColumns] = useState<string[]>([
@@ -332,6 +335,26 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
             </div>
         );
     }
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+        setIsUploading(true);
+        setUploadResult(null);
+        try {
+            const result = await uploadCfdis(files, activeRfc);
+            setUploadResult(result);
+            fetchData(); // Refresh list automatically
+            if (activeRfc) {
+                getPeriods(activeRfc).then(setAvailablePeriods);
+            }
+        } catch (error: any) {
+            setUploadResult({ success: false, message: error.message });
+        } finally {
+            setIsUploading(false);
+            if (event.target) event.target.value = '';
+        }
+    };
 
     return (
         <div className="text-gray-800 h-screen flex flex-col md:flex-row overflow-hidden relative">
@@ -643,6 +666,27 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                     <span className="material-symbols-outlined text-sm">download_for_offline</span>
                                     Descargar XMLs
                                 </button>
+
+                                {/* Upload XMLs / ZIPs Button */}
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept=".xml,.zip"
+                                        id="upload-cfdis"
+                                        className="hidden"
+                                        onChange={handleFileUpload}
+                                        disabled={isUploading}
+                                    />
+                                    <label
+                                        htmlFor="upload-cfdis"
+                                        className={`flex items-center gap-2 px-4 py-2 text-white text-xs font-bold rounded-xl transition-all shadow-lg cursor-pointer ${isUploading ? 'bg-indigo-400 cursor-not-allowed shadow-indigo-100' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100'
+                                            }`}
+                                    >
+                                        <span className={`material-symbols-outlined text-sm ${isUploading ? 'animate-bounce' : ''}`}>cloud_upload</span>
+                                        {isUploading ? 'Subiendo...' : 'Subir XML/ZIP'}
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
@@ -1322,6 +1366,64 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                         Comenzar Descarga
                                     </>
                                 )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal for Upload Results */}
+            {uploadResult && (
+                <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Resultado de Carga</h3>
+                                <p className="text-xs text-gray-500 mt-1">Detalles de los archivos subidos.</p>
+                            </div>
+                            <button onClick={() => setUploadResult(null)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <div className="p-6 flex-1 overflow-y-auto max-h-[60vh] space-y-4">
+                            {!uploadResult.details ? (
+                                <div className="text-red-500 text-center">{uploadResult.message || 'Error desconocido'}</div>
+                            ) : (
+                                <>
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-center">
+                                            <div className="text-3xl font-black">{uploadResult.success}</div>
+                                            <div className="text-xs font-bold uppercase tracking-wider">Aprobados</div>
+                                        </div>
+                                        <div className="bg-red-50 text-red-700 p-4 rounded-xl text-center">
+                                            <div className="text-3xl font-black">{uploadResult.failed}</div>
+                                            <div className="text-xs font-bold uppercase tracking-wider">Fallidos</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-widest border-b pb-2 mb-2">Desglose de Archivos</h4>
+                                        {uploadResult.details.map((dt: any, idx: number) => (
+                                            <div key={idx} className={`p-3 rounded-lg text-xs flex flex-col gap-1 border-l-4 ${dt.status === 'success' ? 'bg-emerald-50/50 border-emerald-500 text-emerald-900' : 'bg-red-50/50 border-red-500 text-red-900'}`}>
+                                                <div className="font-bold flex items-center justify-between mt-1">
+                                                    <span className="truncate pr-2">{dt.file}</span>
+                                                    <span>{dt.status === 'success' ? 'ÉXITO' : 'ERROR'}</span>
+                                                </div>
+                                                <div className={`opacity-80 mt-1 ${dt.status === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
+                                                    {dt.message}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        <div className="p-6 border-t border-gray-100 flex justify-end">
+                            <button
+                                onClick={() => setUploadResult(null)}
+                                className="px-6 py-2.5 bg-gray-900 text-white text-sm font-bold rounded-xl hover:bg-gray-800 transition-all shadow-lg"
+                            >
+                                Entendido
                             </button>
                         </div>
                     </div>
