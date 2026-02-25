@@ -1,6 +1,48 @@
 import type { Cfdi, CfdiPagination } from './models';
 import { API_BASE_URL } from './api/config';
 
+export function getToken(): string | null {
+    return localStorage.getItem('auth_token');
+}
+
+export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+    const token = getToken();
+    const headers = options.headers ? new Headers(options.headers) : new Headers();
+    if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+    }
+    options.headers = headers;
+    
+    let base = url;
+    if (url.startsWith('/api')) {
+        base = API_BASE_URL + url;
+    }
+
+    const response = await fetch(base, options);
+    if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        window.dispatchEvent(new Event('auth_token_expired'));
+    }
+    return response;
+}
+
+export async function login(email: string, password: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ email, password })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || data.error || 'Error login');
+    return data;
+}
+
+export async function logout(): Promise<void> {
+    await authFetch(`${API_BASE_URL}/api/logout`, { method: 'POST' });
+    localStorage.removeItem('auth_token');
+    window.dispatchEvent(new Event('auth_token_expired'));
+}
+
 export async function listCfdis(params: any): Promise<CfdiPagination> {
     const query = new URLSearchParams();
     if (params.rfc_emisor) query.append('rfc_emisor', params.rfc_emisor);
@@ -14,7 +56,7 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
     if (params.status) query.append('status', params.status);
     if (params.cfdi_tipo) query.append('cfdi_tipo', params.cfdi_tipo);
 
-    const response = await fetch(`${API_BASE_URL}/api/cfdis?${query.toString()}`);
+    const response = await authFetch(`${API_BASE_URL}/api/cfdis?${query.toString()}`);
     if (!response.ok) {
         throw new Error('Error fetching CFDIs');
     }
@@ -22,7 +64,7 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
 }
 
 export async function getCfdi(uuid: string): Promise<{ metadata: Cfdi, xml_url: string, sat_response?: any }> {
-    const response = await fetch(`${API_BASE_URL}/api/cfdis/${uuid}`);
+    const response = await authFetch(`${API_BASE_URL}/api/cfdis/${uuid}`);
     if (!response.ok) {
         throw new Error('Error fetching CFDI detail');
     }
@@ -30,7 +72,7 @@ export async function getCfdi(uuid: string): Promise<{ metadata: Cfdi, xml_url: 
 }
 
 export async function refreshCfdiStatus(uuid: string): Promise<{ metadata: Cfdi, sat_response: any }> {
-    const response = await fetch(`${API_BASE_URL}/api/cfdis/${uuid}/refresh-status`, {
+    const response = await authFetch(`${API_BASE_URL}/api/cfdis/${uuid}/refresh-status`, {
         method: 'POST'
     });
     if (!response.ok) {
@@ -40,7 +82,7 @@ export async function refreshCfdiStatus(uuid: string): Promise<{ metadata: Cfdi,
 }
 
 export async function getPeriods(rfcUser: string): Promise<string[]> {
-    const response = await fetch(`${API_BASE_URL}/api/cfdis/periods?rfc_user=${rfcUser}`);
+    const response = await authFetch(`${API_BASE_URL}/api/cfdis/periods?rfc_user=${rfcUser}`);
     if (!response.ok) {
         throw new Error('Error fetching periods');
     }
@@ -48,7 +90,7 @@ export async function getPeriods(rfcUser: string): Promise<string[]> {
 }
 
 export async function listClients(): Promise<any[]> {
-    const response = await fetch(`${API_BASE_URL}/api/clients`);
+    const response = await authFetch(`${API_BASE_URL}/api/clients`);
     if (!response.ok) throw new Error('Error fetching clients');
     return response.json();
 }
@@ -56,7 +98,7 @@ export async function listClients(): Promise<any[]> {
 export async function parseCertificate(file: File): Promise<{ rfc: string, name: string, valid_until: string }> {
     const formData = new FormData();
     formData.append('certificate', file);
-    const response = await fetch(`${API_BASE_URL}/api/clients/parse-certificate`, {
+    const response = await authFetch(`${API_BASE_URL}/api/clients/parse-certificate`, {
         method: 'POST',
         body: formData
     });
@@ -68,7 +110,7 @@ export async function parseCertificate(file: File): Promise<{ rfc: string, name:
 }
 
 export async function createClient(data: FormData): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/clients`, {
+    const response = await authFetch(`${API_BASE_URL}/api/clients`, {
         method: 'POST',
         body: data
     });
@@ -79,7 +121,7 @@ export async function createClient(data: FormData): Promise<any> {
     return response.json();
 }
 export async function startSync(rfc: string, force: boolean = false): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/sat/sync`, {
+    const response = await authFetch(`${API_BASE_URL}/api/sat/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rfc, force })
@@ -89,7 +131,7 @@ export async function startSync(rfc: string, force: boolean = false): Promise<an
 }
 
 export async function verifyStatus(params: any): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/sat/verify-status`, {
+    const response = await authFetch(`${API_BASE_URL}/api/sat/verify-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params)
@@ -99,25 +141,25 @@ export async function verifyStatus(params: any): Promise<any> {
 }
 
 export async function getActiveRequests(rfc: string): Promise<any[]> {
-    const response = await fetch(`${API_BASE_URL}/api/sat/active-requests?rfc=${rfc}`);
+    const response = await authFetch(`${API_BASE_URL}/api/sat/active-requests?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching active requests');
     return response.json();
 }
 
 export async function listAccounts(rfc: string): Promise<any[]> {
-    const response = await fetch(`${API_BASE_URL}/api/accounts?rfc=${rfc}`);
+    const response = await authFetch(`${API_BASE_URL}/api/accounts?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching accounts');
     return response.json();
 }
 
 export async function getAccount(id: number, rfc: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`);
+    const response = await authFetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`);
     if (!response.ok) throw new Error('Error fetching account');
     return response.json();
 }
 
 export async function createAccount(data: any, rfc: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/accounts?rfc=${rfc}`, {
+    const response = await authFetch(`${API_BASE_URL}/api/accounts?rfc=${rfc}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -130,7 +172,7 @@ export async function createAccount(data: any, rfc: string): Promise<any> {
 }
 
 export async function updateAccount(id: number, data: any, rfc: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`, {
+    const response = await authFetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -143,20 +185,20 @@ export async function updateAccount(id: number, data: any, rfc: string): Promise
 }
 
 export async function deleteAccount(id: number, rfc: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`, {
+    const response = await authFetch(`${API_BASE_URL}/api/accounts/${id}?rfc=${rfc}`, {
         method: 'DELETE'
     });
     if (!response.ok) throw new Error('Error deleting account');
 }
 
 export async function getRecentRequests(): Promise<any[]> {
-    const response = await fetch(`${API_BASE_URL}/api/sat/recent-requests`);
+    const response = await authFetch(`${API_BASE_URL}/api/sat/recent-requests`);
     if (!response.ok) throw new Error('Error fetching recent requests');
     return response.json();
 }
 
 export async function getRunnerStatus(): Promise<{ is_alive: boolean; last_activity: string | null }> {
-    const response = await fetch(`${API_BASE_URL}/api/sat/runner-status`);
+    const response = await authFetch(`${API_BASE_URL}/api/sat/runner-status`);
     if (!response.ok) throw new Error('Error fetching runner status');
     return response.json();
 }
@@ -166,20 +208,20 @@ export async function listSatRequests(params: any = {}): Promise<any> {
     if (params.rfc) query.append('rfc', params.rfc);
     if (params.page) query.append('page', params.page);
 
-    const response = await fetch(`${API_BASE_URL}/api/sat/requests?${query.toString()}`);
+    const response = await authFetch(`${API_BASE_URL}/api/sat/requests?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching requests');
     return response.json();
 }
 
 export async function deleteSatRequest(id: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/sat/requests/${id}`, {
+    const response = await authFetch(`${API_BASE_URL}/api/sat/requests/${id}`, {
         method: 'DELETE'
     });
     if (!response.ok) throw new Error('Error deleting request');
 }
 
 export async function verifySatRequest(id: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/sat/requests/${id}/verify`, {
+    const response = await authFetch(`${API_BASE_URL}/api/sat/requests/${id}/verify`, {
         method: 'POST'
     });
     if (!response.ok) {
@@ -191,34 +233,34 @@ export async function verifySatRequest(id: string): Promise<any> {
 }
 
 export async function getProvisionalSummary(rfc: string, year: number, month: number): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
+    const response = await authFetch(`${API_BASE_URL}/api/provisional/summary?rfc=${rfc}&year=${year}&month=${month}`);
     if (!response.ok) throw new Error('Error fetching summary');
     return response.json();
 }
 
 export async function listPpdExplorer(params: any): Promise<any> {
     const query = new URLSearchParams(params);
-    const response = await fetch(`${API_BASE_URL}/api/provisional/ppd-explorer?${query.toString()}`);
+    const response = await authFetch(`${API_BASE_URL}/api/provisional/ppd-explorer?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching PPD explorer');
     return response.json();
 }
 
 export async function listRepExplorer(params: any): Promise<any> {
     const query = new URLSearchParams(params);
-    const response = await fetch(`${API_BASE_URL}/api/provisional/rep-explorer?${query.toString()}`);
+    const response = await authFetch(`${API_BASE_URL}/api/provisional/rep-explorer?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching REP explorer');
     return response.json();
 }
 
 export async function getBucketDetails(params: any): Promise<any> {
     const query = new URLSearchParams(params);
-    const response = await fetch(`${API_BASE_URL}/api/provisional/bucket-details?${query.toString()}`);
+    const response = await authFetch(`${API_BASE_URL}/api/provisional/bucket-details?${query.toString()}`);
     if (!response.ok) throw new Error('Error fetching bucket details');
     return response.json();
 }
 
 export async function updateDeductibility(uuid: string, data: { is_deductible: boolean, deduction_type?: string }): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/cfdis/${uuid}/update-deductibility`, {
+    const response = await authFetch(`${API_BASE_URL}/api/cfdis/${uuid}/update-deductibility`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -226,16 +268,11 @@ export async function updateDeductibility(uuid: string, data: { is_deductible: b
     if (!response.ok) throw new Error('Error updating deductibility');
 }
 
-export function exportCfdiPdf(uuid: string) {
-    window.open(`${API_BASE_URL}/api/cfdis/${uuid}/pdf`, '_blank');
-}
+export async function exportCfdiPdf(uuid: string) { await downloadBlob(`${API_BASE_URL}/api/cfdis/${uuid}/pdf`, `CFDI_${uuid}.pdf`); }
 
-export function exportDetailedBucketPdf(params: any) {
-    const query = new URLSearchParams(params);
-    window.open(`${API_BASE_URL}/api/provisional/export-pdf?` + query.toString(), '_blank');
-}
+export async function exportDetailedBucketPdf(params: any) { const q = new URLSearchParams(params); await downloadBlob(`${API_BASE_URL}/api/provisional/export-pdf?${q}`, `Detalle_${params.bucket}.pdf`); }
 
-export function exportInvoicesZip(params: any) {
+export async function exportInvoicesZip(params: any) {
     const query = new URLSearchParams();
     if (params.rfc_user) query.append('rfc_user', params.rfc_user);
     if (params.year) query.append('year', params.year);
@@ -244,10 +281,10 @@ export function exportInvoicesZip(params: any) {
     if (params.q) query.append('q', params.q);
     if (params.status) query.append('status', params.status);
 
-    window.open(`${API_BASE_URL}/api/sat/bulk-pdf?${query.toString()}`, '_blank');
+    await downloadBlob(`${API_BASE_URL}/api/sat/bulk-pdf?${query.toString()}`, 'Facturas.zip');
 }
 export async function downloadProvisionalXmlZip(rfc: string, periods: { year: number, month: number }[], types: string[] = ['emitidas', 'recibidas']): Promise<Blob> {
-    const response = await fetch(`${API_BASE_URL}/api/provisional/download-xml?rfc=${rfc}`, {
+    const response = await authFetch(`${API_BASE_URL}/api/provisional/download-xml?rfc=${rfc}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ periods, types })
@@ -259,7 +296,7 @@ export async function downloadProvisionalXmlZip(rfc: string, periods: { year: nu
     return response.blob();
 }
 
-export function exportCfdisExcel(params: any, columns: string[]) {
+export async function exportCfdisExcel(params: any, columns: string[]) {
     const query = new URLSearchParams();
     if (params.rfc_user) query.append('rfc_user', params.rfc_user);
     if (params.year) query.append('year', params.year);
@@ -272,20 +309,32 @@ export function exportCfdisExcel(params: any, columns: string[]) {
     query.append('columns', columns.join(','));
 
     // Trigger download
-    window.open(`${API_BASE_URL}/api/cfdis/export?${query.toString()}`, '_blank');
+    await downloadBlob(`${API_BASE_URL}/api/cfdis/export?${query.toString()}`, 'Facturas.xls');
 }
-export function exportProvisionalExcel(params: { rfc: string, year: number, month: number }) {
+export async function exportProvisionalExcel(params: { rfc: string, year: number, month: number }) {
     const query = new URLSearchParams();
     query.append('rfc', params.rfc);
     query.append('year', params.year.toString());
     query.append('month', params.month.toString());
-    window.open(`${API_BASE_URL}/api/provisional/export-excel?${query.toString()}`, '_blank');
+    await downloadBlob(`${API_BASE_URL}/api/provisional/export-excel?${query.toString()}`, `Resumen_${params.month}_${params.year}.xls`);
 }
 
-export function exportProvisionalPdfSummary(params: { rfc: string, year: number, month: number }) {
+export async function exportProvisionalPdfSummary(params: { rfc: string, year: number, month: number }) {
     const query = new URLSearchParams();
     query.append('rfc', params.rfc);
     query.append('year', params.year.toString());
     query.append('month', params.month.toString());
-    window.open(`${API_BASE_URL}/api/provisional/export-pdf-summary?${query.toString()}`, '_blank');
+    await downloadBlob(`${API_BASE_URL}/api/provisional/export-pdf-summary?${query.toString()}`, `Resumen_${params.month}_${params.year}.pdf`);
+}
+
+export async function downloadBlob(url: string, filename: string) {
+    const response = await authFetch(url);
+    if (!response.ok) throw new Error('Error en la descarga');
+    const blob = await response.blob();
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }

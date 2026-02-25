@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
@@ -383,6 +383,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                     >
                         <span className="material-symbols-outlined text-xl">monitoring</span>
                         Control Prov.
+                    </button>
+                    <button onClick={() => logout()} title="Cerrar sesión" className="mt-auto flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 text-sm font-medium transition-all">
+                        <span className="material-symbols-outlined text-xl">logout</span>
+                        Cerrar Sesión
                     </button>
                 </nav>
             </aside>

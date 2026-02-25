@@ -29,6 +29,7 @@ class Business extends Model
         'is_syncing',
         'sync_status',
         'valid_until',
+        'workspace_id',
     ];
 
     /** @var array<string> */
@@ -57,5 +58,10 @@ class Business extends Model
     public function tags()
     {
         return $this->belongsToMany(Tag::class);
+    }
+
+    public function workspace()
+    {
+        return $this->belongsTo(Workspace::class);
     }
 }

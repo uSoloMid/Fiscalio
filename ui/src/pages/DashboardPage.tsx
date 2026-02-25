@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { parseCertificate, createClient } from '../services';
+import { parseCertificate, createClient, logout } from '../services';
 import { listGroups, createGroup, updateGroup, deleteGroup } from '../api/groups';
 import { listTags, createTag, updateTag, deleteTag } from '../api/tags';
 import { listClients, updateClientGroup, updateClientTags, updateClientInfo, deleteClient } from '../api/clients';
@@ -295,6 +295,9 @@ export const DashboardPage = ({
                     </button>
                     <button className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all opacity-40">
                         <span className="material-symbols-outlined">task</span>
+                    </button>
+                    <button onClick={logout} title="Cerrar sesión" className="mt-8 p-3 rounded-2xl text-red-400 hover:bg-red-50 hover:text-red-500 transition-all">
+                        <span className="material-symbols-outlined">logout</span>
                     </button>
                 </nav>
             </aside>

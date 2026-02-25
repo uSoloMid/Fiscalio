@@ -1,6 +1,7 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1)
+;
 
 namespace App\Models;
 
@@ -17,7 +18,7 @@ class User extends Authenticatable
     use Notifiable;
 
     /** @var array<string> */
-    protected $fillable = ['name', 'email', 'password', 'is_admin'];
+    protected $fillable = ['name', 'email', 'password', 'is_admin', 'current_workspace_id'];
 
     /** @var array<string> */
     protected $hidden = ['password', 'remember_token'];
@@ -31,5 +32,15 @@ class User extends Authenticatable
     public function businesses(): BelongsToMany
     {
         return $this->belongsToMany(Business::class);
+    }
+
+    public function currentWorkspace()
+    {
+        return $this->belongsTo(Workspace::class , 'current_workspace_id');
+    }
+
+    public function ownedWorkspaces()
+    {
+        return $this->hasMany(Workspace::class , 'owner_id');
     }
 }
