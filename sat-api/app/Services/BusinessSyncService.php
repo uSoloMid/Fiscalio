@@ -40,16 +40,15 @@ class BusinessSyncService
             $requestCount = 0;
 
             foreach ($types as $type) {
-                // Find latest invoice date for this business and type
-                $query = Cfdi::query();
-                if ($type === 'issued') {
-                    $query->where('rfc_emisor', $business->rfc);
-                }
-                else {
-                    $query->where('rfc_receptor', $business->rfc);
-                }
+                // Find the end_date of the last successful SAT request for this RFC and type
+                // This prevents skipping gaps if a user manually uploads a newer XML
+                $lastRequest = SatRequest::where('rfc', $business->rfc)
+                    ->where('type', $type)
+                    ->where('state', 'completed')
+                    ->orderBy('end_date', 'desc')
+                    ->first();
 
-                $latestDate = $query->max('fecha');
+                $latestDate = $lastRequest ? $lastRequest->end_date : null;
 
                 // If it's the first time syncing THIS business record, 
                 // we MUST ensure we have the 5-year history even if some invoices exist 
@@ -57,11 +56,11 @@ class BusinessSyncService
                     $startDate = now()->subYears(5)->startOfYear();
                 }
                 elseif (!$latestDate) {
-                    // Fallback for missing data
+                    // Fallback for missing data (never synced successfully before)
                     $startDate = now()->subYears(5)->startOfYear();
                 }
                 else {
-                    // Incremental: latest invoice - 2 days (as requested by user)
+                    // Incremental: start from the end of the last successful request (minus 2 days for overlap safety)
                     $startDate = Carbon::parse($latestDate)->subDays(2)->startOfDay();
                 }
 

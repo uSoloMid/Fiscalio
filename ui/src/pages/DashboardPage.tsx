@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { parseCertificate, createClient, logout } from '../services';
+import { parseCertificate, createClient, logout, getRunnerStatus } from '../services';
 import { listGroups, createGroup, updateGroup, deleteGroup } from '../api/groups';
 import { listTags, createTag, updateTag, deleteTag } from '../api/tags';
 import { listClients, updateClientGroup, updateClientTags, updateClientInfo, deleteClient } from '../api/clients';
@@ -58,9 +58,36 @@ export const DashboardPage = ({
     const [newTagColor, setNewTagColor] = useState('#3B82F6');
     const [editingEntity, setEditingEntity] = useState<any>(null);
 
+    // Runner status state
+    const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean; last_activity: string | null }>({ is_alive: false, last_activity: null });
+    const [nowTick, setNowTick] = useState(Date.now());
+
     useEffect(() => {
         loadInitialData();
+        fetchRunnerStatus();
+
+        const tickInterval = setInterval(() => {
+            setNowTick(Date.now());
+        }, 30000);
+
+        const runnerInterval = setInterval(() => {
+            fetchRunnerStatus();
+        }, 60000); // Poll status every 1 min
+
+        return () => {
+            clearInterval(tickInterval);
+            clearInterval(runnerInterval);
+        };
     }, []);
+
+    const fetchRunnerStatus = async () => {
+        try {
+            const status = await getRunnerStatus();
+            setRunnerStatus(status);
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     useEffect(() => {
         loadClientsData();
@@ -311,9 +338,18 @@ export const DashboardPage = ({
                         <div className="flex items-center justify-between md:justify-start gap-4 lg:gap-6">
                             <h1 className="text-lg lg:text-xl font-bold tracking-tight text-gray-900">Dashboard</h1>
                             <div className="hidden sm:block h-6 w-px bg-gray-200"></div>
-                            <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] lg:text-xs font-bold whitespace-nowrap">
-                                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                                SAT Sync: hace 2h
+                            <div className={`flex items-center gap-2 px-3 py-1.5 ${runnerStatus.is_alive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'} rounded-full text-[10px] lg:text-xs font-bold whitespace-nowrap`}>
+                                <span className={`h-2 w-2 rounded-full ${runnerStatus.is_alive ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`}></span>
+                                {(() => {
+                                    if (!runnerStatus.last_activity) return 'SAT Sync: Inactivo';
+                                    const lastAct = new Date(runnerStatus.last_activity.replace(" ", "T")).getTime();
+                                    const now = nowTick;
+                                    const diffMins = Math.floor((now - lastAct) / 60000);
+                                    const nextMins = 15 - (diffMins % 15);
+
+                                    if (!runnerStatus.is_alive) return `SAT Sync: Caído (hace ${diffMins}m)`;
+                                    return `Orquestador: hace ${diffMins}m | Próx: ${nextMins}m`;
+                                })()}
                             </div>
                         </div>
 

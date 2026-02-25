@@ -12,9 +12,13 @@ start "Backend Server" cmd /c "php artisan serve --host=0.0.0.0 --port=3333"
 
 :: 2. Iniciar SAT Runner en una nueva ventana
 echo 🤖 Iniciando SAT Runner...
-start "SAT Runner" cmd /c "php artisan sat:runner --loop"
+start "SAT Runner" cmd /c "title SAT Runner & php artisan sat:runner --loop"
 
-:: 3. Mostrar mensajes finales
+:: 3. Iniciar Scheduler en una nueva ventana
+echo 🕒 Iniciando Scheduler...
+start "Scheduler" cmd /c "title SAT Scheduler & php artisan schedule:work"
+
+:: 4. Mostrar mensajes finales
 echo.
 echo ✅ El sistema esta listo.
 echo.

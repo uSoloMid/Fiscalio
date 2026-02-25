@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ClientCardProps {
     client: any;
@@ -9,13 +8,67 @@ interface ClientCardProps {
     onEditClient: () => void;
 }
 
+function getTimeStatus(client: any, _nowTick: number): { text: string, type: 'syncing' | 'pending' | 'ok' | 'error', nextText: string } {
+    if (client.is_syncing || client.sync_status === 'checking' || client.sync_status === 'queued') {
+        return { text: 'Sincronizando...', type: 'syncing', nextText: 'En progreso' };
+    }
+    if (client.sync_status === 'error') {
+        return { text: 'Fallo al sincronizar', type: 'error', nextText: 'Reintentará pronto' };
+    }
+    if (!client.last_sync_at) {
+        return { text: 'Pendiente', type: 'pending', nextText: 'Sin sincronizar aún' };
+    }
+
+    // Check when was last sync and next sync
+    const lastSyncDate = new Date(client.last_sync_at.replace(" ", "T"));
+    const now = new Date(_nowTick);
+
+    // Elapsed time
+    const diffMs = now.getTime() - lastSyncDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    let text = '';
+    if (diffDays > 0) text = `hace ${diffDays}d`;
+    else if (diffHours > 0) text = `hace ${diffHours}h ${diffMins % 60}m`;
+    else text = `hace ${diffMins}m`;
+
+    // Next sync (threshold is 5 hours, let's say 5 * 60 = 300 mins)
+    const nextSyncMs = lastSyncDate.getTime() + (5 * 60 * 60 * 1000);
+    const timeLeftMs = nextSyncMs - now.getTime();
+
+    let nextText = '';
+    if (timeLeftMs <= 0) {
+        nextText = 'Sincronización inminente';
+    } else {
+        const leftMins = Math.floor(timeLeftMs / 60000);
+        const leftHours = Math.floor(leftMins / 60);
+        if (leftHours > 0) nextText = `Próx. act. en ${leftHours}h ${leftMins % 60}m`;
+        else nextText = `Próx. act. en ${leftMins}m`;
+    }
+
+    return { text, type: 'ok', nextText };
+}
+
 export const ClientCard = ({ client, onClick, onEditGroup, onEditTags, onEditClient }: ClientCardProps) => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [nowTick, setNowTick] = useState(Date.now());
+
+    // Update time every 30 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setNowTick(Date.now());
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     const handleMenuClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsMenuOpen(!isMenuOpen);
     };
+
+    const statusObj = getTimeStatus(client, nowTick);
 
     return (
         <div
@@ -59,12 +112,23 @@ export const ClientCard = ({ client, onClick, onEditGroup, onEditTags, onEditCli
                 )}
             </div>
 
-            <div className="pt-2.5 border-t border-gray-50 flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
-                    <span className="text-[9px] font-bold text-emerald-600 uppercase">Sincronizado</span>
+            <div className="pt-2.5 border-t border-gray-50 flex flex-col gap-1.5 mt-auto">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <div className={`flex-shrink-0 h-1.5 w-1.5 rounded-full ${statusObj.type === 'ok' ? 'bg-emerald-500' : statusObj.type === 'syncing' ? 'bg-blue-500 animate-pulse' : statusObj.type === 'error' ? 'bg-red-500' : 'bg-gray-400'}`}></div>
+                        <span className={`text-[9px] font-bold uppercase truncate ${statusObj.type === 'ok' ? 'text-emerald-600' : statusObj.type === 'syncing' ? 'text-blue-600' : statusObj.type === 'error' ? 'text-red-600' : 'text-gray-500'}`}>
+                            {statusObj.type === 'ok' ? 'Sincronizado' : statusObj.type === 'syncing' ? 'Sincronizando' : statusObj.text}
+                        </span>
+                    </div>
+                    {statusObj.type === 'ok' && (
+                        <span className="text-[9px] text-gray-400 font-medium whitespace-nowrap pl-2 flex-shrink-0">{statusObj.text}</span>
+                    )}
                 </div>
-                <span className="text-[9px] text-gray-400 font-medium">hace 12m</span>
+                {statusObj.nextText && (
+                    <div className="text-[9px] text-gray-400 font-medium text-right italic">
+                        {statusObj.nextText}
+                    </div>
+                )}
             </div>
 
             {/* Floating Menu */}
