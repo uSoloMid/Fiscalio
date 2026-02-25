@@ -484,13 +484,21 @@ class ProvisionalControlController extends Controller
                 'no_deducibles' => collect()
             ];
 
-            // Ingresos Considerados
-            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'ingresos_total']);
-            $details['ingresos_considerados'] = collect($this->getBucketDetails($req)->original);
+            // Ingresos Considerados (PUE + REP)
+            $details['ingresos_considerados'] = collect();
+            foreach(['ingresos_total_pue', 'ingresos_total_rep'] as $b) {
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $items = collect($this->getBucketDetails($req)->original);
+                $details['ingresos_considerados'] = $details['ingresos_considerados']->concat($items);
+            }
 
-            // Egresos Considerados
-            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_total']);
-            $details['egresos_considerados'] = collect($this->getBucketDetails($req)->original);
+            // Egresos Considerados (PUE + REP)
+            $details['egresos_considerados'] = collect();
+            foreach(['egresos_total_pue', 'egresos_total_rep'] as $b) {
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $items = collect($this->getBucketDetails($req)->original);
+                $details['egresos_considerados'] = $details['egresos_considerados']->concat($items);
+            }
 
             // Pendientes Ingresos
             $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'ingresos_pendiente']);
@@ -507,11 +515,7 @@ class ProvisionalControlController extends Controller
             $nd2 = collect($this->getBucketDetails($req2)->original);
             $details['no_deducibles'] = $nd1->concat($nd2);
 
-            foreach(['egresos_total_pue', 'egresos_total_rep'] as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
-                $items = collect($this->getBucketDetails($req)->original);
-                $details['egresos'] = $details['egresos']->concat($items);
-            }
+
 
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
             $clientName = $client ? $client->legal_name : $rfc;
