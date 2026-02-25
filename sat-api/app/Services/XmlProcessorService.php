@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Cfdi;
 use App\Models\SatRequest;
+use App\Models\Business;
 use DateTimeImmutable;
 use DOMDocument;
 use Exception;
@@ -124,22 +125,42 @@ class XmlProcessorService
                 return ['success' => false, 'message' => 'El archivo no es un XML válido o no se pudo extraer el UUID'];
             }
 
-            // Validar si pertenece al RFC del cliente
-            $esValido = strtoupper($data['rfc_emisor']) === $rfcCliente || strtoupper($data['rfc_receptor']) === $rfcCliente;
-
-            // Allow uploading even if it doesn't match perfectly? The user said "cargarlas en el cliente" (upload to the client).
-            // It's safer to ensure it belongs to the client or at least warn. Let's force classification.
+            $emisor = strtoupper($data['rfc_emisor']);
+            $receptor = strtoupper($data['rfc_receptor']);
+            $targetRfc = $rfcCliente;
             $tipo = 'otros';
-            if (strtoupper($data['rfc_emisor']) === $rfcCliente) {
+            $isWarning = false;
+
+            if ($emisor === $targetRfc) {
                 $tipo = 'emitidas';
             }
-            elseif (strtoupper($data['rfc_receptor']) === $rfcCliente) {
+            elseif ($receptor === $targetRfc) {
                 $tipo = 'recibidas';
+            }
+            else {
+                // Verificar si pertenece a algún otro cliente registrado
+                $business = Business::where('rfc', $emisor)->orWhere('rfc', $receptor)->first();
+                if ($business) {
+                    $targetRfc = strtoupper($business->rfc);
+                    if ($emisor === $targetRfc) {
+                        $tipo = 'emitidas';
+                    }
+                    elseif ($receptor === $targetRfc) {
+                        $tipo = 'recibidas';
+                    }
+                    $isWarning = true;
+                }
+                else {
+                    return [
+                        'success' => false,
+                        'message' => "La factura no pertenece ni al cliente actual ni a ningún otro cliente registrado (E: $emisor, R: $receptor)"
+                    ];
+                }
             }
 
             $year = $data['fecha']->format('Y');
             $month = $data['fecha']->format('m');
-            $finalPath = "sat/xml/$rfcCliente/$year/$tipo/$month/" . $data['uuid'] . ".xml";
+            $finalPath = "sat/xml/$targetRfc/$year/$tipo/$month/" . $data['uuid'] . ".xml";
 
             // Guardar XML
             Storage::put($finalPath, $content);
@@ -151,6 +172,8 @@ class XmlProcessorService
                 'success' => true,
                 'uuid' => $data['uuid'],
                 'tipo' => $tipo,
+                'rfc_guardado' => $targetRfc,
+                'is_warning' => $isWarning,
                 'message' => 'Procesada correctamente: ' . $data['uuid']
             ];
 

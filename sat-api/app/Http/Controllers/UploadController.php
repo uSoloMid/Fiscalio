@@ -37,9 +37,15 @@ class UploadController extends Controller
                     $content = file_get_contents($file->getRealPath());
                     $res = $xmlProcessor->processManualFile($content, $rfcUser);
 
+                    $status = 'error';
                     if ($res['success']) {
                         $results['success']++;
                         $msg = 'Procesado: ' . strtoupper($res['tipo']) . ' (' . $res['uuid'] . ')';
+                        $status = 'success';
+                        if (isset($res['is_warning']) && $res['is_warning']) {
+                            $msg = '⚠️ Redirigido a ' . $res['rfc_guardado'] . ' (' . strtoupper($res['tipo']) . ')';
+                            $status = 'warning';
+                        }
                     }
                     else {
                         $results['failed']++;
@@ -47,7 +53,7 @@ class UploadController extends Controller
                     }
                     $results['details'][] = [
                         'file' => $originalName,
-                        'status' => $res['success'] ? 'success' : 'error',
+                        'status' => $status,
                         'message' => $msg
                     ];
                 }
@@ -68,9 +74,15 @@ class UploadController extends Controller
                                 $content = (string)Storage::get($extFile);
                                 $res = $xmlProcessor->processManualFile($content, $rfcUser);
 
+                                $status = 'error';
                                 if ($res['success']) {
                                     $results['success']++;
                                     $msg = 'Procesado: ' . strtoupper($res['tipo']) . ' (' . $res['uuid'] . ')';
+                                    $status = 'success';
+                                    if (isset($res['is_warning']) && $res['is_warning']) {
+                                        $msg = '⚠️ Redirigido a ' . $res['rfc_guardado'] . ' (' . strtoupper($res['tipo']) . ')';
+                                        $status = 'warning';
+                                    }
                                 }
                                 else {
                                     $results['failed']++;
@@ -78,7 +90,7 @@ class UploadController extends Controller
                                 }
                                 $results['details'][] = [
                                     'file' => $originalName . ' -> ' . basename($extFile),
-                                    'status' => $res['success'] ? 'success' : 'error',
+                                    'status' => $status,
                                     'message' => $msg
                                 ];
                             }

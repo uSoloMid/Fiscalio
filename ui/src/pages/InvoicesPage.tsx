@@ -1444,17 +1444,33 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
 
                                     <div className="space-y-2">
                                         <h4 className="text-sm font-bold text-gray-700 uppercase tracking-widest border-b pb-2 mb-2">Desglose de Archivos</h4>
-                                        {uploadResult.details.map((dt: any, idx: number) => (
-                                            <div key={idx} className={`p-3 rounded-lg text-xs flex flex-col gap-1 border-l-4 ${dt.status === 'success' ? 'bg-emerald-50/50 border-emerald-500 text-emerald-900' : 'bg-red-50/50 border-red-500 text-red-900'}`}>
-                                                <div className="font-bold flex items-center justify-between mt-1">
-                                                    <span className="truncate pr-2">{dt.file}</span>
-                                                    <span>{dt.status === 'success' ? 'ÉXITO' : 'ERROR'}</span>
+                                        {uploadResult.details.map((dt: any, idx: number) => {
+                                            let bgClasses = 'bg-red-50/50 border-red-500 text-red-900';
+                                            let textClasses = 'text-red-600';
+                                            let title = 'ERROR';
+
+                                            if (dt.status === 'success') {
+                                                bgClasses = 'bg-emerald-50/50 border-emerald-500 text-emerald-900';
+                                                textClasses = 'text-emerald-700';
+                                                title = 'ÉXITO';
+                                            } else if (dt.status === 'warning') {
+                                                bgClasses = 'bg-amber-50/50 border-amber-500 text-amber-900';
+                                                textClasses = 'text-amber-700';
+                                                title = 'REDIRIGIDO';
+                                            }
+
+                                            return (
+                                                <div key={idx} className={`p-3 rounded-lg text-xs flex flex-col gap-1 border-l-4 ${bgClasses}`}>
+                                                    <div className="font-bold flex items-center justify-between mt-1">
+                                                        <span className="truncate pr-2">{dt.file}</span>
+                                                        <span>{title}</span>
+                                                    </div>
+                                                    <div className={`opacity-80 mt-1 ${textClasses}`}>
+                                                        {dt.message}
+                                                    </div>
                                                 </div>
-                                                <div className={`opacity-80 mt-1 ${dt.status === 'success' ? 'text-emerald-700' : 'text-red-600'}`}>
-                                                    {dt.message}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </>
                             )}
