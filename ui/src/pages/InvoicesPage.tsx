@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
@@ -384,11 +384,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                         <span className="material-symbols-outlined text-xl">monitoring</span>
                         Control Prov.
                     </button>
-                    <button onClick={() => logout()} title="Cerrar sesión" className="mt-auto flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 text-sm font-medium transition-all">
+                </nav>
+                <div className="p-4 border-t border-gray-100">
+                    <button onClick={() => logout()} title="Cerrar sesión" className="w-full flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 text-sm font-medium transition-all">
                         <span className="material-symbols-outlined text-xl">logout</span>
                         Cerrar Sesión
                     </button>
-                </nav>
+                </div>
             </aside>
 
             {/* Main Content */}
@@ -933,22 +935,21 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                             {/* Action Buttons: PDF, XML, ZIP */}
                                             <div className="grid grid-cols-3 gap-2">
                                                 <button
-                                                    onClick={() => window.open(`/api/cfdis/${selectedCfdi.uuid}/pdf`, '_blank')}
+                                                    onClick={() => exportCfdiPdf(selectedCfdi.uuid)}
                                                     className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-red-50 hover:border-red-100 group transition-all"
                                                 >
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-red-500 text-lg">picture_as_pdf</span>
                                                     <span className="text-[8px] font-bold text-gray-400 group-hover:text-red-600 uppercase mt-1">PDF</span>
                                                 </button>
-                                                <a
-                                                    href={`/api/cfdis/${selectedCfdi.uuid}/xml`}
-                                                    target="_blank"
+                                                <button
+                                                    onClick={() => exportCfdiXml(selectedCfdi.uuid)}
                                                     className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-blue-50 hover:border-blue-100 group transition-all"
                                                 >
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-blue-500 text-lg">code</span>
                                                     <span className="text-[8px] font-bold text-gray-400 group-hover:text-blue-600 uppercase mt-1">XML</span>
-                                                </a>
+                                                </button>
                                                 <button
-                                                    onClick={() => window.open(`/api/cfdis/${selectedCfdi.uuid}/zip`, '_blank')}
+                                                    onClick={() => exportCfdiZip(selectedCfdi.uuid)}
                                                     className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 group transition-all"
                                                 >
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-gray-600 text-lg">inventory_2</span>

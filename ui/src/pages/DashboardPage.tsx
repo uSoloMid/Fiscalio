@@ -296,10 +296,12 @@ export const DashboardPage = ({
                     <button className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all opacity-40">
                         <span className="material-symbols-outlined">task</span>
                     </button>
-                    <button onClick={logout} title="Cerrar sesión" className="mt-8 p-3 rounded-2xl text-red-400 hover:bg-red-50 hover:text-red-500 transition-all">
+                </nav>
+                <div className="mt-auto pt-8">
+                    <button onClick={logout} title="Cerrar sesión" className="p-3 rounded-2xl text-red-400 hover:bg-red-50 hover:text-red-500 transition-all">
                         <span className="material-symbols-outlined">logout</span>
                     </button>
-                </nav>
+                </div>
             </aside>
 
             {/* Main Content */}

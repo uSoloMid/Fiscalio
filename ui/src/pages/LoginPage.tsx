@@ -8,6 +8,7 @@ interface LoginPageProps {
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -51,8 +52,9 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                             <img src="https://i.pravatar.cc/150?u=a" alt="Avatar" className="w-full h-full object-cover" />
                         </div>
                         <div>
-                            <p className="font-semibold">Ricardo Salinas</p>
-                            <p className="text-sm text-green-200">CEO, Startup México</p>
+                            <p className="font-semibold text-lg">Alejandro Carbajal</p>
+                            <p className="text-xs text-green-200 uppercase tracking-widest font-semibold mt-1">CEO de Fiscalio México</p>
+                            <p className="text-xs text-green-200">Contador Público</p>
                         </div>
                     </div>
                 </div>
@@ -98,15 +100,17 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                                 </div>
                                 <div className="mt-1 relative">
                                     <input
-                                        type="password"
+                                        type={showPassword ? 'text' : 'password'}
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#0C6B4B] focus:border-[#0C6B4B] sm:text-sm"
+                                        className="appearance-none block w-full px-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-[#0C6B4B] focus:border-[#0C6B4B] sm:text-sm pr-12"
                                         placeholder="••••••••"
                                     />
                                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm leading-5">
-                                        <span className="text-gray-400 font-medium cursor-pointer">VER 👁</span>
+                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-gray-400 font-medium cursor-pointer focus:outline-none">
+                                            {showPassword ? 'OCULTAR' : 'VER 👁'}
+                                        </button>
                                     </div>
                                 </div>
                             </div>

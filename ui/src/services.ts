@@ -12,7 +12,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
         headers.set('Authorization', `Bearer ${token}`);
     }
     options.headers = headers;
-    
+
     let base = url;
     if (url.startsWith('/api')) {
         base = API_BASE_URL + url;
@@ -269,6 +269,8 @@ export async function updateDeductibility(uuid: string, data: { is_deductible: b
 }
 
 export async function exportCfdiPdf(uuid: string) { await downloadBlob(`${API_BASE_URL}/api/cfdis/${uuid}/pdf`, `CFDI_${uuid}.pdf`); }
+export async function exportCfdiXml(uuid: string) { await downloadBlob(`${API_BASE_URL}/api/cfdis/${uuid}/xml`, `CFDI_${uuid}.xml`); }
+export async function exportCfdiZip(uuid: string) { await downloadBlob(`${API_BASE_URL}/api/cfdis/${uuid}/zip`, `CFDI_${uuid}.zip`); }
 
 export async function exportDetailedBucketPdf(params: any) { const q = new URLSearchParams(params); await downloadBlob(`${API_BASE_URL}/api/provisional/export-pdf?${q}`, `Detalle_${params.bucket}.pdf`); }
 
