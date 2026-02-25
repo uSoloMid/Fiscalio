@@ -334,7 +334,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     }
 
     return (
-        <div className="text-gray-800 min-h-screen flex flex-col md:flex-row overflow-hidden relative">
+        <div className="text-gray-800 h-screen flex flex-col md:flex-row overflow-hidden relative">
             {/* Mobile Menu Overlay */}
             {isSidebarOpen && (
                 <div
