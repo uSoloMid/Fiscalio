@@ -306,6 +306,22 @@ export const DashboardPage = ({
         }));
     }, [clients, groupByMode]);
 
+    // Risks calculation
+    const fielRisks = useMemo(() => {
+        let expired = 0;
+        let expiringSoon = 0;
+        const nowMs = Date.now();
+        clients.forEach(c => {
+            if (c.valid_until) {
+                const validMs = new Date(c.valid_until.replace(" ", "T")).getTime();
+                const diffDays = Math.ceil((validMs - nowMs) / (1000 * 60 * 60 * 24));
+                if (diffDays < 0) expired++;
+                else if (diffDays <= 30) expiringSoon++;
+            }
+        });
+        return { expired, expiringSoon };
+    }, [clients]);
+
     return (
         <div className="flex h-screen bg-[#F9FAFB] font-['Inter'] overflow-hidden">
             {/* Sidebar Navigation */}
@@ -426,7 +442,7 @@ export const DashboardPage = ({
                         />
                     </section>
 
-                    {/* Risk Radar (Mockup) */}
+                    {/* Risk Radar */}
                     <section className="bg-white rounded-[32px] border border-gray-100 p-8 shadow-sm">
                         <div className="flex items-center justify-between mb-8">
                             <div className="flex items-center gap-4">
@@ -434,23 +450,35 @@ export const DashboardPage = ({
                                     <span className="material-symbols-outlined text-[#EF4444] text-2xl">shield</span>
                                 </div>
                                 <h2 className="text-xl font-bold text-gray-900">Radar de Riesgos Fiscales</h2>
-                                <span className="px-3 py-1 bg-red-50 text-[#EF4444] text-[10px] font-bold uppercase tracking-widest rounded-full">3 Críticos</span>
+                                {(fielRisks.expired > 0 || fielRisks.expiringSoon > 0) && (
+                                    <span className="px-3 py-1 bg-red-50 text-[#EF4444] text-[10px] font-bold uppercase tracking-widest rounded-full">
+                                        {fielRisks.expired + fielRisks.expiringSoon} Alertas FIEL
+                                    </span>
+                                )}
                             </div>
                             <button className="text-[#10B981] text-xs font-bold hover:underline flex items-center gap-1 uppercase tracking-wider">
                                 Ver todos los errores
                                 <span className="material-symbols-outlined text-sm">arrow_forward</span>
                             </button>
                         </div>
-                        <div className="flex gap-8 opacity-40 grayscale pointer-events-none select-none">
-                            <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50">
+                        <div className="flex gap-8">
+                            <div className={`flex-1 p-6 rounded-3xl border ${fielRisks.expired > 0 ? 'border-red-200 bg-red-50' : fielRisks.expiringSoon > 0 ? 'border-orange-200 bg-orange-50' : 'border-gray-50 bg-gray-50/50'}`}>
+                                <h3 className={`font-bold mb-2 ${fielRisks.expired > 0 ? 'text-red-700' : fielRisks.expiringSoon > 0 ? 'text-orange-700' : 'text-gray-400'}`}>Vencimiento FIEL</h3>
+                                <div className="text-sm font-medium mt-4 space-y-1">
+                                    {fielRisks.expired > 0 && <div className="text-red-600"><span className="font-bold">{fielRisks.expired}</span> vencidas.</div>}
+                                    {fielRisks.expiringSoon > 0 && <div className="text-orange-600"><span className="font-bold">{fielRisks.expiringSoon}</span> vencen pronto (30d).</div>}
+                                    {fielRisks.expired === 0 && fielRisks.expiringSoon === 0 && <div className="text-gray-500">Todas las FIEL están vigentes.</div>}
+                                </div>
+                            </div>
+                            <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50 opacity-40 grayscale pointer-events-none select-none">
                                 <h3 className="font-bold text-gray-400 mb-2">Proveedores 69-B</h3>
                                 <div className="h-2 w-full bg-gray-200 rounded-full"></div>
                             </div>
-                            <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50">
+                            <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50 opacity-40 grayscale pointer-events-none select-none">
                                 <h3 className="font-bold text-gray-400 mb-2">Diferencias IVA</h3>
                                 <div className="h-2 w-full bg-gray-200 rounded-full"></div>
                             </div>
-                            <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50">
+                            <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50 opacity-40 grayscale pointer-events-none select-none">
                                 <h3 className="font-bold text-gray-400 mb-2">Buzón Tributario</h3>
                                 <div className="h-2 w-full bg-gray-200 rounded-full"></div>
                             </div>

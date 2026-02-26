@@ -70,6 +70,31 @@ export const ClientCard = ({ client, onClick, onEditGroup, onEditTags, onEditCli
 
     const statusObj = getTimeStatus(client, nowTick);
 
+    const fielStatus = React.useMemo(() => {
+        if (!client.valid_until) return null;
+        const validMs = new Date(client.valid_until.replace(" ", "T")).getTime();
+        const diffDays = Math.ceil((validMs - nowTick) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) {
+            return {
+                text: `FIEL vencida (${Math.abs(diffDays)}d)`,
+                icon: 'warning',
+                className: 'text-red-700 bg-red-50 border-red-200'
+            };
+        } else if (diffDays <= 30) {
+            return {
+                text: `FIEL vence en ${diffDays}d`,
+                icon: 'schedule',
+                className: 'text-orange-700 bg-orange-50 border-orange-200'
+            };
+        } else {
+            return {
+                text: `FIEL vigente`,
+                icon: 'verified',
+                className: 'text-gray-500 bg-gray-50 border-gray-200'
+            };
+        }
+    }, [client.valid_until, nowTick]);
+
     return (
         <div
             onClick={onClick}
@@ -80,7 +105,15 @@ export const ClientCard = ({ client, onClick, onEditGroup, onEditTags, onEditCli
                     <h4 className="text-sm font-bold text-gray-900 truncate group-hover:text-[#10B981] transition-colors pr-6">
                         {client.common_name || client.legal_name}
                     </h4>
-                    <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">{client.rfc}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-[10px] text-gray-400 font-mono uppercase tracking-wider">{client.rfc}</p>
+                        {fielStatus && (
+                            <div className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border ${fielStatus.className}`}>
+                                <span className="material-symbols-outlined text-[10px]">{fielStatus.icon}</span>
+                                {fielStatus.text}
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <button
                     onClick={handleMenuClick}
