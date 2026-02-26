@@ -6,144 +6,259 @@ import chalk from 'chalk';
 const FIEL_DIR = path.join(process.cwd(), 'fiel');
 const DOWNLOAD_DIR = path.join(process.cwd(), 'downloads');
 
+const SAT_ERRORS = [
+    'cantidad máxima de sesiones permitidas',
+    'Error interno',
+    'HTTP 500',
+    '500 Internal Server Error',
+    'Service Unavailable',
+    'página no encontrada',
+    'no se puede mostrar',
+    'intentar más tarde'
+];
+
+function isSatError(text) {
+    return SAT_ERRORS.some(err => text.toLowerCase().includes(err.toLowerCase()));
+}
+
 async function loginWithFiel(page, loginUrl, rfc) {
     const cerPath = path.join(FIEL_DIR, rfc, `${rfc}.cer`);
     const keyPath = path.join(FIEL_DIR, rfc, `${rfc}.key`);
     const passPath = path.join(FIEL_DIR, rfc, `clave.txt`);
 
     if (!fs.existsSync(cerPath) || !fs.existsSync(keyPath) || !fs.existsSync(passPath)) {
-        throw new Error(`Faltan archivos FIEL para el RFC: ${rfc}. Asegúrate de que .cer, .key y clave.txt existan.`);
+        throw new Error(`Faltan archivos FIEL para el RFC: ${rfc}`);
     }
 
-    const password = await fs.readFile(passPath, 'utf8');
+    const password = (await fs.readFile(passPath, 'utf8')).trim();
 
-    console.log(chalk.yellow(`=> Entrando a portal de Login...`));
-    await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log(chalk.yellow(`=> Navegando a ${loginUrl}...`));
+    await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
 
-    // En algunos portales del SAT, la pestaña e.firma se debe presionar primero
     try {
-        const hasFielButton = await page.$('#buttonFiel');
-        if (hasFielButton) {
-            await page.click('#buttonFiel');
-            // Mini pausa para que la animación termine
-            await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 6000));
+        const bodyText = await page.evaluate(() => document.body.innerText).catch(() => '');
+        if (isSatError(bodyText)) throw new Error(`SAT_ERROR_ON_ENTRY: ${bodyText.substring(0, 100)}`);
+
+        let loginFrame = page;
+        let fielBtn = null;
+        for (const frame of page.frames()) {
+            fielBtn = await frame.$('#buttonFiel, #btndev').catch(() => null);
+            if (fielBtn) {
+                loginFrame = frame;
+                break;
+            }
         }
-    } catch (e) { }
 
-    console.log(chalk.yellow(`=> Inyectando certificados e.Firma...`));
+        if (fielBtn) {
+            await fielBtn.click();
+            await new Promise(r => setTimeout(r, 4000));
+        }
 
-    const fileCer = await page.$('input[id="fileCertificate"]');
-    if (!fileCer) throw new Error('No se encontró el campo para el archivo .CER');
-    await fileCer.uploadFile(cerPath);
+        console.log(chalk.yellow(`=> Cargando certificados...`));
+        let cerInput = null;
+        for (const frame of page.frames()) {
+            cerInput = await frame.$('input[type="file"][id*="ertificate"], input[type="file"][id*="ER"]').catch(() => null);
+            if (cerInput) {
+                loginFrame = frame;
+                break;
+            }
+        }
 
-    const fileKey = await page.$('input[id="filePrivateKey"]');
-    if (!fileKey) throw new Error('No se encontró el campo para el archivo .KEY');
-    await fileKey.uploadFile(keyPath);
+        if (!cerInput) {
+            // Fallback second attempt with broader search
+            for (const frame of page.frames()) {
+                const els = await frame.$$('input[type="file"]');
+                for (const el of els) {
+                    const id = await (await el.getProperty('id')).jsonValue();
+                    if (id.toLowerCase().includes('cert') || id.toLowerCase().includes('cer')) {
+                        cerInput = el;
+                        loginFrame = frame;
+                        break;
+                    }
+                }
+                if (cerInput) break;
+            }
+        }
 
-    const passInput = await page.$('#privateKeyPassword');
-    if (!passInput) throw new Error('No se encontró el campo para la contraseña.');
-    await passInput.type(password.trim());
+        if (!cerInput) throw new Error('No se encontró el input del certificado (.cer)');
+        await cerInput.uploadFile(cerPath);
 
-    console.log(chalk.yellow(`=> Autenticando...`));
-    await Promise.all([
-        page.click('#submit'),
-        page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 60000 })
-    ]);
+        const keyInput = await loginFrame.$('input[type="file"][id*="rivateKey"], input[type="file"][id*="KEY"]');
+        if (!keyInput) throw new Error('No se encontró el input de la llave (.key)');
+        await keyInput.uploadFile(keyPath);
+
+        const passInput = await loginFrame.$('input[type="password"]');
+        if (!passInput) throw new Error('No se encontró el input de la contraseña');
+        await passInput.type(password);
+
+        console.log(chalk.yellow(`=> Enviando credenciales...`));
+        await loginFrame.click('#submit').catch(() => { });
+        await new Promise(r => setTimeout(r, 15000));
+
+    } catch (e) {
+        throw e;
+    }
 }
 
 async function downloadCSF(browser, rfc) {
-    console.log(chalk.blue(`\n[CSF] Iniciando descarga Constancia de Situación Fiscal...`));
-    const page = await browser.newPage();
+    let attempts = 0;
+    while (attempts < 3) {
+        attempts++;
+        console.log(chalk.blue(`\n[CSF] [Intento ${attempts}/3] Iniciando...`));
+        const page = await browser.newPage().catch(() => null);
+        if (!page) continue;
 
-    // Evitar que el PDF abra en el navegador y forzar la descarga a disco
-    const client = await page.target().createCDPSession();
-    await client.send('Page.setDownloadBehavior', {
-        behavior: 'allow',
-        downloadPath: path.join(DOWNLOAD_DIR, rfc)
-    });
+        let pdfBuffer = null;
+        let lastPopup = null;
 
-    try {
-        // Usamos la URL que pasaste para la CSF
-        const loginUrl = 'https://login.siat.sat.gob.mx/nidp/idff/sso?id=fiel_Aviso&sid=0&option=credential&sid=0';
-        await loginWithFiel(page, loginUrl, rfc);
+        const onTarget = async (target) => {
+            if (target.type() === 'page') {
+                const p = await target.page().catch(() => null);
+                if (p) {
+                    lastPopup = p;
+                    console.log(chalk.gray(`[CSF] Detectada nueva ventana emergente.`));
+                    p.on('response', async (res) => {
+                        try {
+                            if ((res.headers()['content-type'] || '').includes('application/pdf')) {
+                                const b = await res.buffer();
+                                if (b.length > 5000) pdfBuffer = b;
+                            }
+                        } catch (e) { }
+                    });
+                }
+            }
+        };
+        browser.on('targetcreated', onTarget);
 
-        console.log(chalk.green(`[CSF] Login Exitoso. Buscando el botón de Generar Constancia...`));
-
-        // A partir de aquí el sistema entra al menú Siat de CSF
-        // Necesitamos esperar a ver si el botón de generar CSF carga mediante iframes o en la página
-        // Este es un selector genérico comúnmente usado en el portal, sujeto a ajustes:
         try {
-            await page.waitForSelector('button, a, input[type="button"], input[type="submit"]', { timeout: 15000 });
-            // Aqui meteremos la lógica extra para esperar la descarga...
-            // Por ejemplo, await page.click('button:has-text("Generar Constancia")');
-            // await new Promise(r => setTimeout(r, 5000));
-        } catch (e) {
-            console.log(chalk.gray(`[CSF] Warning: No se encontró el botón evidente de CSF, revisando frame.`));
-        }
+            await loginWithFiel(page, 'https://wwwmat.sat.gob.mx/aplicacion/login/53027/genera-tu-constancia-de-situacion-fiscal.', rfc);
+            console.log(chalk.green(`[CSF] Esperando 20s para controles...`));
+            await new Promise(r => setTimeout(r, 20000));
 
-        console.log(chalk.green(`[CSF] Flujo terminado.`));
-    } catch (error) {
-        console.error(chalk.red(`[CSF] Error: ${error.message}`));
-    } finally {
-        await page.close();
+            let clicked = false;
+            for (const f of page.frames()) {
+                clicked = await f.evaluate(() => {
+                    const el = Array.from(document.querySelectorAll('button, input, a, span')).find(e => {
+                        const t = (e.innerText || e.textContent || e.value || '').toUpperCase();
+                        return t.includes('GENERAR') && t.includes('CONSTANCIA');
+                    });
+                    if (el) { el.click(); return true; }
+                    return false;
+                }).catch(() => false);
+                if (clicked) break;
+            }
+
+            if (!clicked) {
+                console.log(chalk.red(`[CSF] Botón no encontrado.`));
+                await page.screenshot({ path: path.join(DOWNLOAD_DIR, rfc, `Debug_CSF_Login_${attempts}.png`) });
+            } else {
+                console.log(chalk.yellow(`[CSF] Botón clickeado. Esperando PDF (20s)...`));
+                for (let i = 0; i < 20; i++) {
+                    if (pdfBuffer) break;
+                    await new Promise(r => setTimeout(r, 1000));
+                }
+
+                if (pdfBuffer) {
+                    await fs.writeFile(path.join(DOWNLOAD_DIR, rfc, 'Constancia_Situacion_Fiscal.pdf'), pdfBuffer);
+                    console.log(chalk.green(`[CSF] ¡ÉXITO! PDF interceptado por red.`));
+                    if (lastPopup) await lastPopup.close();
+                    browser.removeListener('targetcreated', onTarget);
+                    await page.close();
+                    return;
+                }
+
+                if (lastPopup) {
+                    console.log(chalk.yellow(`[CSF] Intentando extracción directa desde el visor...`));
+                    const base64 = await lastPopup.evaluate(async () => {
+                        try {
+                            const response = await fetch(window.location.href);
+                            const blob = await response.blob();
+                            return new Promise(r => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => r(reader.result.split(',')[1]);
+                                reader.readAsDataURL(blob);
+                            });
+                        } catch (e) { return null; }
+                    }).catch(() => null);
+
+                    if (base64) {
+                        await fs.writeFile(path.join(DOWNLOAD_DIR, rfc, 'Constancia_Situacion_Fiscal.pdf'), Buffer.from(base64, 'base64'));
+                        console.log(chalk.green(`[CSF] ¡ÉXITO! PDF extraído de la memoria del navegador.`));
+                        await lastPopup.close();
+                        browser.removeListener('targetcreated', onTarget);
+                        await page.close();
+                        return;
+                    }
+                    console.log(chalk.red(`[CSF] No se pudo extraer el PDF de la ventana emergente.`));
+                    await lastPopup.screenshot({ path: path.join(DOWNLOAD_DIR, rfc, `Debug_Popup_${attempts}.png`) });
+                }
+            }
+        } catch (e) { console.log(chalk.red(`[CSF] Error: ${e.message}`)); }
+        finally {
+            browser.removeListener('targetcreated', onTarget);
+            await page.close().catch(() => { });
+        }
+        await new Promise(r => setTimeout(r, 5000));
     }
 }
 
 async function downloadOpinion(browser, rfc) {
-    console.log(chalk.blue(`\n[32-D] Iniciando revisión de Opinión de Cumplimiento...`));
-    const page = await browser.newPage();
+    let attempts = 0;
+    while (attempts < 3) {
+        attempts++;
+        console.log(chalk.blue(`\n[32-D] [Intento ${attempts}/3] Iniciando...`));
+        const page = await browser.newPage().catch(() => null);
+        if (!page) continue;
 
-    const client = await page.target().createCDPSession();
-    await client.send('Page.setDownloadBehavior', {
-        behavior: 'allow',
-        downloadPath: path.join(DOWNLOAD_DIR, rfc)
-    });
+        let pdfBuffer = null;
+        page.on('response', async (res) => {
+            try {
+                if ((res.headers()['content-type'] || '').includes('application/pdf')) {
+                    const b = await res.buffer();
+                    if (b.length > 5000) pdfBuffer = b;
+                }
+            } catch (e) { }
+        });
 
-    try {
-        // Usamos la URL para Opinión 32D
-        // Usaremos el portal general de 32D para que el SAT nos redirija a SU URL dinámica de target
-        const loginUrl = 'https://ptsc32d.clouda.sat.gob.mx/';
-        await loginWithFiel(page, loginUrl, rfc);
-
-        console.log(chalk.green(`[32-D] Login Exitoso. Obteniendo status de opinión...`));
-
-        // Generalmente el portal 32D abre directo el PDF de respuesta o una pantalla que dice "Su opinión de cumplimiento es POSITIVA"
-        // await new Promise(r => setTimeout(r, 5000));
-
-    } catch (error) {
-        console.error(chalk.red(`[32-D] Error: ${error.message}`));
-    } finally {
-        await page.close();
+        try {
+            await loginWithFiel(page, 'https://ptsc32d.clouda.sat.gob.mx/', rfc);
+            console.log(chalk.green(`[32-D] Monitoreando descarga...`));
+            for (let i = 0; i < 40; i++) {
+                if (pdfBuffer) {
+                    await fs.writeFile(path.join(DOWNLOAD_DIR, rfc, 'Opinion_Cumplimiento_32D.pdf'), pdfBuffer);
+                    console.log(chalk.green(`[32-D] ¡ÉXITO! Opinión guardada.`));
+                    await page.close();
+                    return;
+                }
+                const body = await page.evaluate(() => document.body.innerText).catch(() => '');
+                if (isSatError(body)) break;
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        } catch (e) { console.log(chalk.red(`[32-D] Error: ${e.message}`)); }
+        finally { await page.close().catch(() => { }); }
+        await new Promise(r => setTimeout(r, 5000));
     }
 }
 
 async function main() {
-    const args = process.argv.slice(2);
-    if (args.length === 0) {
-        console.log(chalk.red('Error: Debes proporcionar un RFC como argumento.'));
-        console.log(chalk.gray('Uso: node scraper_sat.js <RFC>'));
-        process.exit(1);
-    }
-    const rfc = args[0];
+    const rfc = process.argv[2];
+    if (!rfc) { console.log('RFC requerido'); process.exit(1); }
 
-    console.log(chalk.cyan.bold(`\n⚙️  Fiscalio Bot - Scraping FIEL para ${rfc}`));
     await fs.ensureDir(path.join(DOWNLOAD_DIR, rfc));
-
-    // Lanzamos el navegador en modo headless
     const browser = await puppeteer.launch({
-        headless: "new", // Usa false si quieres ver lo que hace visualmente en tu PC local (X11)
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-blink-features=AutomationControlled' // Evasión básica de anti-bots
-        ]
+        headless: false,
+        protocolTimeout: 300000,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
-    await downloadCSF(browser, rfc);
-    await downloadOpinion(browser, rfc);
-
-    await browser.close();
-    console.log(chalk.cyan.bold(`\n✅ Proceso Finalizado para ${rfc}. Revisa la carpeta downloads/`));
+    try {
+        await downloadCSF(browser, rfc);
+        await downloadOpinion(browser, rfc);
+    } finally {
+        await browser.close().catch(() => { });
+        console.log(`\n✅ Finalizado para ${rfc}`);
+    }
 }
 
 main();
