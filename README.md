@@ -61,7 +61,16 @@ El sistema descarga, extrae, clasifica y audita comprobantes fiscales del SAT (M
 - Los clientes se auditan cada **6 horas** de forma automática ("Sync Threshold").
 - Genera vistas contables: Control Provisional (PUE, PPD, REP, desgloses por tasa 16%, 8%, 0%, Exentos) y descarga masiva de XML/PDFs consolidados.
 
+## 🤖 6. Agente Scraper Avanzado (FIEL)
+Ubicado en `/agent/scraper_sat.js`, es un motor basado en **Puppeteer** diseñado para automatizar descargas complejas que la API normal del SAT no permite:
+- **Constancia de Situación Fiscal (CSF)**: Extracción binaria directa desde la memoria del navegador (Blob bypass) para obtener el PDF original sin marcas de agua ni capturas de pantalla.
+- **Opinión de Cumplimiento (32-D)**: Monitoreo de red en tiempo real para capturar el flujo de datos del PDF.
+- **Evasión de Errores SAT**: Detección automática y reintentos (3 niveles) ante Errores 500, "Sesiones Máximas Alcanzadas" e inestabilidad del portal.
+- **Uso Local**: `node scraper_sat.js <RFC>` dentro de la carpeta `agent/`.
+
 **Resoluciones Recientes a Bugs Críticos (Feb 2026):**
+- **Mejora Scraper SAT**: Se implementó una técnica de "Blob Fetcher" en memoria para capturar Constancias Fiscales (CSF) originales, solucionando el problema de PDFs que parecían fotos/capturas.
+- **Resiliencia SAT**: Se agregó un sistema de detección de errores 500 y "Service Unavailable" del SAT en el Scraper, permitiendo reintentos automáticos tras pausas de enfriamiento.
 - Se removió un BOM hidden en `SatRunnerCommand.php` que rompía la ejecución PHP con el error de Namespace.
 - Se configuró el límite de memoria a infinito (`memory_limit = -1`) en el Runner para prevenir muertes súbitas al extraer miles de archivos.
 - Se agregó el botón de **Procesamiento Manual** directo en el Front-End (Historial de solicitudes SAT) para destrabar paquetes en estado "polling" o "downloading" a voluntad, sin depender exclusivamente del cron background.
