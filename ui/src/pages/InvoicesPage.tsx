@@ -50,21 +50,23 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         const validMs = new Date(activeValidUntil.replace(" ", "T")).getTime();
         const nowMs = Date.now();
         const diffDays = Math.ceil((validMs - nowMs) / (1000 * 60 * 60 * 24));
+        const expirationDateStr = new Date(validMs).toLocaleDateString('es-MX', { year: '2-digit', month: 'short', day: 'numeric' });
+
         if (diffDays < 0) {
             return {
-                text: `FIEL vencida (${Math.abs(diffDays)}d)`,
+                text: `FIEL vencida (${Math.abs(diffDays)}d) - Venció: ${expirationDateStr}`,
                 icon: 'warning',
                 className: 'text-red-700 bg-red-50 border-red-200'
             };
         } else if (diffDays <= 30) {
             return {
-                text: `FIEL vence en ${diffDays}d`,
+                text: `FIEL vence en ${diffDays}d (${expirationDateStr})`,
                 icon: 'schedule',
                 className: 'text-orange-700 bg-orange-50 border-orange-200'
             };
         } else {
             return {
-                text: `FIEL vigente`,
+                text: `FIEL vigente (hasta ${expirationDateStr})`,
                 icon: 'verified',
                 className: 'text-gray-500 bg-gray-50 border-gray-200'
             };
