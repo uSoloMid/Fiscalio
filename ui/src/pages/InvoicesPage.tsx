@@ -5,7 +5,7 @@ import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
 
-export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string }) => {
+export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, activeValidUntil }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string, activeValidUntil?: string }) => {
     const [year, setYear] = useState(localStorage.getItem('active_year') || new Date().getFullYear().toString());
     const [month, setMonth] = useState(localStorage.getItem('active_month') || (new Date().getMonth() + 1).toString().padStart(2, '0'));
     const [filterType, setFilterType] = useState<'all' | 'emitidas' | 'recibidas' | 'canceladas'>('all');
@@ -44,6 +44,33 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt }: {
     const [isDragOver, setIsDragOver] = useState(false);
 
     const [showExportModal, setShowExportModal] = useState(false);
+
+    const fielStatus = React.useMemo(() => {
+        if (!activeValidUntil) return null;
+        const validMs = new Date(activeValidUntil.replace(" ", "T")).getTime();
+        const nowMs = Date.now();
+        const diffDays = Math.ceil((validMs - nowMs) / (1000 * 60 * 60 * 24));
+        if (diffDays < 0) {
+            return {
+                text: `FIEL vencida (${Math.abs(diffDays)}d)`,
+                icon: 'warning',
+                className: 'text-red-700 bg-red-50 border-red-200'
+            };
+        } else if (diffDays <= 30) {
+            return {
+                text: `FIEL vence en ${diffDays}d`,
+                icon: 'schedule',
+                className: 'text-orange-700 bg-orange-50 border-orange-200'
+            };
+        } else {
+            return {
+                text: `FIEL vigente`,
+                icon: 'verified',
+                className: 'text-gray-500 bg-gray-50 border-gray-200'
+            };
+        }
+    }, [activeValidUntil]);
+
     const [exportColumns, setExportColumns] = useState<string[]>([
         'uuid', 'fecha', 'serie', 'folio', 'rfc_emisor', 'name_emisor', 'rfc_receptor', 'name_receptor',
         'concepto', 'subtotal', 'iva', 'retenciones', 'total', 'moneda', 'tipo', 'metodo_pago', 'estado_sat'
@@ -496,9 +523,17 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt }: {
                                     <span className="hidden sm:inline">{onBack ? 'Dashboard' : 'Cambiar'}</span>
                                 </button>
                                 <div className="w-px h-8 md:h-10 bg-gray-200 flex-shrink-0"></div>
-                                <div className="truncate">
+                                <div className="truncate flex flex-col items-start">
                                     <h1 className="text-base md:text-xl lg:text-2xl font-bold text-gray-900 leading-tight truncate">{clientName || activeClientName || activeRfc}</h1>
-                                    <p className="text-[10px] font-mono text-gray-500 tracking-wide mt-0.5 truncate">{activeRfc}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <p className="text-[10px] font-mono text-gray-500 tracking-wide truncate">{activeRfc}</p>
+                                        {fielStatus && (
+                                            <div className={`inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded border ${fielStatus.className}`}>
+                                                <span className="material-symbols-outlined text-[10px]">{fielStatus.icon}</span>
+                                                {fielStatus.text}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
