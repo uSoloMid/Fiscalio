@@ -130,6 +130,19 @@ export async function startSync(rfc: string, force: boolean = false): Promise<an
     return response.json();
 }
 
+export async function triggerScraperFiel(rfc: string): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/sat/scrape-fiel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc })
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Error ejecutando el scraper de la FIEL');
+    }
+    return response.json();
+}
+
 export async function verifyStatus(params: any): Promise<any> {
     const response = await authFetch(`${API_BASE_URL}/api/sat/verify-status`, {
         method: 'POST',

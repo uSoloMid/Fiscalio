@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
@@ -44,6 +44,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [isDragOver, setIsDragOver] = useState(false);
 
     const [showExportModal, setShowExportModal] = useState(false);
+
+    const [isScrapingFiel, setIsScrapingFiel] = useState(false);
 
     const fielStatus = React.useMemo(() => {
         if (!activeValidUntil) return null;
@@ -295,6 +297,19 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
             console.error("Auto-sync failed", e);
         } finally {
             setSyncing(false);
+        }
+    };
+
+    const handleScrapeFielClick = async () => {
+        if (!activeRfc) return;
+        setIsScrapingFiel(true);
+        try {
+            await triggerScraperFiel(activeRfc);
+        } catch (e: any) {
+            console.error("Scraper failed", e);
+            alert("Error: " + e.message);
+        } finally {
+            setIsScrapingFiel(false);
         }
     };
 
@@ -693,6 +708,15 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                     className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10.5px] font-bold uppercase tracking-wider transition-all shadow-sm ${syncing ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'}`}>
                                     <span className={`material-symbols-outlined text-base ${syncing ? 'animate-spin' : ''}`}>sync</span>
                                     {syncing ? 'Sincronizando...' : getNextSyncText()}
+                                </button>
+
+                                <button
+                                    onClick={handleScrapeFielClick}
+                                    disabled={isScrapingFiel}
+                                    title="Descarga Constancia de Situación Fiscal y Opinión 32-D usando la e.firma"
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10.5px] font-bold uppercase tracking-wider transition-all shadow-sm ${isScrapingFiel ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'}`}>
+                                    <span className={`material-symbols-outlined text-base ${isScrapingFiel ? 'animate-spin' : ''}`}>{isScrapingFiel ? 'downloading' : 'security'}</span>
+                                    {isScrapingFiel ? 'Extrayendo...' : 'Robot FIEL'}
                                 </button>
 
                                 <button

@@ -57,36 +57,54 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/sat/verify/{requestId}', [Api\SatController::class , 'verify']);
     Route::get('/sat/download/{packageId}', [Api\SatController::class , 'download']);
 
-    Route::get('/provisional/summary', [\App\Http\Controllers\ProvisionalControlController::class , 'getSummary']);
-    Route::get('/provisional/export-excel', [\App\Http\Controllers\ProvisionalControlController::class , 'exportExcel']);
-    Route::get('/provisional/ppd-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getPpdExplorer']);
-    Route::get('/provisional/rep-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getRepExplorer']);
-    Route::get('/provisional/bucket-details', [\App\Http\Controllers\ProvisionalControlController::class , 'getBucketDetails']);
-    Route::post('/cfdis/{uuid}/update-deductibility', [\App\Http\Controllers\ProvisionalControlController::class , 'updateDeductibility']);
-    Route::get('/provisional/export-pdf', [\App\Http\Controllers\ProvisionalControlController::class , 'exportDetailedBucketPdf']);
-    Route::get('/provisional/export-pdf-summary', [\App\Http\Controllers\ProvisionalControlController::class , 'exportPdfSummary']);
-    Route::post('/provisional/download-xml', [\App\Http\Controllers\DownloadController::class , 'downloadXmlZip']);
+    // Trigger agent scraper directly
+    Route::post('/sat/scrape-fiel', function (Request $request) {
+            $rfc = $request->json('rfc');
+            if (!$rfc)
+                return response()->json(['error' => 'RFC required'], 400);
 
-    Route::get('/clients', [ClientController::class , 'index']);
-    Route::post('/clients/parse-certificate', [ClientController::class , 'parseCertificate']);
-    Route::post('/clients', [ClientController::class , 'store']);
-    Route::put('/clients/{id}', [ClientController::class , 'updateClient']);
-    Route::delete('/clients/{id}', [ClientController::class , 'destroy']);
-    Route::put('/clients/{id}/group', [ClientController::class , 'updateGroup']);
-    Route::put('/clients/{id}/tags', [ClientController::class , 'updateTags']);
+            try {
+                $agentUrl = env('AGENT_URL', 'http://agent:3005');
+                $response = \Illuminate\Support\Facades\Http::timeout(5)->post("$agentUrl/run-scraper", [
+                    'rfc' => $rfc
+                ]);
+                return response()->json($response->json(), $response->status());
+            }
+            catch (\Exception $e) {
+                return response()->json(['error' => 'Failed to reach agent -> ' . $e->getMessage()], 500);
+            }
+        }
+        );
 
-    Route::get('/groups', [GroupController::class , 'index']);
-    Route::post('/groups', [GroupController::class , 'store']);
-    Route::put('/groups/{id}', [GroupController::class , 'update']);
-    Route::delete('/groups/{id}', [GroupController::class , 'destroy']);
+        Route::get('/provisional/summary', [\App\Http\Controllers\ProvisionalControlController::class , 'getSummary']);
+        Route::get('/provisional/export-excel', [\App\Http\Controllers\ProvisionalControlController::class , 'exportExcel']);
+        Route::get('/provisional/ppd-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getPpdExplorer']);
+        Route::get('/provisional/rep-explorer', [\App\Http\Controllers\ProvisionalControlController::class , 'getRepExplorer']);
+        Route::get('/provisional/bucket-details', [\App\Http\Controllers\ProvisionalControlController::class , 'getBucketDetails']);
+        Route::post('/cfdis/{uuid}/update-deductibility', [\App\Http\Controllers\ProvisionalControlController::class , 'updateDeductibility']);
+        Route::get('/provisional/export-pdf', [\App\Http\Controllers\ProvisionalControlController::class , 'exportDetailedBucketPdf']);
+        Route::get('/provisional/export-pdf-summary', [\App\Http\Controllers\ProvisionalControlController::class , 'exportPdfSummary']);
+        Route::post('/provisional/download-xml', [\App\Http\Controllers\DownloadController::class , 'downloadXmlZip']);
 
-    Route::get('/tags', [TagController::class , 'index']);
-    Route::post('/tags', [TagController::class , 'store']);
-    Route::put('/tags/{id}', [TagController::class , 'update']);
-    Route::delete('/tags/{id}', [TagController::class , 'destroy']);
+        Route::get('/clients', [ClientController::class , 'index']);
+        Route::post('/clients/parse-certificate', [ClientController::class , 'parseCertificate']);
+        Route::post('/clients', [ClientController::class , 'store']);
+        Route::put('/clients/{id}', [ClientController::class , 'updateClient']);
+        Route::delete('/clients/{id}', [ClientController::class , 'destroy']);
+        Route::put('/clients/{id}/group', [ClientController::class , 'updateGroup']);
+        Route::put('/clients/{id}/tags', [ClientController::class , 'updateTags']);
 
-    Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
-});
+        Route::get('/groups', [GroupController::class , 'index']);
+        Route::post('/groups', [GroupController::class , 'store']);
+        Route::put('/groups/{id}', [GroupController::class , 'update']);
+        Route::delete('/groups/{id}', [GroupController::class , 'destroy']);
+
+        Route::get('/tags', [TagController::class , 'index']);
+        Route::post('/tags', [TagController::class , 'store']);
+        Route::put('/tags/{id}', [TagController::class , 'update']);
+        Route::delete('/tags/{id}', [TagController::class , 'destroy']);
+
+        Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);    });
 
 require __DIR__ . '/debug_routes.php';
 require __DIR__ . '/debug_cwd.php';

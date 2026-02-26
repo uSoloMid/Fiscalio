@@ -4,6 +4,9 @@ import axios from 'axios';
 import path from 'path';
 import chalk from 'chalk';
 import schedule from 'node-schedule';
+import http from 'http';
+import { exec } from 'child_process';
+
 
 // Configuración
 const API_URL = process.env.API_URL || 'http://localhost:3333';
@@ -93,3 +96,62 @@ schedule.scheduleJob('* * * * *', syncCredentials);
 
 // Mantener vivo
 console.log(chalk.gray('⏱️  Agente activo. Revisando cambios cada minuto...'));
+
+// Micro-servidor HTTP para gatillar acciones manuales
+const server = http.createServer((req, res) => {
+    // Configurar CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/run-scraper') {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                if (!data.rfc) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'RFC is required' }));
+                    return;
+                }
+
+                console.log(chalk.yellow(`\n[API CALL] Gatillando scraper manualmente para ${data.rfc}...`));
+
+                // Ejecutamos en background
+                exec(`node scraper_sat.js ${data.rfc}`, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(chalk.red(`Error al ejecutar scraper de ${data.rfc}: ${error.message}`));
+                    }
+                    if (stderr) {
+                        console.error(chalk.yellow(`Warning de scraper: ${stderr}`));
+                    }
+                    console.log(chalk.gray(`Salida de scraper para ${data.rfc}:\n${stdout}`));
+                });
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'started', rfc: data.rfc }));
+            } catch (e) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid JSON' }));
+            }
+        });
+    } else {
+        res.writeHead(404);
+        res.end('Not Found');
+    }
+});
+
+const AGENT_PORT = process.env.AGENT_PORT || 3005;
+server.listen(AGENT_PORT, '0.0.0.0', () => {
+    console.log(chalk.blue(`🌐 Servidor HTTP interno escuchando en puerto ${AGENT_PORT}`));
+});
+
