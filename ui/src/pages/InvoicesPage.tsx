@@ -5,7 +5,7 @@ import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import type { Cfdi } from '../models';
 
-export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: string, onBack?: () => void, clientName?: string }) => {
+export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string }) => {
     const [year, setYear] = useState(localStorage.getItem('active_year') || new Date().getFullYear().toString());
     const [month, setMonth] = useState(localStorage.getItem('active_month') || (new Date().getMonth() + 1).toString().padStart(2, '0'));
     const [filterType, setFilterType] = useState<'all' | 'emitidas' | 'recibidas' | 'canceladas'>('all');
@@ -24,7 +24,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
     const [drawerLoading, setDrawerLoading] = useState(false);
     const [satStatusUpdating, setSatStatusUpdating] = useState(false);
     const [syncing, setSyncing] = useState(false);
-    const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+    const [lastSyncAt, setLastSyncAt] = useState<string | null>(initialSyncAt || null);
     const [verifying, setVerifying] = useState(false);
     const [verificationSummary, setVerificationSummary] = useState<any>(null);
     const [activeRequests, setActiveRequests] = useState<any[]>([]);
@@ -220,12 +220,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
         return () => clearInterval(interval);
     }, [activeRfc]);
 
-    // Auto-sync on load
-    useEffect(() => {
-        if (activeRfc) {
-            handleAutoSync(false); // background sync
-        }
-    }, [activeRfc]);
+    // Removed auto-sync on load per user request
 
     // Resizing logic
     useEffect(() => {
@@ -259,6 +254,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
             const res = await startSync(activeRfc, manual);
             if (res.last_sync) {
                 setLastSyncAt(res.last_sync);
+                // Also update local storage so Dashboard is aware when going back
+                localStorage.setItem('active_last_sync', res.last_sync);
             }
             if (manual) {
                 // Refresh list
@@ -270,6 +267,18 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
         } finally {
             setSyncing(false);
         }
+    };
+
+    const getNextSyncText = () => {
+        if (!lastSyncAt) return 'Sincronizar (Manual)';
+        const last = new Date(lastSyncAt.replace(" ", "T"));
+        const next = new Date(last.getTime() + (6 * 60 * 60 * 1000));
+        const now = new Date();
+        if (now > next) return 'Sincronizar ahora';
+        const diffMins = Math.floor((next.getTime() - now.getTime()) / 60000);
+        const h = Math.floor(diffMins / 60);
+        const m = diffMins % 60;
+        return `Auto en ${h}h ${m}m | Forzar`;
     };
 
     const handleVerifyBatch = async () => {
@@ -643,9 +652,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
                                 <button
                                     onClick={() => handleAutoSync(true)}
                                     disabled={syncing}
-                                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm ${syncing ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                                    <span className={`material-symbols-outlined text-sm ${syncing ? 'animate-spin' : ''}`}>sync</span>
-                                    {syncing ? 'Sincronizando...' : (lastSyncAt ? `Última: ${new Date(lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Sincronizar')}
+                                    title={lastSyncAt ? `Última sincronización: ${new Date(lastSyncAt.replace(" ", "T")).toLocaleString()}` : 'Aún no sincronizado'}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10.5px] font-bold uppercase tracking-wider transition-all shadow-sm ${syncing ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'}`}>
+                                    <span className={`material-symbols-outlined text-base ${syncing ? 'animate-spin' : ''}`}>sync</span>
+                                    {syncing ? 'Sincronizando...' : getNextSyncText()}
                                 </button>
 
                                 <button

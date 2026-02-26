@@ -10,6 +10,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getToken());
   const [activeRfc, setActiveRfc] = useState(localStorage.getItem('active_rfc') || '');
   const [activeClientName, setActiveClientName] = useState(localStorage.getItem('active_client_name') || '');
+  const [activeLastSync, setActiveLastSync] = useState(localStorage.getItem('active_last_sync') || '');
   const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
@@ -23,19 +24,23 @@ function App() {
     };
   }, []);
 
-  const handleSelectClient = (rfc: string, name: string) => {
+  const handleSelectClient = (rfc: string, name: string, lastSync: string = '') => {
     localStorage.setItem('active_rfc', rfc);
     localStorage.setItem('active_client_name', name);
+    localStorage.setItem('active_last_sync', lastSync);
     setActiveRfc(rfc);
     setActiveClientName(name);
+    setActiveLastSync(lastSync);
     setShowHistory(false);
   };
 
   const handleBackToDashboard = () => {
     localStorage.removeItem('active_rfc');
     localStorage.removeItem('active_client_name');
+    localStorage.removeItem('active_last_sync');
     setActiveRfc('');
     setActiveClientName('');
+    setActiveLastSync('');
     setShowHistory(false);
   };
 
@@ -53,6 +58,7 @@ function App() {
         <InvoicesPage
           activeRfc={activeRfc}
           clientName={activeClientName}
+          initialSyncAt={activeLastSync}
           onBack={handleBackToDashboard}
         />
       ) : showHistory ? (

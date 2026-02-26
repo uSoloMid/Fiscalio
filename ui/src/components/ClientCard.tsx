@@ -34,8 +34,8 @@ function getTimeStatus(client: any, _nowTick: number): { text: string, type: 'sy
     else if (diffHours > 0) text = `hace ${diffHours}h ${diffMins % 60}m`;
     else text = `hace ${diffMins}m`;
 
-    // Next sync (threshold is 5 hours, let's say 5 * 60 = 300 mins)
-    const nextSyncMs = lastSyncDate.getTime() + (5 * 60 * 60 * 1000);
+    // Next sync (threshold is 6 hours)
+    const nextSyncMs = lastSyncDate.getTime() + (6 * 60 * 60 * 1000);
     const timeLeftMs = nextSyncMs - now.getTime();
 
     let nextText = '';

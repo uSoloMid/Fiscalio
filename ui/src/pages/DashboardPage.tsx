@@ -15,7 +15,7 @@ export const DashboardPage = ({
     onSelectClient,
     onViewHistory
 }: {
-    onSelectClient: (rfc: string, name: string) => void,
+    onSelectClient: (rfc: string, name: string, lastSyncAt: string) => void,
     onViewHistory: () => void
 }) => {
     // Data states
@@ -500,7 +500,7 @@ export const DashboardPage = ({
                                             <ClientCard
                                                 key={client.rfc}
                                                 client={client}
-                                                onClick={() => onSelectClient(client.rfc, client.legal_name)}
+                                                onClick={() => onSelectClient(client.rfc, client.legal_name, client.last_sync_at || '')}
                                                 onEditGroup={() => { setSelectedClient(client); setIsGroupModalOpen(true); }}
                                                 onEditTags={() => { setSelectedClient(client); setIsTagsModalOpen(true); }}
                                                 onEditClient={() => {
