@@ -64,7 +64,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
                 return response()->json(['error' => 'RFC required'], 400);
 
             try {
-                $agentUrl = env('AGENT_URL', 'http://agent:3005');
+                $agentUrl = env('AGENT_URL', 'http://fiscalio-agent:3005');
                 $response = \Illuminate\Support\Facades\Http::timeout(5)->post("$agentUrl/run-scraper", [
                     'rfc' => $rfc
                 ]);
@@ -104,7 +104,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/tags/{id}', [TagController::class , 'update']);
         Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 
-        Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);    });
+        Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
+    });
 
 require __DIR__ . '/debug_routes.php';
 require __DIR__ . '/debug_cwd.php';
