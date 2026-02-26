@@ -348,7 +348,7 @@ export const DashboardPage = ({
                                     const nextMins = 15 - (diffMins % 15);
 
                                     if (!runnerStatus.is_alive) return `SAT Sync: Caído (hace ${diffMins}m)`;
-                                    return `Orquestador: hace ${diffMins}m | Próx: ${nextMins}m`;
+                                    return `Monitor SAT Activo | Próx. revisión de bloques: ${nextMins}m`;
                                 })()}
                             </div>
                         </div>

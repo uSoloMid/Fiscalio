@@ -22,8 +22,8 @@ class BusinessSyncService
      */
     public function syncIfNeeded(Business $business, bool $force = false)
     {
-        // Threshold: 5 hours since last sync check
-        $syncThreshold = now()->subHours(5); // Umbral ajustado a 5 horas
+        // Threshold: 12 hours since last sync check
+        $syncThreshold = now()->subHours(12); // Umbral ajustado a 12 horas para mayor seguridad con el SAT
 
         if ($business->is_syncing && !$force) {
             return ['status' => 'already_syncing'];

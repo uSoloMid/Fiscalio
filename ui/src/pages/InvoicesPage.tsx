@@ -272,7 +272,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt }: {
     const getNextSyncText = () => {
         if (!lastSyncAt) return 'Sincronizar (Manual)';
         const last = new Date(lastSyncAt.replace(" ", "T"));
-        const next = new Date(last.getTime() + (6 * 60 * 60 * 1000));
+        const next = new Date(last.getTime() + (12 * 60 * 60 * 1000));
         const now = new Date();
         if (now > next) return 'Sincronizar ahora';
         const diffMins = Math.floor((next.getTime() - now.getTime()) / 60000);
