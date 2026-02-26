@@ -85,8 +85,18 @@ class SatRunnerCommand extends Command
             }
         }
         catch (Exception $e) {
-            $this->error("[Error] " . $e->getMessage());
-            $req->next_retry_at = now()->addMinutes(1);
+            $msg = $e->getMessage();
+            $this->error("[Error] " . $msg);
+
+            // Si el SAT rechaza porque no hay información, detenemos el proceso (se marca completado con 0 XMLs)
+            if (str_contains($msg, 'Solicitud rechazada') || str_contains($msg, 'No se encontró la información')) {
+                $req->state = 'completed';
+                $this->info("Marcando Request {$req->id} como completado (Sin información/Rechazada por SAT).");
+            }
+            else {
+                $req->next_retry_at = now()->addMinutes(1);
+            }
+
             $req->save();
         }
     }
