@@ -310,8 +310,8 @@ export const DashboardPage = ({
         <div className="flex h-screen bg-[#F9FAFB] font-['Inter'] overflow-hidden">
             {/* Sidebar Navigation */}
             <aside className="w-20 lg:w-24 flex-shrink-0 flex flex-col items-center py-8 bg-white border-r border-gray-100 z-20">
-                <div className="mb-10 p-3 bg-[#10B981] rounded-2xl shadow-lg shadow-emerald-200 cursor-pointer">
-                    <span className="material-symbols-outlined text-white text-3xl">account_balance_wallet</span>
+                <div className="mb-10 cursor-pointer flex justify-center w-full">
+                    <img src="/img/fiscalio-logo.png" alt="Fiscalio Logo" className="w-12 h-12 object-contain" />
                 </div>
                 <nav className="flex flex-col gap-8 w-full items-center">
                     <button className="p-3 rounded-2xl bg-emerald-50 text-[#10B981] transition-all">

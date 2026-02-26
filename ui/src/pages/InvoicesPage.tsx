@@ -396,9 +396,9 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName }: { activeRfc: str
             {/* Sidebar */}
             <aside className={`fixed md:relative w-64 h-full flex-shrink-0 flex flex-col bg-white border-r border-gray-200 z-30 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                 <div className="h-20 flex items-center px-6 border-b border-gray-100 justify-between">
-                    <div className="flex items-center gap-2 text-[var(--primary)] font-bold text-xl tracking-tight">
-                        <span className="material-symbols-outlined text-3xl">account_balance_wallet</span>
-                        <span>Fiscalio</span>
+                    <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
+                        <img src="/img/fiscalio-logo.png" alt="Fiscalio Logo" className="h-8 object-contain" />
+                        <span className="text-gray-900">Fiscalio</span>
                     </div>
                     <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-gray-400">
                         <span className="material-symbols-outlined">close</span>

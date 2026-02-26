@@ -36,9 +36,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             {/* Sidebar verde oscuro */}
             <div className="hidden lg:flex lg:flex-col lg:w-1/2 bg-[#0C6B4B] text-white p-12 justify-between">
                 <div className="flex items-center space-x-3">
-                    <div className="bg-white text-[#0C6B4B] p-2 rounded-lg font-bold text-xl leading-none">
-                        F
-                    </div>
+                    <img src="/img/fiscalio-logo.png" alt="Fiscalio Logo" className="h-10 object-contain" />
                     <span className="text-2xl font-bold tracking-tight">Fiscalio</span>
                 </div>
 
@@ -48,13 +46,11 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                     </h1>
                     <div className="flex items-center space-x-4">
                         <div className="w-12 h-12 rounded-full overflow-hidden bg-white/20">
-                            {/* placeholder para imagen de ricardo */}
-                            <img src="https://i.pravatar.cc/150?u=a" alt="Avatar" className="w-full h-full object-cover" />
+                            <img src="/img/foto-fiscalio.jpg" alt="Avatar" className="w-full h-full object-cover" />
                         </div>
                         <div>
-                            <p className="font-semibold text-lg">Alejandro Carbajal</p>
-                            <p className="text-xs text-green-200 uppercase tracking-widest font-semibold mt-1">CEO de Fiscalio México</p>
-                            <p className="text-xs text-green-200">Contador Público</p>
+                            <p className="font-semibold text-lg">Control de Facturas</p>
+                            <p className="text-xs text-green-200 uppercase tracking-widest font-semibold mt-1">Sistema Fiscalio</p>
                         </div>
                     </div>
                 </div>
@@ -65,9 +61,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 <div className="w-full max-w-md mx-auto">
                     {/* Logo en movil */}
                     <div className="lg:hidden flex items-center mb-8 space-x-3 text-[#0C6B4B]">
-                        <div className="bg-[#0C6B4B] text-white p-2 rounded-lg font-bold text-xl leading-none">
-                            F
-                        </div>
+                        <img src="/img/fiscalio-logo.png" alt="Fiscalio Logo" className="h-8 object-contain" />
                         <span className="text-2xl font-bold tracking-tight">Fiscalio</span>
                     </div>
 
