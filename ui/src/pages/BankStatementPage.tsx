@@ -1,24 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { processBankStatement, confirmBankStatement, listBankStatements } from '../services';
+import React, { useState } from 'react';
+import { processBankStatement, confirmBankStatement } from '../services';
 
 export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc: string, clientName: string, onBack: () => void }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [result, setResult] = useState<any>(null);
-    const [statements, setStatements] = useState<any[]>([]);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-    useEffect(() => {
-        loadStatements();
-    }, [activeRfc]);
-
-    const loadStatements = async () => {
-        try {
-            const data = await listBankStatements(activeRfc);
-            setStatements(data);
-        } catch (err) {
-            console.error(err);
-        }
-    };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -47,7 +34,6 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
             }, activeRfc);
             setShowConfirmModal(false);
             setResult(null);
-            loadStatements();
         } catch (err) {
             alert("Error al guardar movimientos");
         }
