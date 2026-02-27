@@ -95,8 +95,11 @@ class BankStatementController extends Controller
         ]);
 
         $rfc = $request->input('rfc');
+        Log::info("Confirming bank statement for RFC: $rfc", $request->all());
+
         $business = \App\Models\Business::where('rfc', $rfc)->first();
         if (!$business) {
+            Log::error("Business not found for RFC: $rfc");
             return response()->json(['error' => 'Empresa no encontrada'], 404);
         }
 
@@ -116,10 +119,19 @@ class BankStatementController extends Controller
             ]);
 
             foreach ($request->input('movements') as $m) {
+                // Convert DD/MM/YYYY to YYYY-MM-DD for SQLite
+                $date = $m['fecha'];
+                if (strpos($date, '/') !== false) {
+                    $parts = explode('/', $date);
+                    if (count($parts) === 3) {
+                        $date = "{$parts[2]}-{$parts[1]}-{$parts[0]}";
+                    }
+                }
+
                 BankMovement::create([
                     'bank_statement_id' => $statement->id,
-                    'date' => $m['fecha'],
-                    'description' => $m['concepto'],
+                    'date' => $date,
+                    'description' => $m['concepto'] ?? 'Sin concepto',
                     'reference' => $m['referencia'] ?? null,
                     'cargo' => $m['cargo'] ?? 0,
                     'abono' => $m['abono'] ?? 0,
