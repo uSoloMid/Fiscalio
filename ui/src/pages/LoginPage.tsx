@@ -6,8 +6,8 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('1');
+    const [password, setPassword] = useState('1');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -74,7 +74,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                                 <label className="block text-sm font-medium text-gray-700">Correo electrónico</label>
                                 <div className="mt-1">
                                     <input
-                                        type="email"
+                                        type="text"
                                         required
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
