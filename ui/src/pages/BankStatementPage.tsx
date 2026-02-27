@@ -194,6 +194,16 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                             </tbody>
                         </table>
 
+                        {result && result.movements?.length === 0 && (
+                            <div className="py-32 flex flex-col items-center justify-center">
+                                <div className="w-24 h-24 bg-red-50 rounded-[32px] flex items-center justify-center mb-6 border-2 border-dashed border-red-100">
+                                    <span className="material-symbols-outlined text-red-200 text-5xl">error</span>
+                                </div>
+                                <h4 className="text-red-400 text-sm font-bold uppercase tracking-[0.2em] mb-2">No se encontraron movimientos</h4>
+                                <p className="text-gray-400 text-xs font-medium italic text-center px-10">El PDF fue leído pero no pudimos identificar las transacciones. <br />Verifica que el PDF no sea una imagen escaneada.</p>
+                            </div>
+                        )}
+
                         {!result && (
                             <div className="py-32 flex flex-col items-center justify-center">
                                 <div className="w-24 h-24 bg-gray-50 rounded-[32px] flex items-center justify-center mb-6 border-2 border-dashed border-gray-100">
