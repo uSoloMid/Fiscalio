@@ -1,0 +1,1 @@
+ssh -o BatchMode=yes -o ConnectTimeout=5 fiscalio@100.123.107.90 "cd ~/Fiscalio && docker exec api php artisan tinker --execute='echo json_encode(App\Models\Business::select(\"rfc\", \"is_syncing\", \"last_sync_at\")->get());'"

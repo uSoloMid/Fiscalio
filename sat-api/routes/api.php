@@ -105,6 +105,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 
         Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
+
+        // Bank Statements
+        Route::post('/bank-statements/process', [\App\Http\Controllers\BankStatementController::class , 'process']);
+        Route::post('/bank-statements/confirm', [\App\Http\Controllers\BankStatementController::class , 'confirm']);
+        Route::get('/bank-statements', [\App\Http\Controllers\BankStatementController::class , 'index']);
+        Route::get('/bank-statements/{id}', [\App\Http\Controllers\BankStatementController::class , 'show']);
+        Route::delete('/bank-statements/{id}', [\App\Http\Controllers\BankStatementController::class , 'destroy']);
+        Route::put('/bank-movements/{id}', [\App\Http\Controllers\BankStatementController::class , 'updateMovement']);
     });
 
 require __DIR__ . '/debug_routes.php';

@@ -1,0 +1,100 @@
+#19 /var/www/vendor/laravel/framework/src/Illuminate/Console/Command.php(120): Symfony\\Component\\Console\\Command\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArrayInput), Object(Illuminate\\Console\\OutputStyle))
+#20 /var/www/vendor/laravel/framework/src/Illuminate/Console/Concerns/CallsCommands.php(67): Illuminate\\Console\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArrayInput), Object(Illuminate\\Console\\OutputStyle))
+#21 /var/www/vendor/laravel/framework/src/Illuminate/Console/Concerns/CallsCommands.php(28): Illuminate\\Console\\Command->runCommand('sat:verify-past', Array, Object(Illuminate\\Console\\OutputStyle))
+#22 /var/www/app/Console/Commands/SatRunJobsCommand.php(54): Illuminate\\Console\\Command->call('sat:verify-past', Array)
+#23 /var/www/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(36): App\\Console\\Commands\\SatRunJobsCommand->handle()
+#24 /var/www/vendor/laravel/framework/src/Illuminate/Container/Util.php(40): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
+#25 /var/www/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(93): Illuminate\\Container\\Util::unwrapIfClosure(Object(Closure))
+#26 /var/www/vendor/laravel/framework/src/Illuminate/Container/BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod(Object(Illuminate\\Foundation\\Application), Array, Object(Closure))
+#27 /var/www/vendor/laravel/framework/src/Illuminate/Container/Container.php(653): Illuminate\\Container\\BoundMethod::call(Object(Illuminate\\Foundation\\Application), Array, Array, NULL)
+#28 /var/www/vendor/laravel/framework/src/Illuminate/Console/Command.php(136): Illuminate\\Container\\Container->call(Array)
+#29 /var/www/vendor/symfony/console/Command/Command.php(298): Illuminate\\Console\\Command->execute(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
+#30 /var/www/vendor/laravel/framework/src/Illuminate/Console/Command.php(120): Symfony\\Component\\Console\\Command\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
+#31 /var/www/vendor/symfony/console/Application.php(1040): Illuminate\\Console\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#32 /var/www/vendor/symfony/console/Application.php(301): Symfony\\Component\\Console\\Application->doRunCommand(Object(App\\Console\\Commands\\SatRunJobsCommand), Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#33 /var/www/vendor/symfony/console/Application.php(171): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#34 /var/www/vendor/laravel/framework/src/Illuminate/Console/Application.php(94): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#35 /var/www/vendor/laravel/framework/src/Illuminate/Foundation/Console/Kernel.php(129): Illuminate\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#36 /var/www/artisan(35): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#37 {main}
+"} 
+[2026-02-24 21:48:08] local.INFO: UUID ya registrado: B44DDC51-0B09-4EAA-A47D-33895E84FCE0  
+[2026-02-24 21:48:08] local.INFO: UUID ya registrado: C6929949-FAD3-401C-A6D8-41BFA1FA5027  
+[2026-02-24 21:48:08] local.INFO: UUID ya registrado: CB8C01C5-7C3E-4DB8-B965-3CEF3E789100  
+[2026-02-24 21:48:10] local.INFO: Procesamiento completado para Request 0f9348e5-0753-43c4-b448-95c65f73d852. XMLs: 4266  
+[2026-02-24 21:48:17] local.INFO: Archivos encontrados en sat/tmp/7693d2d0-f100-4371-9593-b4894971ebda: 7000  
+[2026-02-24 21:48:17] local.INFO: UUID ya registrado: 04CAF76D-C20C-48B9-951E-554DA00152F8  
+[2026-02-24 21:48:18] local.INFO: UUID ya registrado: 138AE82D-1533-4998-A43C-2698B78740AC  
+[2026-02-24 21:48:18] local.INFO: UUID ya registrado: 217D4B35-0EEE-4A5E-8C79-76C867A55C35  
+[2026-02-24 21:48:18] local.INFO: UUID ya registrado: 22B4D57C-FB63-4F40-A057-9B3E271B7548  
+[2026-02-24 21:48:18] local.INFO: UUID ya registrado: 25A73262-3BBD-4DB6-A896-5E4E8053EE12  
+[2026-02-24 21:48:19] local.INFO: UUID ya registrado: 2B3457E1-E277-4798-AB09-24BE458704F0  
+[2026-02-24 21:48:19] local.INFO: UUID ya registrado: 33F6A964-0274-48F4-89CB-A6192C649FE8  
+[2026-02-24 21:48:19] local.INFO: UUID ya registrado: 3419C1A8-988E-49C8-B4B0-8BCFA30AA936  
+[2026-02-24 21:48:19] local.INFO: UUID ya registrado: 39C8183E-F7BC-42EA-8BB5-D695B63BF942  
+[2026-02-24 21:48:20] local.INFO: UUID ya registrado: 3CA465F7-DA19-4EA2-89AD-4FF54517CF55  
+[2026-02-24 21:48:20] local.INFO: UUID ya registrado: 40C67B92-C2CC-49C0-B46E-51A09C72433C  
+[2026-02-24 21:48:20] local.INFO: UUID ya registrado: 4AE68706-C7EE-4840-B190-0D9E5385A57B  
+[2026-02-24 21:48:20] local.INFO: UUID ya registrado: 4E7A108D-8E5F-499C-898D-08D3D5D95874  
+[2026-02-24 21:48:21] local.INFO: UUID ya registrado: 5CB0BED0-C8CA-444D-81A7-A23ACECD7FDE  
+[2026-02-24 21:48:22] local.INFO: UUID ya registrado: 6FE75E11-DC7E-41DB-8CB6-0C50FBA569E5  
+[2026-02-24 21:48:22] local.INFO: UUID ya registrado: 70D80547-94F8-441A-A506-E4CCD7230953  
+[2026-02-24 21:48:22] local.INFO: UUID ya registrado: 77814B17-E3A9-47A3-B4CE-36B4C730B021  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 81132EDA-CF65-4495-9A3F-143ED191D13A  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 81AAAAEF-6D62-4AF5-AEDD-38A75A777D18  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 85B2C4D0-4B9D-4591-9E4D-CCA84682D436  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 86994C26-9FB4-471D-825E-1685E02C4B18  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 899A4B08-C826-4BDE-8FEB-D63350DEF89C  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 8A4CD348-B155-475A-875D-DEB8CC877E96  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 8C4A794A-22EF-40E2-A916-AFAF6B449924  
+[2026-02-24 21:48:23] local.INFO: UUID ya registrado: 8D245CC2-B2D2-4930-B8F6-3A4AE5430FCE  
+[2026-02-24 21:48:24] local.INFO: UUID ya registrado: 9640AC45-1AC6-4C81-98F5-BC83400BFFD9  
+[2026-02-24 21:48:24] local.INFO: UUID ya registrado: 96F753B8-4247-4B3D-A289-918B5D77A5FA  
+[2026-02-24 21:48:24] local.INFO: UUID ya registrado: A1DA675B-9E58-43DB-BFF0-3A9294331A9D  
+[2026-02-24 21:48:24] local.INFO: UUID ya registrado: A5386AB0-601A-44F8-8289-7905468B8687  
+[2026-02-24 21:48:25] local.INFO: UUID ya registrado: B3BAD995-1432-4F5F-9FF1-50BE0AE950DE  
+[2026-02-24 21:48:25] local.INFO: UUID ya registrado: B3BB035A-A050-471C-829F-A00AC84E5C72  
+[2026-02-24 21:48:26] local.INFO: UUID ya registrado: BD0018FD-49D1-496C-B092-7214B0CE1185  
+[2026-02-24 21:48:26] local.INFO: UUID ya registrado: CC5F62D9-E359-4148-9C00-4D66436D9AA6  
+[2026-02-24 21:48:27] local.INFO: UUID ya registrado: CEEA3968-EBA3-4712-8630-D74A465DB8CC  
+[2026-02-24 21:48:27] local.INFO: UUID ya registrado: D8EDFD91-DFB3-4DDB-ABA1-196D3F98532B  
+[2026-02-24 21:48:27] local.INFO: UUID ya registrado: DFEDD35A-7948-4D0F-9671-7864BCAB1372  
+[2026-02-24 21:48:28] local.INFO: UUID ya registrado: EA13F14C-8C97-4A78-88F4-1BDD1AD96863  
+[2026-02-24 21:48:28] local.INFO: UUID ya registrado: F3C63E31-3F20-4FC4-84EE-B89060A4B761  
+[2026-02-24 21:48:29] local.INFO: UUID ya registrado: F9DF084C-8303-434E-A1FD-82D4DC4F7535  
+[2026-02-24 21:48:29] local.INFO: UUID ya registrado: FA671AAA-792E-49F8-8492-67DD37B8570A  
+[2026-02-24 21:48:29] local.INFO: UUID ya registrado: FF7B7333-A582-46D8-8C67-048F0397BDE7  
+[2026-02-24 21:48:30] local.INFO: Procesamiento completado para Request 7693d2d0-f100-4371-9593-b4894971ebda. XMLs: 7000  
+[2026-02-24 21:48:31] local.INFO: Archivos encontrados en sat/tmp/7693d2d0-f100-4371-9593-b4894971ebda: 3890  
+[2026-02-24 21:48:31] local.INFO: UUID ya registrado: 04DDA0C2-6202-49BB-8C0E-12495A767B19  
+[2026-02-24 21:48:31] local.INFO: UUID ya registrado: 059A755F-D303-47B6-85AB-0048DE3C598D  
+[2026-02-24 21:48:31] local.INFO: UUID ya registrado: 08284C7F-3F56-42BB-A809-91C29ECB8B1D  
+[2026-02-24 21:48:31] local.INFO: UUID ya registrado: 0B809E92-EF2B-45FD-9B07-C61ACC25F476  
+[2026-02-24 21:48:31] local.INFO: UUID ya registrado: 0F3ADC9D-C563-4686-896C-3BF3659065D2  
+[2026-02-24 21:48:32] local.INFO: UUID ya registrado: 26DC4D7C-942E-4350-BDC3-FA58380A2D1E  
+[2026-02-24 21:48:32] local.INFO: UUID ya registrado: 28CCE628-A6AC-4CAF-AC46-A3B40A1EC1EB  
+[2026-02-24 21:48:32] local.INFO: UUID ya registrado: 2A0754DA-52F4-495E-856D-5AA9DAFABBF7  
+[2026-02-24 21:48:32] local.INFO: UUID ya registrado: 2F644A89-7028-4697-9E7A-621CCC3260C6  
+[2026-02-24 21:48:32] local.INFO: UUID ya registrado: 3FB2C9E4-8F26-49A0-87B2-36431A411B5D  
+[2026-02-24 21:48:33] local.INFO: UUID ya registrado: 499201E1-ECDB-4D8C-97CB-C40041E2504F  
+[2026-02-24 21:48:33] local.INFO: UUID ya registrado: 55FBADA4-DE19-4B2E-B122-65764A834743  
+[2026-02-24 21:48:33] local.INFO: UUID ya registrado: 6BF41E6B-5250-4900-A193-B07BE70B789A  
+[2026-02-24 21:48:34] local.INFO: UUID ya registrado: 6F6A7CFE-D01D-4272-9A6D-4C05C61F5FA1  
+[2026-02-24 21:48:34] local.INFO: UUID ya registrado: 82CB6217-0815-416B-8F12-503561345899  
+[2026-02-24 21:48:34] local.INFO: UUID ya registrado: 83B361B8-6C01-4F93-89D0-8E72AFD2C56A  
+[2026-02-24 21:48:34] local.INFO: UUID ya registrado: 87D0DBF8-BF2C-438B-80F8-1647DA586C1C  
+[2026-02-24 21:48:34] local.INFO: UUID ya registrado: 8F3695CD-91E9-4E42-B183-A495BEAE9881  
+[2026-02-24 21:48:35] local.INFO: UUID ya registrado: 979C596D-2F58-46FB-A36D-1010F1F26F16  
+[2026-02-24 21:48:35] local.INFO: UUID ya registrado: 9C1AF2AC-539B-49EF-8779-37C3FB14F159  
+[2026-02-24 21:48:35] local.INFO: UUID ya registrado: B1C0CEA9-E17B-4905-9AAC-01D57280E983  
+[2026-02-24 21:48:35] local.INFO: UUID ya registrado: B1F00BF5-C76C-4B34-B456-345C1F82C92E  
+[2026-02-24 21:48:36] local.INFO: UUID ya registrado: BC908492-D600-4357-A6C0-73F6607E75BD  
+[2026-02-24 21:48:36] local.INFO: UUID ya registrado: D77FFF88-8700-4121-B71E-A8C4A5EF15BE  
+[2026-02-24 21:48:36] local.INFO: UUID ya registrado: DA0C4D77-6125-4DDE-AAF3-DAC244217456  
+[2026-02-24 21:48:36] local.INFO: UUID ya registrado: DAE5EB24-84E2-441D-9174-38BEE8340256  
+[2026-02-24 21:48:36] local.INFO: UUID ya registrado: DD3839F0-E396-4F95-87E7-1DB3E318D251  
+[2026-02-24 21:48:37] local.INFO: UUID ya registrado: E03A1066-3551-4C7B-91FD-723AB868EFA8  
+[2026-02-24 21:48:37] local.INFO: UUID ya registrado: EC8AAD5E-8356-4DF0-818D-C2D302A45374  
+[2026-02-24 21:48:37] local.INFO: UUID ya registrado: EE798BC6-A8CD-4952-BA0E-228A7968D71B  
+[2026-02-24 21:48:37] local.INFO: UUID ya registrado: F2DD8B50-4685-4624-99A7-A9D3F8D26732  
+[2026-02-24 21:48:38] local.INFO: Procesamiento completado para Request 7693d2d0-f100-4371-9593-b4894971ebda. XMLs: 3890  

@@ -1,0 +1,486 @@
+2
+Recibiste tu estado de cuenta con
+zoe
+
+RFC genérico...
+Significa que los datos fiscales que tienes registrados con nosotros no
+coinciden con los de tu Constancia de Situaci6n Fiscal.
+Modificalos ahora para asegurar que tus comprobantes CFDI tengan validez
+fiscal.
+iNo dejes pasar mas tiempo! Hazlo en solo 3 pasos:
+
+1. Entra al canal digital de tu eleccién. Puede ser:
+
+App BBVA | App BBVA Empresas | bbva.mx | www.bbvanetcash.mx
+
+2. Revisa que los siguientes datos coincidan con los de tu Constancia de
+Situaci6n Fiscal vigente*; para el uso del CFDI te recomendamos consultarlo
+con un contador 0 especialista en el tema.
+
+¢ RFC
+
+* Nombre o raz6n social
+
+* Cédigo postal fiscal
+
+¢ Régimen fiscal
+
+¢ Uso de CFDI
+
+3. Modifica el que sea necesario, en ese mismo canal**.
+iListo! Podras ver reflejados tus datos modificados en el préximo comprobante
+fiscal que emitamos, siempre y cuando lo hayas modificado de manera
+correcta.
+Si tienes dudas, contacta a tu ejecutivo o banquero.
+
+*Puedes obtener tu constancia en www.sat.gob.mx, solo ve a “Otros tramites y servicios” y selecciona “Genera
+
+tu Constancia de Situacién Fiscal”.
+
+**Para modificar el RFC es necesario acudir a sucursal.
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+PAGINA 2/11
+QUIERO IR TOURS SAS DE CV Periodo DEL 01/02/2025 AL 28/02/2025
+AVENIDA ESTADO DE PUEBLA 57 A 2B Fecha de Corte 28/02/2025
+LAZARO CARDENAS No. de Cuenta 0124404407
+CUERNAVACA .
+MOR MEXICO CP 62080 No. de Cliente D6667181
+RF.C QIT230901K94
+No. Cuenta CLABE 012180001214044073
+SUCURSAL: 0696 | CDMX PLAZA UNIVERSIDAD
+DIRECCION: AV. UNIVERSIDAD 1000 COL. SANTA CRUZ
+ATOYAC MEX DF
+PLAZA: CIUDAD DE MEXICO
+TELEFONO: (5)6880258
+Informacion Financiera MONEDA NACIONAL
+Rendimiento Comportamiento
+Saldo Promedio 145,853.10 Saldo de Liquidaci6n Inicial 30,960.09
+Dias del Periodo 28 Saldo de Operacién Inicial 30,960.09
+Tasa Bruta Anual % 0.000 Depdsitos / Abonos (+) 44 1,373,201.88
+Saldo Promedio Gravable 145,853.10 Retiros / Cargos (-) 21 1,387,436.95
+Intereses a Favor (+) 0.00 Saldo Final (+) 16,725.02
+ISR Retenido (-) 0.00 Saldo de Operaci6n Final 16,725.02
+Comisiones de la cuenta Saldo Promedio Minimo Mensual Hasta: 0
+Cheques pagados 0 0.00
+Manejo de Cuenta 0.00 Otros productos incluidos en el estado de cuenta _(Inversiones,
+‘Anualidad 0.00 Contrato | Producto | Tasa de Total de
+7 6 Interes | Nominal Real__| comisiones
+Operaciones 0.00 anual
+Total Comisiones 15.00
+Cargos Objetados 0 0.00 NIA NA NIA NA NIA NA
+Abonos Objetados 0 0.00
+Detalle de Movimientos Realizados
+FECHA SALDO
+OPER LIQ COD. DESCRIPCION REFERENCIA CARGOS ABONOS OPERACION _LIQUIDACION
+O1/FEB 04/FEB 120 SPEI RECIBIDOSANTANDER 6,833.33 37,793.42 29,097.09
+4152739TRANSFERENCIA A QUIERO IR TOUR Ref. 0142395203 014
+00014540565583176918
+2025020140014BMOV0020452771810
+Estimado Cliente,
+Su Estado de Cuenta ha sido modificado y ahora tiene mas detalle de informacion.
+También le informamos que su Contrato ha sido modificado,
+el cual puede consultarlo en cualquier sucursal o www.bbva.mx
+Con BBVA adelante.
+La GAT Real es el rendimiento que obtendria después de descontar la inflacion estimada
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 3/11
+FECHA SALDO
+OPER LIQ COD. DESCRIPCION REFERENCIA CARGOS ABONOS OPERACION _LIQUIDACION
+LAURA SUSANA ROBLES SALINAS
+Q2/FEB  04/FEB 120 SPEI RECIBIDOBANAMEX 20,000.00 57,793.42 29,097.09
+0020225Europa Fernando Said y Marco C Ref. 0145134512 002
+00002540099702170778
+085905645150303354
+MARCO ANTONIO,DE LA ROSA/CERET
+03/FEB  04/FEB N06 PAGO CUENTA DE TERCERO 4,500.00 62,293.42 29,097.09
+BNET 2860666971 EncantosdeEuropaRJ Ref. 7598710311
+O4/FEB = 01/FEB _A15 GASOL MINIBIL 500.00
+RFC: MIN 210309CVO 19:15 AUT: 204382 Ref. ******6122
+O4/FEB = O1/FEB A15 HOTEL REFORMA 1,363.00
+RFC: FORO8306289B0 02:27 AUT: 868272 Ref. ******6122
+O4/FEB 04/FEB F22 DEV TRANSF INTERNAL EMIT. 141,628.49
+DEV. TRANS. INT. EM 6950.00USD Ref. 3615207.0173.01
+O4/FEB  04/FEB C02 DEPOSITO EN EFECTIVO 9,996.00 212,054.91 212,054.91
+Ref. 697
+OS/FEB OS/FEB 117 SPEI ENVIADO SANTANDER 75,000.00
+0502250Tour costa Rica Ref. 0045056303 014
+00005579100193262084
+BNET01002502050045056303
+SENDY ELENA CALDERON HIDALGO
+OS/FEB OS5/FEB 120 SPEI RECIBIDOINBURSA 68,000.00 205,054.91 203,456.91
+2025020pago de viajé Ref. 0160008229 036
+00036068500618263729
+036APPM05022025191939760
+JOSE ADALBERTO GARIBAY LUNA
+O6/FEB OS5/FEB A15 LIVIER CUERNAVACA 1,598.00 203,456.91 203,023.36
+RFC: IUGC860104F94 16:59 AUT: 039748 Ref. ******6122
+O7/FEB O6/FEB A15 HONORATA 433.55 203,023.36 203,023.36
+RFC: BJO 121005SE4 19:08 AUT: 168823 Ref. ******6122
+O9/FEB  10/FEB N06 PAGO CUENTA DE TERCERO 4,500.00 207,523.36 202,523.36
+BNET 2860666971 EncantosdeEuropaRJ Ref. 8096492973
+10/FEB  10/FEB 120 SPEI RECIBIDONVIO 20,000.00
+0000001nd Ref. 0180344694 710
+00710969000011430362
+202502109071013080000775570822
+Itzuri Julissa Orihuela Diaz
+10/FEB  10/FEB 120 SPEI RECIBIDOBANAMEX 60,000.00
+0100225Viaje a europa Ref. 0180400511 002
+00002544902440257059
+085902258370304150
+ROSALINDA,GARCIA/VILLAFA@A.
+10/FEB  10/FEB N06 PAGO CUENTA DE TERCERO 60,000.00
+BNET 0142910691 Sandray Rafa Europ Ref. 8208101104
+10/FEB  09/FEB A15 GASOL EST CHIPITLAN 500.00 347,023.36 347,023.36
+RFC: CCI 020116894 11:55 AUT: 881783 Ref. ****"*6122
+‘1/FEB 14/FEB 120 SPEI RECIBIDOSANTANDER 6,833.33
+9375587TRANSFERENCIA A QUIERO IR TOUR Ref. 0185506354 014
+00014540565583176918
+2025021140014BMOVP020402597310
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 4/11
+FECHA SALDO
+OPER LIQ COD. DESCRIPCION REFERENCIA CARGOS ABONOS OPERACION _LIQUIDACION
+LAURA SUSANA ROBLES SALINAS
+‘1/FEB  11/FEB 120 SPEI RECIBIDONVIO 15,000.00
+0000001nd Ref. 0187136181 710
+00710969000014801493
+202502129071016080000777821233
+Jesus Enrique Orihuela Santos
+‘1/FEB 11/FEB 120 SPEI RECIBIDONVIO 15,000.00 383,856.69 383,856.69
+0000001nd Ref. 0187143537 710
+00710969000014801493
+202502129071054080000777822902
+Jesus Enrique Orihuela Santos
+12/FEB  12/FEB N06 PAGO CUENTA DE TERCERO 30,000.00
+BNET 1140987387 ant tours Ref. 8349144792
+12/FEB 12/FEB 120 SPEI RECIBIDOBANAMEX 40,000.00
+0120225abono viaje Europa Cris y Luis Ref. 0189471422 002
+00002540904234667491
+085904518260304353
+LUIS MANUEL,RODRIGUEZ/OLVERA
+12/FEB 12/FEB 120 SPEI RECIBIDOSANTANDER 23,829.63
+2129296TRANSFERENCIA A QUIERO IR TOUR Ref. 0190481723 014
+00014544606065780826
+2025021240014BMOV0000478594570
+MARIA FELIX VERGARA MALDONADO
+12/FEB  12/FEB N06 PAGO CUENTA DE TERCERO 9,000.00 486,686.32 486,686.32
+BNET 1514420342 extensionMadrid Fi Ref. 8381436735
+13/FEB 13/FEB S39 SERV BANCA INTERNET 15.00
+Ref. OPS SERV BCA IN
+13/FEB  13/FEB S40 IVACOM SERV BCA INTERNET 2.40
+Ref. IVA COM SERV BC
+13/FEB  13/FEB C02 DEPOSITO EN EFECTIVO 272,250.00
+Ref. 716
+13/FEB 13/FEB 120 SPE! RECIBIDOSANTANDER 7,500.00
+4294133TRANSFERENCIA A QUIERO IR TOUR Ref. 0195905294 014
+00014540565583176918
+2025021340014BMOV0020430468650
+LAURA SUSANA ROBLES SALINAS
+13/FEB  13/FEB N06 PAGO CUENTA DE TERCERO 489,360.00
+BNET 0115993857 DIC24GPO008JM Ref. 8458141112
+13/FEB  13/FEB N06 PAGO CUENTA DE TERCERO 244,680.00
+BNET 0115993857 ENE25GPO001JM Ref. 8458328370
+13/FEB 13/FEB 120 SPEI RECIBIDOSANTANDER 20,000.00 52,378.92 52,378.92
+6424298TRANSFERENCIA A QUIERO IR TOUR Ref. 0197478475 014
+00014544606222529150
+2025021340014BMOV0020441051990
+LEZARET ALVARADO RUMBO
+14/FEB  14/FEB N06 PAGO CUENTA DE TERCERO 34,000.00
+BNET 1511161906 tours Ref. 8522321014
+14/FEB  14/FEB NO6 PAGO CUENTA DE TERCERO 20,000.00
+BNET 1201530607 anticipo viaje Ref. 8541072886
+14/FEB  14/FEB N06 PAGO CUENTA DE TERCERO 30,285.00
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 5/11
+FECHA SALDO
+OPER LIQ COD. DESCRIPCION REFERENCIA CARGOS ABONOS OPERACION _LIQUIDACION
+BNET 0115993857 DIC24P0008JM Ref. 8543334126
+14/FEB  14/FEB N06 PAGO CUENTA DE TERCERO 5,500.00
+BNET 2860666971 EncantosdeEuropaRJ Ref. 8550098859
+14/FEB  14/FEB N06 PAGO CUENTA DE TERCERO 3,000.00 84,593.92 84,593.92
+BNET 2860666971 ToursEuropaRJR Ref. 8550295716
+15/FEB 17/FEB 120 SPEI RECIBIDOBANAMEX 20,000.00 104,593.92 84,593.92
+0150225Europa Fernando Said y Marco A Ref. 0106490907 002
+00002540099702170778
+085902555350304657
+MARCO ANTONIO,DE LA ROSA/CERET
+18/FEB 18/FEB C02 DEPOSITO EN EFECTIVO 19,000.00
+Ref. 727RYGARCIA
+18/FEB 18/FEB 120 SPEI RECIBIDOHSBC 10,000.00
+0000002UItimo pago tour Ref. 0120447840 021
+00021215061499978365
+HSBC229347
+MARLEN SAYAGO INIESTRA.
+18/FEB 18/FEB 120 SPEI RECIBIDOHSBC 4,000.00 137,593.92 137,093.92
+0180225Ultimo pago de mi tour Ref. 0120462702 021
+00021215061499978365
+HSBC231209
+MARLEN SAYAGO INIESTRA.
+19/FEB  19/FEB 120 SPEI RECIBIDOSANTANDER 1,500.00
+6367621TOUR MANUEL ANTONIO COSTA RICA Ref. 0127289920 014
+00014544606065780826
+2025021940014BMOV0000477703590
+MARIA FELIX VERGARA MALDONADO
+19/FEB 18/FEB A15 GASOL SERV CUMBRE 500.00 138,593.92 138,593.92
+RFC: SSC 990310GI1 19:24 AUT: 403962 Ref. ******6122
+20/FEB  20/FEB N06 PAGO CUENTA DE TERCERO 360.00
+BNET 1572044849 Lonas excursion QI Ref. 9043623710
+20/FEB  20/FEB N06 PAGO CUENTA DE TERCERO 23,000.00
+BNET 1514420342 viajes opcionales Ref. 9059289334
+20/FEB  20/FEB N06 PAGO CUENTA DE TERCERO 9,000.00
+BNET 2860666971 EncantosdeEuropaRJ Ref. 9071285346
+20/FEB  20/FEB N06 PAGO CUENTA DE TERCERO 2,000.00 172,233.92 172,233.92
+BNET 2860666971 ToursAducionalesRJ Ref. 9071369640
+22/FEB  24/FEB N06 PAGO CUENTA DE TERCERO 300.00 171,933.92 172,233.92
+BNET 1572044849 Lonas publicidad Q Ref. 9229023911
+23/FEB 24/FEB 120 SPEI RECIBIDOBANAMEX 10,580.00
+0230225liquidacion Europa Cristy Luis Ref. 0143976523 002
+00002540904234667491
+085904017830305453
+LUIS MANUEL,RODRIGUEZ/OLVERA
+23/FEB 24/FEB 120 SPEI RECIBIDOBANAMEX 28,592.00
+0230225Adicionales Europa Cristy Luis Ref. 0143988422 002
+00002540904234667491
+085904048990305459
+LUIS MANUEL,RODRIGUEZ/OLVERA
+23/FEB 24/FEB 120 SPEI RECIBIDOBANAMEX 6,000.00 217,105.92 171,733.92
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 6/11
+FECHA SALDO
+OPER LIQ COD. DESCRIPCION REFERENCIA CARGOS ABONOS OPERACION _LIQUIDACION
+0230225Adicionales Cristy Luis M Ref. 0143997456 002
+00002540904234667491
+085904073120305452
+LUIS MANUEL,RODRIGUEZ/OLVERA
+24/FEB  24/FEB C02 DEPOSITO EN EFECTIVO 65,900.00
+Ref. 740
+24/FEB  24/FEB 120 SPEI RECIBIDOBANORTE 200,000.00
+0250224Prestamo Viaje europa Ref. 0147850252 072
+00072540011518346212
+3843CP03202502243823030152
+ERENDIRA RODRIGUEZ LABRA
+24/FEB  24/FEB N06 PAGO CUENTA DE TERCERO 200,000.00
+BNET 0115993857 ENE25GPO001JM Ref. 9395972550
+24/FEB  24/FEB N06 PAGO CUENTA DE TERCERO 272,000.00
+BNET 0115993857 DIC24GPO008JM Ref. 9396087090
+24/FEB  23/FEB A15 SERV COSSY 3 500.00 10,505.92 10,505.92
+RFC: SCO 000719FI0 10:13 AUT: 048400 Ref. ******6122
+25/FEB  25/FEB_120 SPEI RECIBIDOSANTANDER 8,000.00
+1420120TRANSFERENCIA A QUIERO IR TOUR Ref. 0151817477 014
+00014540565583176918
+2025022540014BMOV0020481214280
+LAURA SUSANA ROBLES SALINAS
+25/FEB  25/FEB N06 PAGO CUENTA DE TERCERO 300.00
+BNET 1572044849 Lonas QIT Ref. 9473858836
+25/FEB 25/FEB C09 TRASPASO ENTRE CUENTAS 11,279.00 29,484.92 29,484.92
+DE LA CUENTA 0189290567
+26/FEB § 26/FEB C02 DEPOSITO EN EFECTIVO 3,000.05
+Ref. 748
+26/FEB § 26/FEB C02 DEPOSITO EN EFECTIVO 3,980.05
+Ref. 749
+26/FEB = 26/FEB_ 117 SPEI ENVIADO BANAMEX 800.00 35,665.02 35,165.02
+2602250Pago contabilidad QIT Febrero Ref. 0049985315 002
+00002580901487757441
+BNET01002502260049985315
+JOSE SALGADO FLORES
+27IFEB —27/FEB_N06 PAGO CUENTA DE TERCERO 38,000.00
+BNET 1140987387 resto viaje Ref. 9648729493,
+27IFEB —27/FEB_ N06 PAGO CUENTA DE TERCERO 10,000.00
+BNET 2860666971 EncantosdeEuropaRJ Ref. 9677550344
+27IFEB —27/FEB_ N06 PAGO CUENTA DE TERCERO 2,000.00
+BNET 2860666971 ToursAdicionalesRJ Ref. 9677673909
+27IFEB = 26/FEB_A15 SERV ACATLIPA 500.00 85,165.02 85,165.02
+RFC: SAC 970416FW4 13:52 AUT: 170742 Ref. ******6122
+28/FEB = 28/FEB_ 117 SPEI ENVIADO BANAMEX 68,440.00 16,725.02 16,725.02
+2802250HXP91085231 Ref. 0025586807 002
+00002180070101399076
+BNET01002502280025586807
+PULLMAN TRAVEL SA DE CV
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 7/11
+Total de Movimientos
+TOTAL IMPORTE CARGOS 1,387,436.95 TOTAL MOVIMIENTOS CARGOS 21
+TOTAL IMPORTE ABONOS 1,373,201.88 TOTAL MOVIMIENTOS ABONOS 44
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 8/11
+Cuadro resumen y grafico de movimientos del periodo
+" 7 100 %. 5
+Saldo Inicial 30,960.09 2.23%
+Depésitos / Abonos (+) 1,373,201.88 98.97% | BS
++)
+Otros cargos (-) -1,387,436.95 -100.00%
+Saldo Final 16,725.02 1.20%
+Nota: —& lacolumna "porcentaje" se sefiala con el 100% ala cantidad mas alta, permitiéndole
+relacionarse porcentualmente con las demas.
+Otros cargos: Ver detalle de movimientos
+"Conforme a lo publicado el 15 de noviembre de 2017 en el Diario Oficial de la Federacion, le informamos que a partir del 1° de enero 2018, el Impuesto
+sobre la Renta (ISR) a retener sera de 0.46% en lugar del 0.58% que actualmente se retiene"
+Los montos minimos requeridos para los productos de inversién a plazo fijo son: Pagaré Liquidable al vencimiento MN. $2,000.00,
+Certificado de Depdsitos MN: $5,000 (sujetos a cambio dependiendo de las variaciones del mercado). Para mayor informacién consulta la
+pagina de internet: https://www.bbva.mx
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 9/11
+No. Cliente D6667181
+Tiene 90 dias naturales contados a partir de la fecha de corte o de la realizacién de la operacién para presentar su
+aclaracién en la sucursal donde radica su cuenta, o bien, llamando al Centro de Atencién Telefonica al teléfono 55 5226
+2663.
+Con gusto atenderemos sus reclamaciones que ha presentado ante nuestra instituci6n a través de Linea =
+BBVA al teléfono 55 5226 2663 Ciudad de México, en caso de no recibir una respuesta satisfactoria = | AB
+dirigirse a: —
+Unidad Especializada de Atencién a Clientes (UNE) ———
+BBVA recibe las consultas, reclamaciones o aclaraciones, en su Unidad Especializada de Atencién a Usuarios, ubicada
+en Lago Alberto 320 (entrada por Mariano Escobedo 303), Col. Granada, C.P. 11320, Alcaldia Miguel Hidalgo, Ciudad de
+México, México y por correo electrénico une.mx@bbva.com o teléfono 55 1998 8039, asi como en cualquiera de sus
+sucursales u oficinas. En el caso de no obtener una respuesta satisfactoria, podra acudir a la Comisién Nacional para la
+Proteccién y Defensa de los Usuarios de Servicios Financieros www.condusef.gob.mx y 55 5340 0999.
+"Si desea recibir pagos a través de transferencias electrénicas de fondos interbancarias, debera hacer del conocimiento
+de la persona que le enviara el o los pagos respectivos, el ntiimero de Cuenta que a continuacion se indica:
+2180001214044073 Clave Bancaria Estandar (CLABE), asi como el nombre de este Banco."
+Todas las tasas de interés estan expresadas en terminos anuales.
+“Unicamente estan garantizados por el Instituto de Proteccién al Ahorro Bancarios (IPAB), los depésitos bancarios de
+dinero a la vista, retirables en dias preestablecidos, de ahorro, y a plazo con previo aviso, asi como los préstamos y
+créditos que acepte la Institucién, hasta por el equivalente a cuatrocientas mil UDIS por persona, cualquiera que sea el
+numero, tipo y clase de dichas obligaciones a su favor y a cargo de la Institucién de banca multiple.”
+www.ipab.org.mx
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 10/11
+
+Glosario de Abreviaturas
+‘ADMON ADMINISTRACION DEV/DEVOL — DEVOLUCION Movs MOVIMIENTOS
+ADIC ADICIONAL DEVU DEVUELTO MovMTos MOVIMIENTOS
+‘ADMIN ADMINISTRACION DIF DIFERENCIA MpB MULTIDEPOSITO
+ANT ANTERIOR DIN DINERO N/A NO APLICA
+ANTIC ANTICIPADA DISP DISPOSICION OPER OPERACION
+ANUL ANULACION DLLS DOLARES ops OPERACIONES
+‘APORT ‘APORTACION DOC/DOCTO — DOCUMENTO ORD ORDEN
+AUT AUTOMATICO EDO ESTADO P/PAG PAGO
+BCA BANCA ELECT ELECTRONICA PAT PATRIMONIAL
+BCOS BANCOS EMI EMISION PENALIZ/PEN  PENALIZACION
+BMOV BBVA MEXICO EMP EMPRESARIAL PROM PROMEDIO
+BONI BONIFICACION EXTEM EXTEMPORANEA REDESC REDESCUENTO
+BONIF BONIFICACION EXT EXTRANJERO RFC REGISTRO FEDERAL DE
+cob. CODIGO DE LEYENDA FALLEC FALLECIMIENTO CONTRIBUYENTES
+cA) CAJERO FALT FALTANTE REF. REFERENCIA
+CANC CANCELACION GAT GANANCIA ANUAL TOTAL REP REPOSICION
+cco CARGO GAR/GTIA GARANTIA RESP RESPONSABILIDAD
+cw CASH WINDOWS GPO GRUPO RET RETIRO
+CH/CHQ CHEQUE HONOR HONORARIOS REV REVERSO
+a COBRO INMEDIATO IVA IMPUESTO AL VALOR AGREGADO ~—ROB-EXT/ROB___ ROBO O EXTRAVIO
+COMER COMERCIO ISR IMPUESTO SOBRE LA RENTA SBC SALVO BUEN COBRO
+com COMISION INDEMN INDEMNIZACION SEG SEGURO
+cE CONCENTRACION INMEDIATO INF INFORMACION SERV SERVICIO
+
+EMPRESARIAL INSP INSPECCION Ele) SALDO
+CONF CONFIRMACION INT INTERESES SOBR SOBREGIRO
+CONS CONSULTA INTS INTERESES soc SOCIEDADES
+CONV CONVENIO INT/INTNAL INTERNACIONAL TARJ TARJETA
+CORREC CORRECCION INV INVERSION TDC TARJETA DE CREDITO
+CRED CREDITO LIBRAMIE LIBRAMIENTO TDE TARJETA DE DEBITO EMPRESARIAL
+CTA CUENTA LIQ LIQUIDACION TPV ‘TERMINAL PUNTO DE VENTA
+CED CUENTA EN DOLARES MP MARCA PROPIA TB ‘TESORERIA INTEGRAL BANCARIA
+DcD DINAMICA DE CONVERSION MDO MERCADO TT TITULAR
+
+DE DIVISAS MIN MINIMO TRANS ‘TRANSFERENCIA
+DEP DEPOSITO MN MONEDA NACIONAL TRASP ‘TRASPASO
+DESC/DESCTO DESCUENTO Mov MOVIMIENTO VTAS VENTAS
+
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---
+Estado de Cuenta
+MAESTRA PYME BBVA
+B BVA PAGINA 11/14
+No. Cliente D6667181
+Cuida el medio ambiente consultando tu estado de cuenta en www.bbva.mx recuerda que el medio ambiente es
+responsabilidad de todos
+Nombre del Receptor : QUIERO IR TOURS SASDE CV
+Cédigo Postal de Domicilio Fiscal : 06600
+Regimen Fiscal : 616 - Sin obligaciones fiscales
+Uso de CFDI : S01 - Sin efectos fiscales.
+Exportacion : 01 - No aplica
+Folio Fiscal: Certificado
+6B192A6D-527A-4299-8BD8-CEF75378090C 00001000000509478830
+Sello Digital
+THj/F+MgX7O/WCddfSADr4jMtpIVkHt+DRECnw73Jynew1 1 Oaql CPCV9abjoc8GdLIMGPToAKiJ36bMmCGJK/20G
+ahNqosif9PmzV5pitCIK2yqL +HHwirMnFWe880nLV3MImgnf+ou9AOzWxDC2Dbp7WLBgXjOn4 Y7mb4XNE6cUsi5x
+ExeK8X4szU+1TLB34UTIVUct+oauDBSXx1KhuBIRF39yDWoDIFpo2lI3qSqdujQbpBlkD/brKPmjxn3Z7yCay4kdxoY
+PCLBr65mIxwGjAlqDFiIACM1LdSugPw/Y7nFSPOSO09yc0qWbaBLKYxieDOFSCuW/p2jgvINkYIHA==
+Sello SAT
+GydO1+LFHwIAP722Zrtfx40UpAgmZeU5ZFojrWBDAdY 282W7V6zD7ce3dlIATST6LBCLIDWBKx91mFeWkhr3VTM
+55TKOJ+HGshOr2NsF GJfl3Cw64Y mvuLweRyhh4WtEWshvdiN/fAPoeZXVY 6po7cvBtycCMUf+/dPcH+Cv8TI3CEO
+E3Bw8yF Y OtztsmN2/EVRs85RD2qbTIGSOzgUEu30VTcF Q8T gJo7/J4V/DhTWH2qe2gEiOv8cHi5yqfskC3HOSxyY Ir
+Nfegg8ryqouEwzmyXscniFoQSucu1S6cudiqnJKnu8e0Bbd34c3/kEgkgMtGR/oLNK+ux+e+KdrzwA==
+No. de Serie del Certificado del SAT: 00001000000705359682 Fecha y hora de certificacién: | 2025-03-01T16:03:00
+Cadena Original del complemento de certificacion digital del SAT:
+Mt :U81 oee ae eee aA eee eae aoe 8 Ot TIS RS DOLT HLT + Max OW Cars ADrtiMtpIVKtit+D
+E naradmnew t 10aqT CPCV9abjoc8GdLIMGPToAKiJ36bMmCGJK/20GahNqosii opm Vopitc yal * HwirMnF
+We88OnL' Billmgnt oUSAQTWxDC2Dbp7 WL BaXiOndY 7mbsXNEGcUsioxExekexdscUet LB34UTIVUc+oauDBS
+Xx1KhuBlRF39y! NVeDIE poellsaSgduiQl RRBIKD, rKPmjxn3Z7yCay4kdxoY PCLBr65mlxwGjAlqDFIACM1LdSugPw/Y
+7NFSPOSOO9ycOqWbaBLkY xieDOFSCuW/p2jgvINkYIHA==|00001000000705359682)|
+El BEL rh ll Este documento es una representacion impresa de un CFDI.
+Ibias
+Lr eaten ol ny
+ie, He eee
+eeu bea eel
+Oy aD eso Emitido en
+aay oe PET Ciudad de México, México a 01 de Marzo de 2025 a las 11:35:08
+SE ge
+Fle eae
+5 ‘al Latah A,
+au Ot te
+Oe a ce
+"Por Disposicion Oficial si recibes o envias transferencias de fondos nacionales en moneda extranjera y transferencias de fondos
+internacionales, BBVA esta obligado a compartir en la plataforma del Banco de México para consulta y obtencién de otras Entidades
+Financieras la informacién correspondiente a esas operaciones y a tu identificacion como Cliente, misma que BBVA debera consultar
+durante el tiempo que mantengas una relaci6n juridica con esta Institucién, por lo que si efectlas o recibes dichas operaciones se
+entendera que otorgas tu consentimiento para ello."
+Régimen Fiscal:
+Régimen General de Ley Personas Morales
+BBVA MEXICO, S.A., INSTITUCION DE BANCA MULTIPLE, GRUPO FINANCIERO BBVA MEXICO
+Av. Paseo de la Reforma 510, Col. Juarez, Alcaldia Cuauhtémoc, C.P. 06600, Ciudad de México. México R.F.C. BBA830831LJ2
+
+---PAGE---

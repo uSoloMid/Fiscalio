@@ -369,3 +369,52 @@ export async function downloadBlob(url: string, filename: string) {
     link.click();
     document.body.removeChild(link);
 }
+
+export async function processBankStatement(file: File, rfc: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('business_rfc', rfc);
+    formData.append('rfc', rfc);
+
+    const response = await authFetch(`${API_BASE_URL}/api/bank-statements/process`, {
+        method: 'POST',
+        body: formData
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Error al procesar el estado de cuenta');
+    }
+    return response.json();
+}
+
+export async function confirmBankStatement(data: any, rfc: string): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/bank-statements/confirm?rfc=${rfc}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error al confirmar el estado de cuenta');
+    return response.json();
+}
+
+export async function listBankStatements(rfc: string): Promise<any[]> {
+    const response = await authFetch(`${API_BASE_URL}/api/bank-statements?rfc=${rfc}`);
+    if (!response.ok) throw new Error('Error al listar estados de cuenta');
+    return response.json();
+}
+
+export async function getBankStatement(id: number, rfc: string): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/bank-statements/${id}?rfc=${rfc}`);
+    if (!response.ok) throw new Error('Error al obtener estado de cuenta');
+    return response.json();
+}
+
+export async function updateBankMovement(id: number, data: any, rfc: string): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/bank-movements/${id}?rfc=${rfc}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    });
+    if (!response.ok) throw new Error('Error al actualizar movimiento');
+    return response.json();
+}
