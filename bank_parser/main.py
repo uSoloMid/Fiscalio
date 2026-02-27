@@ -43,14 +43,38 @@ def main():
             {"banco": banco, "fecha": "2026-02-15", "concepto": "EJEMPLO EXTRACCION", "referencia": "0000", "cargo": 0.0, "abono": 100.0, "saldo": 100.0}
         ]
 
-    # 3. Exportar resultados
+    # 3. Calcular Resumen Financiero
+    total_cargos = sum(float(t.get('cargo', 0)) for t in transacciones)
+    total_abonos = sum(float(t.get('abono', 0)) for t in transacciones)
+    
+    initial_balance = 0
+    final_balance = 0
+    if transacciones:
+        first = transacciones[0]
+        last = transacciones[-1]
+        # Saldo Inicial = Saldo Primero - Abono + Cargo
+        initial_balance = float(first.get('saldo', 0)) - float(first.get('abono', 0)) + float(first.get('cargo', 0))
+        final_balance = float(last.get('saldo', 0))
+
+    # 4. Exportar resultados
     if args.output:
         df = pd.DataFrame(transacciones)
         df.to_excel(args.output, index=False)
         print(json.dumps({"success": True, "banco": banco, "output": args.output}))
     else:
         # Imprime JSON estandarizado para que lo lea PHP/Laravel
-        print(json.dumps({"success": True, "banco": banco, "transacciones": transacciones}, indent=2))
+        result = {
+            "success": True, 
+            "banco": banco, 
+            "transacciones": transacciones,
+            "summary": {
+                "initialBalance": initial_balance,
+                "totalCargos": total_cargos,
+                "totalAbonos": total_abonos,
+                "finalBalance": final_balance
+            }
+        }
+        print(json.dumps(result, indent=2))
 
 if __name__ == "__main__":
     main()
