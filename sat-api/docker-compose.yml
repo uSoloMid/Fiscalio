@@ -20,7 +20,9 @@ services:
       - ../bank_parser:/var/www/bank_parser
 
     networks:
-      - fiscalio_fiscalio-network
+      fiscalio_fiscalio-network:
+        aliases:
+          - api
 
 networks:
   fiscalio_fiscalio-network:
