@@ -20,13 +20,20 @@ class BankStatementController extends Controller
         $file = $request->file('file');
         $rfc = $request->input('rfc');
 
+        // Resolve business
+        $business = \App\Models\Business::where('rfc', $rfc)->first();
+        if (!$business) {
+            return response()->json(['error' => 'No se encontró la empresa con el RFC proporcionado'], 404);
+        }
+
         // Save temporary file
         $tempPath = $file->storeAs('temp_banks', 'bank_' . time() . '.pdf');
         $absolutePath = storage_path('app/' . $tempPath);
 
-        // Call python script
+        // Call python script - Detect OS
+        $python = PHP_OS === 'WINNT' ? 'python' : 'python3';
         $scriptPath = base_path('bank_parser/main.py');
-        $command = "python3 " . escapeshellarg($scriptPath) . " " . escapeshellarg($absolutePath) . " 2>&1";
+        $command = "$python " . escapeshellarg($scriptPath) . " " . escapeshellarg($absolutePath) . " 2>&1";
 
         Log::info("Executing bank parser: " . $command);
 
@@ -43,7 +50,7 @@ class BankStatementController extends Controller
         $rawOutput = implode("\n", $output);
         Log::info("Bank parser raw output: " . $rawOutput);
 
-        // Intentar encontrar el inicio y fin del JSON si hay basura
+        // Clean JSON output
         $startPos = strpos($rawOutput, '{');
         $endPos = strrpos($rawOutput, '}');
 
@@ -58,10 +65,16 @@ class BankStatementController extends Controller
         if (!$data) {
             Log::error("Failed to decode JSON from bank parser. Cleaned output: " . ($jsonResult ?? 'N/A'));
             return response()->json([
-                'error' => 'TEST_ERROR_PERSISTENCE ' . $rfc,
+                'error' => 'No se pudo decodificar el resultado del procesador',
                 'raw' => $jsonResult,
                 'details' => $output
             ], 500);
+        }
+
+        // Translation layer: transacciones -> movements (To match UI and Migration)
+        if (isset($data['transacciones']) && !isset($data['movements'])) {
+            $data['movements'] = $data['transacciones'];
+            unset($data['transacciones']);
         }
 
         // Add file name for confirmation step
@@ -82,17 +95,20 @@ class BankStatementController extends Controller
         ]);
 
         $rfc = $request->input('rfc');
+        $business = \App\Models\Business::where('rfc', $rfc)->first();
+        if (!$business) {
+            return response()->json(['error' => 'Empresa no encontrada'], 404);
+        }
 
         try {
             DB::beginTransaction();
 
             $statement = BankStatement::create([
-                'rfc_user' => $rfc,
+                'business_id' => $business->id,
                 'bank_name' => $request->input('bank_name'),
-                'account_number' => $request->input('account_number') ?? 'N/A',
+                'account_number' => $request->input('account_number') ?? 'PREDETERMINADA',
                 'file_name' => $request->input('file_name'),
-                'period_month' => now()->format('m'), // Simplified
-                'period_year' => now()->format('Y'),
+                'period' => now()->format('M-Y'), // Simplified, could be improved by parsing from PDF
                 'initial_balance' => $request->input('summary')['initialBalance'] ?? 0,
                 'total_cargos' => $request->input('summary')['totalCargos'] ?? 0,
                 'total_abonos' => $request->input('summary')['totalAbonos'] ?? 0,
@@ -102,9 +118,9 @@ class BankStatementController extends Controller
             foreach ($request->input('movements') as $m) {
                 BankMovement::create([
                     'bank_statement_id' => $statement->id,
-                    'fecha' => $m['fecha'],
-                    'concepto' => $m['concepto'],
-                    'referencia' => $m['referencia'] ?? null,
+                    'date' => $m['fecha'],
+                    'description' => $m['concepto'],
+                    'reference' => $m['referencia'] ?? null,
                     'cargo' => $m['cargo'] ?? 0,
                     'abono' => $m['abono'] ?? 0,
                     'saldo' => $m['saldo'] ?? 0,
@@ -125,7 +141,11 @@ class BankStatementController extends Controller
     public function index(Request $request)
     {
         $rfc = $request->input('rfc');
-        return BankStatement::where('rfc_user', $rfc)
+        $business = \App\Models\Business::where('rfc', $rfc)->first();
+        if (!$business)
+            return response()->json([]);
+
+        return BankStatement::where('business_id', $business->id)
             ->withCount('movements')
             ->orderBy('created_at', 'desc')
             ->get();
