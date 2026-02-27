@@ -1,10 +1,55 @@
-import React, { useState } from 'react';
-import { processBankStatement, confirmBankStatement } from '../services';
+import React, { useState, useEffect } from 'react';
+import { processBankStatement, confirmBankStatement, listBankStatements, getBankStatement } from '../services';
 
 export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc: string, clientName: string, onBack: () => void }) => {
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isConfirming, setIsConfirming] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [statements, setStatements] = useState<any[]>([]);
+
+    useEffect(() => {
+        loadStatements();
+    }, [activeRfc]);
+
+    const loadStatements = async () => {
+        try {
+            const data = await listBankStatements(activeRfc);
+            setStatements(data);
+        } catch (e) {
+            console.error("Error loading statements", e);
+        }
+    };
+
+    const handleSelectStatement = async (id: number) => {
+        setIsProcessing(true);
+        try {
+            const data = await getBankStatement(id, activeRfc);
+            // Adapt data to match result structure
+            setResult({
+                banco: data.bank_name,
+                fileName: data.file_name,
+                movements: data.movements.map((m: any) => ({
+                    fecha: m.date,
+                    concepto: m.description,
+                    referencia: m.reference,
+                    cargo: parseFloat(m.cargo),
+                    abono: parseFloat(m.abono),
+                    saldo: parseFloat(m.saldo)
+                })),
+                summary: {
+                    initialBalance: parseFloat(data.initial_balance),
+                    totalCargos: parseFloat(data.total_cargos),
+                    totalAbonos: parseFloat(data.total_abonos),
+                    finalBalance: parseFloat(data.final_balance)
+                }
+            });
+        } catch (e) {
+            alert("Error al cargar detalle");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,6 +69,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     };
 
     const handleConfirm = async () => {
+        setIsConfirming(true);
         try {
             await confirmBankStatement({
                 rfc: activeRfc,
@@ -35,8 +81,12 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
             }, activeRfc);
             setShowConfirmModal(false);
             setResult(null);
+            alert("¡Estado de cuenta guardado con éxito!");
+            loadStatements();
         } catch (err) {
             alert("Error al guardar movimientos");
+        } finally {
+            setIsConfirming(false);
         }
     };
 
@@ -206,12 +256,49 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                         )}
 
                         {!result && (
-                            <div className="py-32 flex flex-col items-center justify-center">
-                                <div className="w-24 h-24 bg-gray-50 rounded-[32px] flex items-center justify-center mb-6 border-2 border-dashed border-gray-100">
-                                    <span className="material-symbols-outlined text-gray-200 text-5xl">account_balance_wallet</span>
+                            <div className="py-10 px-10">
+                                <div className="flex items-center justify-between mb-8">
+                                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">HISTORIAL DE IMPORTACIONES</h3>
+                                    <span className="px-3 py-1 bg-emerald-50 text-[10px] font-black text-emerald-600 rounded-full border border-emerald-100">Mostrando {statements.length} registros</span>
                                 </div>
-                                <h4 className="text-gray-400 text-sm font-bold uppercase tracking-[0.2em] mb-2">Sin movimientos cargados</h4>
-                                <p className="text-gray-400 text-xs font-medium italic">Importa un PDF para visualizar los movimientos aquí</p>
+
+                                <div className="grid grid-cols-1 gap-4">
+                                    {statements.length > 0 ? statements.map((s) => (
+                                        <div
+                                            key={s.id}
+                                            onClick={() => handleSelectStatement(s.id)}
+                                            className="bg-white border border-gray-100 p-6 rounded-[32px] flex items-center justify-between hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-100/20 transition-all cursor-pointer group"
+                                        >
+                                            <div className="flex items-center gap-6">
+                                                <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-emerald-50 transition-colors">
+                                                    <span className="material-symbols-outlined text-gray-400 group-hover:text-emerald-500">account_balance</span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-black text-gray-900 uppercase">{s.bank_name}</p>
+                                                    <p className="text-[10px] font-bold text-gray-400 mt-0.5">{s.file_name}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-12">
+                                                <div className="text-right">
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Movimientos</p>
+                                                    <p className="text-sm font-black text-gray-900">{s.movements_count || 0}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo Final</p>
+                                                    <p className="text-sm font-black text-emerald-600">{formatCurrency(parseFloat(s.final_balance))}</p>
+                                                </div>
+                                                <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-gray-300 group-hover:border-emerald-200 group-hover:text-emerald-500 transition-all">
+                                                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <div className="py-20 flex flex-col items-center justify-center bg-gray-50/50 rounded-[40px] border-2 border-dashed border-gray-100">
+                                            <span className="material-symbols-outlined text-gray-200 text-5xl mb-4">history</span>
+                                            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">No hay historial disponible</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
@@ -351,10 +438,13 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                             <div className="w-full space-y-5">
                                 <button
                                     onClick={handleConfirm}
-                                    className="w-full py-5 bg-[#10B981] text-white font-black rounded-[24px] shadow-2xl shadow-emerald-200/50 hover:bg-[#059669] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 tracking-widest text-xs uppercase"
+                                    disabled={isConfirming}
+                                    className="w-full py-5 bg-[#10B981] text-white font-black rounded-[24px] shadow-2xl shadow-emerald-200/50 hover:bg-[#059669] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 tracking-widest text-xs uppercase disabled:opacity-50"
                                 >
-                                    <span className="material-symbols-outlined">verified</span>
-                                    Sí, los totales son correctos
+                                    <span className={`material-symbols-outlined ${isConfirming ? 'animate-spin' : ''}`}>
+                                        {isConfirming ? 'sync' : 'verified'}
+                                    </span>
+                                    {isConfirming ? 'Guardando...' : 'Sí, los totales son correctos'}
                                 </button>
                                 <button
                                     onClick={() => setShowConfirmModal(false)}
