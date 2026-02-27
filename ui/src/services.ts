@@ -419,3 +419,9 @@ export async function updateBankMovement(id: number, data: any, rfc: string): Pr
     if (!response.ok) throw new Error('Error al actualizar movimiento');
     return response.json();
 }
+export async function deleteBankStatement(id: number, rfc: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/api/bank-statements/${id}?rfc=${rfc}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Error al eliminar estado de cuenta');
+}

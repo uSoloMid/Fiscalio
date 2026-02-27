@@ -106,12 +106,28 @@ class BankStatementController extends Controller
         try {
             DB::beginTransaction();
 
+            $movements = $request->input('movements');
+            $period = now()->format('M-Y');
+            if (!empty($movements)) {
+                $firstDate = $movements[0]['fecha'];
+                if (strpos($firstDate, '/') !== false) {
+                    $parts = explode('/', $firstDate);
+                    $months = [
+                        '01' => 'ENE', '02' => 'FEB', '03' => 'MAR', '04' => 'ABR',
+                        '05' => 'MAY', '06' => 'JUN', '07' => 'JUL', '08' => 'AGO',
+                        '09' => 'SEP', '10' => 'OCT', '11' => 'NOV', '12' => 'DIC'
+                    ];
+                    $mIdx = $parts[1];
+                    $period = ($months[$mIdx] ?? 'MES') . '-' . ($parts[2] ?? '2026');
+                }
+            }
+
             $statement = BankStatement::create([
                 'business_id' => $business->id,
                 'bank_name' => $request->input('bank_name'),
                 'account_number' => $request->input('account_number') ?? 'PREDETERMINADA',
                 'file_name' => $request->input('file_name'),
-                'period' => now()->format('M-Y'), // Simplified, could be improved by parsing from PDF
+                'period' => $period,
                 'initial_balance' => $request->input('summary')['initialBalance'] ?? 0,
                 'total_cargos' => $request->input('summary')['totalCargos'] ?? 0,
                 'total_abonos' => $request->input('summary')['totalAbonos'] ?? 0,

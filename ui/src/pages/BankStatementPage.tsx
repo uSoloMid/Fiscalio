@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { processBankStatement, confirmBankStatement, listBankStatements, getBankStatement } from '../services';
+import { processBankStatement, confirmBankStatement, listBankStatements, getBankStatement, deleteBankStatement } from '../services';
 
 export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc: string, clientName: string, onBack: () => void }) => {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -7,6 +7,8 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const [result, setResult] = useState<any>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [statements, setStatements] = useState<any[]>([]);
+    const [bankFilter, setBankFilter] = useState('all');
+    const [yearFilter, setYearFilter] = useState('all');
 
     useEffect(() => {
         loadStatements();
@@ -51,6 +53,27 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
         }
     };
 
+    const handleDeleteStatement = async (e: React.MouseEvent, id: number) => {
+        e.stopPropagation();
+        if (!confirm("¿Estás seguro de que deseas eliminar este estado de cuenta y todos sus movimientos?")) return;
+
+        try {
+            await deleteBankStatement(id, activeRfc);
+            loadStatements();
+            if (result && result.id === id) setResult(null);
+        } catch (e) {
+            alert("Error al eliminar");
+        }
+    };
+
+    const filteredStatements = statements.filter(s => {
+        const matchesBank = bankFilter === 'all' || s.bank_name.toLowerCase() === bankFilter.toLowerCase();
+        const matchesYear = yearFilter === 'all' || (s.period && s.period.includes(yearFilter));
+        return matchesBank && matchesYear;
+    });
+
+    const uniqueBanks = Array.from(new Set(statements.map(s => s.bank_name)));
+    const uniqueYears = Array.from(new Set(statements.map(s => s.period?.split('-')[1]).filter(y => y)));
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -171,16 +194,16 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
 
                     <div className="flex items-center gap-10">
                         <div className="flex flex-col items-end">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Nombre del Banco</p>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Periodo</p>
+                            <p className="text-sm font-bold text-gray-900 border-b-2 border-orange-500/30 pb-0.5 uppercase tracking-wide">{result?.period || "DETECCIÓN AUTOMÁTICA"}</p>
+                        </div>
+                        <div className="flex flex-col items-end">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Banco</p>
                             <p className="text-sm font-bold text-gray-900 border-b-2 border-emerald-500/30 pb-0.5 uppercase tracking-wide">{result?.banco || "PENDIENTE"}</p>
                         </div>
                         <div className="flex flex-col items-end">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Nombre de la Cuenta</p>
-                            <p className="text-sm font-bold text-gray-900 border-b-2 border-emerald-500/30 pb-0.5 tracking-wide">Operativa Principal</p>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Número de Cuenta</p>
-                            <p className="text-sm font-bold text-gray-400 border-b-2 border-gray-100 pb-0.5 tracking-widest">**** 1234</p>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Cuenta</p>
+                            <p className="text-sm font-bold text-gray-400 border-b-2 border-gray-100 pb-0.5 tracking-widest">{result?.account_number || "**** 0000"}</p>
                         </div>
                     </div>
                 </div>
@@ -258,12 +281,32 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                         {!result && (
                             <div className="py-10 px-10">
                                 <div className="flex items-center justify-between mb-8">
-                                    <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">HISTORIAL DE IMPORTACIONES</h3>
-                                    <span className="px-3 py-1 bg-emerald-50 text-[10px] font-black text-emerald-600 rounded-full border border-emerald-100">Mostrando {statements.length} registros</span>
+                                    <div className="flex items-center gap-6">
+                                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">HISTORIAL DE IMPORTACIONES</h3>
+                                        <div className="flex items-center gap-3">
+                                            <select
+                                                value={bankFilter}
+                                                onChange={e => setBankFilter(e.target.value)}
+                                                className="text-[10px] font-bold bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            >
+                                                <option value="all">TODOS LOS BANCOS</option>
+                                                {uniqueBanks.map(b => <option key={b} value={b}>{b.toUpperCase()}</option>)}
+                                            </select>
+                                            <select
+                                                value={yearFilter}
+                                                onChange={e => setYearFilter(e.target.value)}
+                                                className="text-[10px] font-bold bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                            >
+                                                <option value="all">TODOS LOS AÑOS</option>
+                                                {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <span className="px-3 py-1 bg-emerald-50 text-[10px] font-black text-emerald-600 rounded-full border border-emerald-100">Mostrando {filteredStatements.length} registros</span>
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4">
-                                    {statements.length > 0 ? statements.map((s) => (
+                                    {filteredStatements.length > 0 ? filteredStatements.map((s) => (
                                         <div
                                             key={s.id}
                                             onClick={() => handleSelectStatement(s.id)}
@@ -274,8 +317,11 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-emerald-500">account_balance</span>
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-black text-gray-900 uppercase">{s.bank_name}</p>
-                                                    <p className="text-[10px] font-bold text-gray-400 mt-0.5">{s.file_name}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-black text-gray-900 uppercase">{s.bank_name}</p>
+                                                        <span className="px-2 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-black rounded-md">{s.period}</span>
+                                                    </div>
+                                                    <p className="text-[10px] font-bold text-gray-400 mt-0.5">{s.file_name.substring(0, 30)}...</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-12">
@@ -287,8 +333,17 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo Final</p>
                                                     <p className="text-sm font-black text-emerald-600">{formatCurrency(parseFloat(s.final_balance))}</p>
                                                 </div>
-                                                <div className="w-8 h-8 rounded-full border border-gray-100 flex items-center justify-center text-gray-300 group-hover:border-emerald-200 group-hover:text-emerald-500 transition-all">
-                                                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={(e) => handleDeleteStatement(e, s.id)}
+                                                        className="w-10 h-10 rounded-2xl border border-red-50 text-red-100 flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all"
+                                                        title="Eliminar"
+                                                    >
+                                                        <span className="material-symbols-outlined text-base">delete</span>
+                                                    </button>
+                                                    <div className="w-10 h-10 rounded-2xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:border-emerald-200 group-hover:text-emerald-500 transition-all">
+                                                        <span className="material-symbols-outlined text-base">arrow_forward</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
