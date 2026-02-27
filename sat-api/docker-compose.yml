@@ -20,8 +20,8 @@ services:
       - ../bank_parser:/var/www/bank_parser
 
     networks:
-      - fiscalio-network
+      - fiscalio_fiscalio-network
 
 networks:
-  fiscalio-network:
-    driver: bridge
+  fiscalio_fiscalio-network:
+    external: true

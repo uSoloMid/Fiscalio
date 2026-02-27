@@ -1,11 +1,15 @@
 import paramiko
+import json
 
-def check_python_env():
+def test_internal_login():
     host = '100.123.107.90'
     username = 'fiscalio'
     password = 'Solomid8'
     
-    command = "docker exec sat-api-app python3 -m pip list"
+    # Test internal login via curl inside the container
+    payload = json.dumps({"email": "1", "password": "1"})
+    # Need to escape the payload for the shell
+    command = f"docker exec sat-api-app curl -v -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' -d '{payload}' http://localhost:10000/api/login"
     
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -21,4 +25,4 @@ def check_python_env():
         ssh.close()
 
 if __name__ == "__main__":
-    check_python_env()
+    test_internal_login()
