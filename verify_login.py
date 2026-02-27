@@ -1,12 +1,13 @@
 import paramiko
 
-def check_laravel_logs():
+def verify_login_logic():
     host = '100.123.107.90'
     username = 'fiscalio'
     password = 'Solomid8'
     
-    # Get last 50 lines of laravel.log
-    command = "docker exec sat-api-app tail -n 50 storage/logs/laravel.log"
+    # Check if a user with email '1' and password '1' can authenticate in Tinker
+    code = r"echo Auth::attempt(['email' => '1', 'password' => '1']) ? 'OK' : 'FAIL';"
+    command = f'cd ~/Fiscalio && docker exec sat-api-app php artisan tinker --execute="{code}"'
     
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -22,4 +23,4 @@ def check_laravel_logs():
         ssh.close()
 
 if __name__ == "__main__":
-    check_laravel_logs()
+    verify_login_logic()

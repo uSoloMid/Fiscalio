@@ -1,12 +1,11 @@
 import paramiko
 
-def check_laravel_logs():
+def check_ps():
     host = '100.123.107.90'
     username = 'fiscalio'
     password = 'Solomid8'
     
-    # Get last 50 lines of laravel.log
-    command = "docker exec sat-api-app tail -n 50 storage/logs/laravel.log"
+    command = "docker ps"
     
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -22,4 +21,4 @@ def check_laravel_logs():
         ssh.close()
 
 if __name__ == "__main__":
-    check_laravel_logs()
+    check_ps()
