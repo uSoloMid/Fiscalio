@@ -26,6 +26,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const handleConfirm = async () => {
         try {
             await confirmBankStatement({
+                rfc: activeRfc,
                 bank_name: result.banco,
                 account_number: "PREDETERMINADA",
                 file_name: result.fileName,

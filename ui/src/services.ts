@@ -8,6 +8,7 @@ export function getToken(): string | null {
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
     const token = getToken();
     const headers = options.headers ? new Headers(options.headers) : new Headers();
+    headers.set('Accept', 'application/json');
     if (token) {
         headers.set('Authorization', `Bearer ${token}`);
     }
