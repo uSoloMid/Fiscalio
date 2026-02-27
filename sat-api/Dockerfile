@@ -9,7 +9,12 @@ RUN apt-get update && apt-get install -y \
     unzip \
     zip \
     sqlite3 \
+    python3 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar dependencias de procesamiento bancario de Python
+RUN pip3 install pdfplumber pandas openpyxl --break-system-packages
 
 # ✅ Instalador robusto de extensiones PHP (mlocati)
 ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/

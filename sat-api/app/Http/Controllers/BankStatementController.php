@@ -41,12 +41,15 @@ class BankStatementController extends Controller
         }
 
         $jsonResult = implode("", $output);
+        Log::info("Bank parser raw output: " . $jsonResult);
         $data = json_decode($jsonResult, true);
 
         if (!$data) {
+            Log::error("Failed to decode JSON from bank parser. Raw output: " . $jsonResult);
             return response()->json([
                 'error' => 'El procesador no devolvió un JSON válido',
-                'raw' => $jsonResult
+                'raw' => $jsonResult,
+                'details' => $output
             ], 500);
         }
 

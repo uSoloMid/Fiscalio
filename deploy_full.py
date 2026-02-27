@@ -9,7 +9,7 @@ def deploy_fix():
     commands = [
         "cd ~/Fiscalio && git checkout dev",
         "cd ~/Fiscalio && git pull origin dev",
-        "cd ~/Fiscalio/sat-api && docker compose up -d",
+        "cd ~/Fiscalio/sat-api && docker compose up -d --build",
         "docker exec sat-api-app php artisan optimize:clear",
         "docker exec sat-api-app php artisan config:clear",
         "docker exec sat-api-app php artisan route:clear",
