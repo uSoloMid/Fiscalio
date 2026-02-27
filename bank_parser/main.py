@@ -56,17 +56,43 @@ def main():
         initial_balance = float(first.get('saldo', 0)) - float(first.get('abono', 0)) + float(first.get('cargo', 0))
         final_balance = float(last.get('saldo', 0))
 
-    # 4. Exportar resultados
-    if args.output:
+    # 4. Generar Excel Automáticamente (Respaldo)
+    excel_path = pdf_path.replace(".pdf", ".xlsx")
+    try:
         df = pd.DataFrame(transacciones)
-        df.to_excel(args.output, index=False)
-        print(json.dumps({"success": True, "banco": banco, "output": args.output}))
+        df.to_excel(excel_path, index=False)
+        auto_excel = excel_path
+    except Exception as e:
+        sys.stderr.write(f"Error generando Excel automático: {e}\n")
+        auto_excel = None
+
+    # 5. Exportar resultados
+    if args.output:
+        # Si se pidió una ruta específica por parámetro
+        try:
+            df = pd.DataFrame(transacciones)
+            df.to_excel(args.output, index=False)
+            print(json.dumps({
+                "success": True, 
+                "banco": banco, 
+                "output": args.output, 
+                "excel_path": auto_excel,
+                "summary": {
+                    "initialBalance": initial_balance,
+                    "totalCargos": total_cargos,
+                    "totalAbonos": total_abonos,
+                    "finalBalance": final_balance
+                }
+            }))
+        except Exception as e:
+            print(json.dumps({"success": False, "error": str(e)}))
     else:
         # Imprime JSON estandarizado para que lo lea PHP/Laravel
         result = {
             "success": True, 
             "banco": banco, 
             "transacciones": transacciones,
+            "excel_path": auto_excel,
             "summary": {
                 "initialBalance": initial_balance,
                 "totalCargos": total_cargos,
