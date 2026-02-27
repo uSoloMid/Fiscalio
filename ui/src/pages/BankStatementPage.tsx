@@ -120,14 +120,23 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
             return;
         }
 
-        const headers = ["FECHA", "REFERENCIA", "CONCEPTO", "CARGO", "ABONO", "SALDO"];
+        // Headers matching UI exactly
+        const headers = ["FECHA", "REFERENCIA", "DESCRIPCIÓN", "CARGOS (-)", "ABONOS (+)", "BALANCE"];
+
+        // Helper to escape CSV values
+        const escapeCSV = (val: any) => {
+            if (val === null || val === undefined) return '""';
+            const s = String(val).replace(/"/g, '""');
+            return `"${s}"`;
+        };
+
         const rows = result.movements.map((m: any) => [
-            m.fecha,
-            m.referencia || "",
-            m.concepto,
-            m.cargo,
-            m.abono,
-            m.saldo
+            escapeCSV(m.fecha),
+            escapeCSV(m.referencia || "N/A"),
+            escapeCSV(m.concepto),
+            m.cargo.toFixed(2),
+            m.abono.toFixed(2),
+            m.saldo.toFixed(2)
         ]);
 
         const csvContent = [
@@ -135,11 +144,11 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
             ...rows.map((r: any) => r.join(","))
         ].join("\n");
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob(["\ufeff" + csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
-        link.setAttribute("download", `Estado_de_Cuenta_${result.banco}_${result.fileName}.csv`);
+        link.setAttribute("download", `Estado_de_Cuenta_${result.banco}_${result.period || 'provisional'}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -439,20 +448,30 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                 Valide los totales extraídos del archivo <span className="text-gray-900 font-black">{result?.fileName}</span>
                             </p>
 
-                            <div className="w-full space-y-4 mb-12">
-                                <div className="bg-emerald-50/50 p-6 rounded-[32px] flex items-center justify-between border border-emerald-100">
-                                    <span className="text-xs font-black text-emerald-800 tracking-wider">ABONOS</span>
-                                    <span className="text-2xl font-black text-emerald-600">{formatCurrency(result?.summary?.totalAbonos || 0)}</span>
+                            <div className="w-full space-y-4 mb-10">
+                                <div className="bg-gray-50 p-4 rounded-2xl flex items-center justify-between border border-gray-100">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo Inicial</span>
+                                    <span className="text-lg font-black text-gray-900">{formatCurrency(result?.summary?.initialBalance || 0)}</span>
                                 </div>
-                                <div className="bg-red-50/50 p-6 rounded-[32px] flex items-center justify-between border border-red-100">
-                                    <span className="text-xs font-black text-red-800 tracking-wider">CARGOS</span>
-                                    <span className="text-2xl font-black text-red-600">{formatCurrency(result?.summary?.totalCargos || 0)}</span>
+                                <div className="flex gap-4">
+                                    <div className="flex-1 bg-emerald-50/50 p-5 rounded-[28px] border border-emerald-100">
+                                        <p className="text-[9px] font-black text-emerald-800 uppercase tracking-widest mb-1">Abonos (+)</p>
+                                        <p className="text-xl font-black text-emerald-600">{formatCurrency(result?.summary?.totalAbonos || 0)}</p>
+                                    </div>
+                                    <div className="flex-1 bg-red-50/50 p-5 rounded-[28px] border border-red-100">
+                                        <p className="text-[9px] font-black text-red-800 uppercase tracking-widest mb-1">Cargos (-)</p>
+                                        <p className="text-xl font-black text-red-600">{formatCurrency(result?.summary?.totalCargos || 0)}</p>
+                                    </div>
                                 </div>
-                                <div className="pt-8 flex flex-col items-center">
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">DIFERENCIA</span>
-                                    <h3 className="text-4xl font-black text-gray-900">
-                                        {formatCurrency((result?.summary?.totalAbonos || 0) - (result?.summary?.totalCargos || 0))}
+                                <div className="pt-6 border-t border-dashed border-gray-100 flex flex-col items-center">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-1">SALDO FINAL CALCULADO</span>
+                                    <h3 className="text-4xl font-black text-gray-900 tracking-tighter">
+                                        {formatCurrency((result?.summary?.initialBalance || 0) + (result?.summary?.totalAbonos || 0) - (result?.summary?.totalCargos || 0))}
                                     </h3>
+                                    <div className="mt-4 flex items-center gap-2 px-4 py-1.5 bg-emerald-500 text-white rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse shadow-lg shadow-emerald-200">
+                                        <span className="material-symbols-outlined text-sm">verified</span>
+                                        Debe coincidir con la carátula
+                                    </div>
                                 </div>
                             </div>
 
