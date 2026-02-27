@@ -58,7 +58,7 @@ class BankStatementController extends Controller
         if (!$data) {
             Log::error("Failed to decode JSON from bank parser. Cleaned output: " . ($jsonResult ?? 'N/A'));
             return response()->json([
-                'error' => 'El procesador no devolvió un JSON válido',
+                'error' => 'TEST_ERROR_PERSISTENCE ' . $rfc,
                 'raw' => $jsonResult,
                 'details' => $output
             ], 500);
