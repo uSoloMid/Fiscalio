@@ -114,6 +114,38 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
         }
     };
 
+    const handleExportExcel = () => {
+        if (!result?.movements || result.movements.length === 0) {
+            alert("No hay movimientos para exportar");
+            return;
+        }
+
+        const headers = ["FECHA", "REFERENCIA", "CONCEPTO", "CARGO", "ABONO", "SALDO"];
+        const rows = result.movements.map((m: any) => [
+            m.fecha,
+            m.referencia || "",
+            m.concepto,
+            m.cargo,
+            m.abono,
+            m.saldo
+        ]);
+
+        const csvContent = [
+            headers.join(","),
+            ...rows.map((r: any) => r.join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Estado_de_Cuenta_${result.banco}_${result.fileName}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleBackClick = () => {
         if (activeView === 'detail' && !showConfirmModal) {
             setActiveView('management');
