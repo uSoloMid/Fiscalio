@@ -1,5 +1,6 @@
 import pdfplumber
 import re
+import sys
 
 def extract_banamex(pdf_path):
     transacciones = []
@@ -134,5 +135,5 @@ def extract_banamex(pdf_path):
                 
         return transacciones
     except Exception as e:
-        print(f"Error procesando Banamex: {e}")
+        sys.stderr.write(f"Error procesando Banamex: {e}\n")
         return []

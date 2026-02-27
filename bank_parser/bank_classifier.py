@@ -1,4 +1,5 @@
 import fitz
+import sys
 
 def identify_bank(pdf_path: str) -> str:
     """
@@ -45,5 +46,5 @@ def identify_bank(pdf_path: str) -> str:
             
         return "banamex" # Fallback temporal si no se detecta (Banamex no siempre dice "Banamex" literal, a veces dice "ESTADO DE CUENTA AL")
     except Exception as e:
-        print(f"Error clasificando: {e}")
+        sys.stderr.write(f"Error clasificando: {e}\n")
         return None

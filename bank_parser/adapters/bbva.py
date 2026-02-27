@@ -1,5 +1,6 @@
 import pdfplumber
 import re
+import sys
 
 def extract_bbva(pdf_path):
     transacciones = []
@@ -143,5 +144,5 @@ def extract_bbva(pdf_path):
                 
         return transacciones
     except Exception as e:
-        print(f"Error procesando BBVA: {e}")
+        sys.stderr.write(f"Error procesando BBVA: {e}\n")
         return []
