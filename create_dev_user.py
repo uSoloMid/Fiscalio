@@ -5,11 +5,9 @@ def create_dev_user():
     username = 'fiscalio'
     password = 'Solomid8'
     
-    # Using bcrypt and avoiding complex escaping
-    php_code = "$user=App\\Models\\User::updateOrCreate(['email'=>'1'],['name'=>'Dev User','password'=>bcrypt('1')]);echo 'CREATED:'.$user->email;"
-    
-    # We use single quotes for the bash command to avoid interpolation
-    command = f'docker exec api php artisan tinker --execute="{php_code}"'
+    # We add is_admin => 1
+    code = r"App\Models\User::updateOrCreate(['email'=>'1'],['password'=>bcrypt('1'),'name'=>'Dev','is_admin'=>1])"
+    command = f'cd ~/Fiscalio && docker exec api php artisan tinker --execute="{code}"'
     
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -17,10 +15,8 @@ def create_dev_user():
         ssh.connect(host, username=username, password=password)
         print(f"Executing: {command}")
         stdin, stdout, stderr = ssh.exec_command(command)
-        out = stdout.read().decode()
-        err = stderr.read().decode()
-        print(f"OUT: {out}")
-        print(f"ERR: {err}")
+        print(f"OUT: {stdout.read().decode()}")
+        print(f"ERR: {stderr.read().decode()}")
     except Exception as e:
         print(f"Connection failed: {e}")
     finally:

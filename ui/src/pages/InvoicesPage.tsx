@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
+import { BankStatementPage } from './BankStatementPage';
 import type { Cfdi } from '../models';
 
 export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, activeValidUntil }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string, activeValidUntil?: string }) => {
@@ -30,7 +31,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [activeRequests, setActiveRequests] = useState<any[]>([]);
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
-    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional'>('invoices');
+    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks'>('invoices');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [showCancelled, setShowCancelled] = useState(false);
@@ -487,6 +488,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                         <span className="material-symbols-outlined text-xl">monitoring</span>
                         Control Prov.
                     </button>
+                    <button
+                        onClick={() => { setCurrentView('banks'); setIsSidebarOpen(false); }}
+                        className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'banks' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        <span className="material-symbols-outlined text-xl">account_balance</span>
+                        Bancos
+                    </button>
                 </nav>
                 <div className="p-4 border-t border-gray-100 mt-auto">
                     <button onClick={() => logout()} title="Cerrar sesión" className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 text-sm font-medium transition-all">
@@ -519,6 +527,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                             localStorage.setItem('active_year', y.toString());
                             localStorage.setItem('active_month', m.toString().padStart(2, '0'));
                         }}
+                    />
+                </div>
+            ) : currentView === 'banks' ? (
+                <div className="flex-1 h-screen overflow-hidden">
+                    <BankStatementPage
+                        activeRfc={activeRfc}
+                        clientName={clientName || activeClientName || activeRfc}
+                        onBack={() => setCurrentView('invoices')}
                     />
                 </div>
             ) : (

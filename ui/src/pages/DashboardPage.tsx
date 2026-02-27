@@ -17,8 +17,7 @@ export const DashboardPage = ({
     onViewBanks
 }: {
     onSelectClient: (rfc: string, name: string, lastSyncAt: string, validUntil: string) => void,
-    onViewHistory: () => void,
-    onViewBanks: () => void
+    onViewHistory: () => void
 }) => {
     // Data states
     const [clients, setClients] = useState<any[]>([]);
@@ -340,9 +339,6 @@ export const DashboardPage = ({
                     </button>
                     <button onClick={onViewHistory} title="Historial SAT" className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
                         <span className="material-symbols-outlined">history</span>
-                    </button>
-                    <button onClick={onViewBanks} title="Bancos" className="p-3 rounded-2xl text-gray-400 hover:bg-emerald-50 hover:text-emerald-500 transition-all">
-                        <span className="material-symbols-outlined">account_balance</span>
                     </button>
                     <button className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all opacity-40">
                         <span className="material-symbols-outlined">task</span>

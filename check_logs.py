@@ -1,18 +1,25 @@
 import paramiko
 
-def run_cmd(client, cmd):
-    print(f"--- Running: {cmd} ---")
-    stdin, stdout, stderr = client.exec_command(cmd)
-    return stdout.read().decode()
-
-try:
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect('100.123.107.90', username='fiscalio', password='Solomid8', timeout=10)
+def check_laravel_logs():
+    host = '100.123.107.90'
+    username = 'fiscalio'
+    password = 'Solomid8'
     
-    out = run_cmd(client, "cd ~/Fiscalio && docker logs api | tail -n 100")
-    print(out)
+    # Get last 50 lines of laravel.log
+    command = "docker exec api tail -n 50 storage/logs/laravel.log"
+    
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        ssh.connect(host, username=username, password=password)
+        print(f"Executing: {command}")
+        stdin, stdout, stderr = ssh.exec_command(command)
+        print(f"OUT:\n{stdout.read().decode()}")
+        print(f"ERR:\n{stderr.read().decode()}")
+    except Exception as e:
+        print(f"Connection failed: {e}")
+    finally:
+        ssh.close()
 
-    client.close()
-except Exception as e:
-    print("Error:", e)
+if __name__ == "__main__":
+    check_laravel_logs()

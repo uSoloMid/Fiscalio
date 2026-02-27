@@ -3,7 +3,6 @@ import { InvoicesPage } from './pages/InvoicesPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SatRequestsHistoryPage } from './pages/SatRequestsHistoryPage'
 import { LoginPage } from './pages/LoginPage'
-import { BankStatementPage } from './pages/BankStatementPage'
 import { ErrorBoundary } from './ErrorBoundary'
 import { getToken } from './services'
 
@@ -14,7 +13,6 @@ function App() {
   const [activeLastSync, setActiveLastSync] = useState(localStorage.getItem('active_last_sync') || '');
   const [activeValidUntil, setActiveValidUntil] = useState(localStorage.getItem('active_valid_until') || '');
   const [showHistory, setShowHistory] = useState(false);
-  const [showBankStatements, setShowBankStatements] = useState(false);
 
   useEffect(() => {
     const handleAuthExpired = () => {
@@ -37,7 +35,6 @@ function App() {
     setActiveLastSync(lastSync);
     setActiveValidUntil(validUntil);
     setShowHistory(false);
-    setShowBankStatements(false);
   };
 
   const handleBackToDashboard = () => {
@@ -50,7 +47,6 @@ function App() {
     setActiveLastSync('');
     setActiveValidUntil('');
     setShowHistory(false);
-    setShowBankStatements(false);
   };
 
   const handleLoginSuccess = () => {
@@ -73,17 +69,10 @@ function App() {
         />
       ) : showHistory ? (
         <SatRequestsHistoryPage onBack={() => setShowHistory(false)} />
-      ) : showBankStatements ? (
-        <BankStatementPage
-          activeRfc={localStorage.getItem('active_rfc') || ''}
-          clientName={localStorage.getItem('active_client_name') || ''}
-          onBack={() => setShowBankStatements(false)}
-        />
       ) : (
         <DashboardPage
           onSelectClient={handleSelectClient}
           onViewHistory={() => setShowHistory(true)}
-          onViewBanks={() => setShowBankStatements(true)}
         />
       )}
     </ErrorBoundary>
