@@ -8,28 +8,69 @@ def extract_bbva(pdf_path):
     meses_str = {"ENE": "01", "FEB": "02", "MAR": "03", "ABR": "04", "MAY": "05", "JUN": "06", 
                  "JUL": "07", "AGO": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DIC": "12"}
     
+    summary = {
+        "initial_balance": 0.0,
+        "final_balance": 0.0,
+        "total_cargos": 0.0,
+        "total_abonos": 0.0,
+        "account_number": "PREDETERMINADA",
+        "period": ""
+    }
+
     try:
         with pdfplumber.open(pdf_path) as pdf:
-            year_str = "2026"
+            year_str = "2025"
+            
+            # --- PARTE 1: ESCANEAR CARÁTULA (Página 1) ---
+            first_page = pdf.pages[0]
+            first_text = first_page.extract_text() or ""
+            
+            # 1. Detectar Periodo
+            # Formato: DEL 01/01/2025 AL 31/01/2025
+            # El usuario dice que está en la parte superior derecha.
+            period_match = re.search(r"AL (\d{2})/(\d{2})/(\d{4})", first_text)
+            if period_match:
+                d, m, y = period_match.groups()
+                year_str = y
+                months_map = {
+                    "01": "ENE", "02": "FEB", "03": "MAR", "04": "ABR", "05": "MAY", "06": "JUN",
+                    "07": "JUL", "08": "AGO", "09": "SEP", "10": "OCT", "11": "NOV", "12": "DIC"
+                }
+                summary["period"] = f"{months_map.get(m, 'MES')}-{y}"
+
+            # 2. Detectar No. de Cuenta
+            acc_match = re.search(r"No\. de Cuenta\s+(\d+)", first_text)
+            if acc_match:
+                summary["account_number"] = acc_match.group(1)
+
+            # 3. Detectar Saldo Anterior (Inicial)
+            # En la captura se ve "Saldo Anterior" y el monto a la derecha.
+            words = first_page.extract_words()
+            for i, w in enumerate(words):
+                txt = w['text']
+                if "Anterior" in txt:
+                    # El monto suele estar a la derecha en la misma línea
+                    for next_w in words[i+1:i+15]:
+                        if abs(next_w['top'] - w['top']) < 8: # misma línea (margen 8px)
+                            # Intentar limpiar el texto para ver si es un número: $ 98,394.46
+                            clean_val = next_w['text'].replace("$", "").replace(",", "")
+                            if re.match(r"^-?\d+\.\d{2}$", clean_val):
+                                summary["initial_balance"] = float(clean_val)
+                                break
+                
+                if "Final" in txt:
+                    for next_w in words[i+1:i+15]:
+                        if abs(next_w['top'] - w['top']) < 8:
+                            clean_val = next_w['text'].replace("$", "").replace(",", "")
+                            if re.match(r"^-?\d+\.\d{2}$", clean_val):
+                                summary["final_balance"] = float(clean_val)
+                                break
+
+            # --- PARTE 2: EXTRAER MOVIMIENTOS ---
             in_details = False
             current_tx = None
             stop_all = False
             
-            # Buscar el año y mes global en la primera página
-            first_page_text = pdf.pages[0].extract_text() or ""
-            # Ejemplo: DEL 01/02/2025 AL 28/02/2025
-            ym = re.search(r"AL (\d{2})/(\d{2})/(\d{4})", first_page_text)
-            if ym: 
-                year_str = ym.group(3)
-                month_idx = ym.group(2)
-                # Opcional: Podríamos detectar el periodo aquí y guardarlo
-                # Pero el controlador de Laravel lo recalcula. Aseguramos que el año sea correcto.
-            else:
-                # Intento 2: Buscar Periodo: Enero 2025
-                period_match = re.search(r"Periodo\s*:\s*([A-Za-z]+)\s*(\d{4})", first_page_text, re.I)
-                if period_match:
-                    year_str = period_match.group(2)
-
             for page in pdf.pages:
                 if stop_all: break
                 
@@ -40,7 +81,6 @@ def extract_bbva(pdf_path):
                 lines = []
                 words.sort(key=lambda w: (w['top'], w['x0']))
                 
-                if not words: continue
                 current_line = [words[0]]
                 for w in words[1:]:
                     if abs(w['top'] - current_line[-1]['top']) < 3:
@@ -65,7 +105,7 @@ def extract_bbva(pdf_path):
                 for line_words in lines:
                     text_line = " ".join([w['text'] for w in line_words])
                     if "Detalle de Movimientos Realizados" in text_line:
-                        start_y = line_words[0]['bottom'] + 10 # Un poco abajo del título
+                        start_y = line_words[0]['bottom'] + 10
                         in_details = True
                         break
                 
@@ -75,21 +115,17 @@ def extract_bbva(pdf_path):
                 for line_words in valid_lines:
                     text_line = " ".join([w['text'] for w in line_words])
                     
-                    # Ignorar encabezados de tabla repetidos en cada página
                     if "FECHA" in text_line and "SALDO" in text_line:
                         continue
                     if "OPER LIQ" in text_line or "CARGOS ABONOS" in text_line:
                         continue
-                    # Ignorar avisos de "Estimado Cliente" o basurilla legal al pie de página si cutoff fallara
                     if "Estimado Cliente" in text_line or "La GAT Real" in text_line:
                         continue
 
-                    # Buscar fecha al inicio: 01/FEB
                     first_word = line_words[0]['text']
                     date_match = re.match(r"^(\d{2})/([A-Z]{3})$", first_word)
 
                     if date_match:
-                        # Guardar anterior
                         if current_tx:
                             transacciones.append(current_tx)
                             
@@ -112,12 +148,9 @@ def extract_bbva(pdf_path):
                             tw = w['text']
                             x1 = w['x1']
                             
-                            # Si es la fecha de la columna OPER o LIQ (01/FEB), la saltamos para el concepto
                             if re.match(r"^\d{2}/[A-Z]{3}$", tw) and i < 3:
                                 continue
                             
-                            # Identificar montos por posición X (Geometría)
-                            # Basado en investigación: Cargos x1 ~ 420, Abonos x1 ~ 460, Saldo x1 ~ 595
                             if re.match(r"^-?\d{1,3}(,\d{3})*\.\d{2}$", tw):
                                 val = float(tw.replace(",", ""))
                                 if 330 < x1 <= 425:
@@ -125,32 +158,27 @@ def extract_bbva(pdf_path):
                                 elif 425 < x1 <= 485:
                                     current_tx["abono"] = val
                                 elif x1 > 485:
-                                    # BBVA tiene dos columnas de saldo (Operación y Liquidación)
-                                    # Tomamos la de Operación (primera que encontremos > 485)
                                     if current_tx["saldo"] == 0:
                                         current_tx["saldo"] = val
                             else:
-                                # Capturar referencia si viene con prefijo "Ref."
-                                if "Ref." in tw:
-                                    # Intentar sacar lo que sigue a Ref.
-                                    # El usuario pidió que Concepto y Referencia se tomen juntos si están pegados
-                                    pass
                                 desc_parts.append(tw)
                         
                         inc_desc = " ".join(desc_parts)
                         if inc_desc:
                             current_tx["concepto"] = (current_tx["concepto"] + " " + inc_desc).strip()
                         
-                        # Extraer referencia del concepto si existe
                         if "Ref. " in current_tx["concepto"]:
                             parts = current_tx["concepto"].split("Ref. ")
                             if len(parts) > 1:
-                                current_tx["referencia"] = parts[1].split()[0] # Primer bloque después de Ref.
+                                current_tx["referencia"] = parts[1].split()[0]
 
             if current_tx:
                 transacciones.append(current_tx)
                 
-        return transacciones
+        return {
+            "movements": transacciones,
+            "summary": summary
+        }
     except Exception as e:
         sys.stderr.write(f"Error procesando BBVA: {e}\n")
-        return []
+        return {"movements": [], "summary": summary}

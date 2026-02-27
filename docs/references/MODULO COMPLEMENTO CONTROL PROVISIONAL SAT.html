@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>REP to PPD Relationship List - Facturas Pro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              colors: {
+                "primary": "#137fec",
+                "background-light": "#f6f7f8",
+                "background-dark": "#101922",
+              },
+              fontFamily: {
+                "display": ["Manrope", "sans-serif"]
+              },
+              borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+            },
+          },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        .high-density-table td, .high-density-table th {
+            padding: 0.75rem 1rem;
+        }
+        .nested-table td, .nested-table th {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display min-h-screen">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-10 py-3">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-3 text-primary">
+<span class="material-symbols-outlined text-3xl font-bold">receipt_long</span>
+<h2 class="text-slate-900 dark:text-white text-lg font-bold leading-tight tracking-tight">Facturas Pro</h2>
+</div>
+<nav class="flex items-center gap-6">
+<a class="text-slate-600 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Dashboard</a>
+<a class="text-primary text-sm font-bold border-b-2 border-primary pb-1" href="#">Facturas</a>
+<a class="text-slate-600 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Control Provisional</a>
+<a class="text-slate-600 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Reportes</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-6 items-center">
+<label class="flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg h-full">
+<div class="text-slate-400 flex border-none bg-slate-100 dark:bg-slate-800 items-center justify-center pl-4 rounded-l-lg" data-icon="search">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-slate-100 dark:bg-slate-800 focus:ring-0 h-full placeholder:text-slate-400 px-4 rounded-r-lg text-sm font-normal" placeholder="Buscar UUID o Cliente" value=""/>
+</div>
+</label>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-slate-200" data-alt="User profile avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAZRa-4mqgBuQCiOumpBYq0rmBYSkfn2R92spMQk8k2Dxih6fd8y_eGnnWUh23JYD-S7P9EzodSYOfk07LOEWocQd6gOHS13k9aS1xPyX7b_7dLC_W9TSbnskfDrDoIAdPb19Kc8JTklkF7S834z_KrhWEH_CDcXm5P4qfBjtyJ2TIlXddr01clelOSTRk8T9y2vQVLPtysq_xbJJKLjXe4FwXvesSENyI3fO9PYDolN4VV2A0msZlT28Sm3_c4m4ZL27xN7bpBZFg");'></div>
+</div>
+</header>
+<main class="flex flex-1 flex-col max-w-[1280px] mx-auto w-full px-10 py-8">
+<!-- Page Header -->
+<div class="flex flex-col gap-2 mb-6">
+<h1 class="text-slate-900 dark:text-white text-3xl font-black leading-tight tracking-tight">Relación de Complementos de Pago (REP)</h1>
+<p class="text-slate-500 dark:text-slate-400 text-base">Gestión y conciliación fiscal de pagos recibidos y realizados mediante comprobantes de recepción de pagos.</p>
+</div>
+<!-- Tabs Section -->
+<div class="mb-6">
+<div class="flex border-b border-slate-200 dark:border-slate-800 gap-8">
+<button class="flex items-center gap-2 border-b-2 border-primary text-primary pb-3 px-1 transition-all">
+<span class="material-symbols-outlined text-xl">trending_up</span>
+<span class="text-sm font-bold">Ingresos (REPs cobrados)</span>
+</button>
+<button class="flex items-center gap-2 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 pb-3 px-1 transition-all">
+<span class="material-symbols-outlined text-xl">trending_down</span>
+<span class="text-sm font-bold">Gastos (REPs pagados)</span>
+</button>
+</div>
+</div>
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between">
+<p class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Total en REPs del periodo</p>
+<span class="material-symbols-outlined text-primary text-xl">payments</span>
+</div>
+<p class="text-slate-900 dark:text-white text-2xl font-bold">$452,800.00 MXN</p>
+<div class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+<span class="material-symbols-outlined text-sm">arrow_upward</span>
+<span>12.5% vs mes anterior</span>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+<div class="flex items-center justify-between">
+<p class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Facturas PPD liquidadas</p>
+<span class="material-symbols-outlined text-primary text-xl">task_alt</span>
+</div>
+<p class="text-slate-900 dark:text-white text-2xl font-bold">128</p>
+<div class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+<span class="material-symbols-outlined text-sm">add</span>
+<span>5 nuevas facturas</span>
+</div>
+</div>
+<!-- Extra Stats -->
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">REP Pendientes</p>
+<p class="text-slate-900 dark:text-white text-2xl font-bold">14</p>
+<p class="text-amber-600 dark:text-amber-400 text-xs font-bold">Requieren atención</p>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+<p class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Promedio de Pago</p>
+<p class="text-slate-900 dark:text-white text-2xl font-bold">$3,537.50</p>
+<p class="text-slate-400 text-xs font-medium italic">Por complemento</p>
+</div>
+</div>
+<!-- List Controls -->
+<div class="flex items-center justify-between mb-4">
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50">
+<span class="material-symbols-outlined text-lg">filter_list</span>
+                        Filtros
+                    </button>
+<button class="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 text-sm font-medium hover:bg-slate-50">
+<span class="material-symbols-outlined text-lg">calendar_today</span>
+                        Septiembre 2023
+                    </button>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-bold shadow-sm hover:bg-primary/90 transition-all">
+<span class="material-symbols-outlined text-lg">download</span>
+                        Exportar Reporte
+                    </button>
+</div>
+</div>
+<!-- Main REP List Table -->
+<div class="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+<table class="w-full text-left border-collapse high-density-table">
+<thead class="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+<tr>
+<th class="w-10"></th>
+<th class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Fecha de Pago</th>
+<th class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Cliente / Proveedor</th>
+<th class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">UUID del REP</th>
+<th class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Monto Total</th>
+<th class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Moneda</th>
+<th class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">Estatus</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<!-- Row 1: Expanded -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors group">
+<td class="text-primary font-bold">
+<span class="material-symbols-outlined transition-transform rotate-90">chevron_right</span>
+</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">12 Oct 2023</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">Soluciones Tecnológicas S.A. de C.V.</td>
+<td class="text-slate-400 dark:text-slate-500 text-xs font-mono">550e8400...E29B</td>
+<td class="text-slate-900 dark:text-white text-sm font-bold">$125,000.00</td>
+<td class="text-slate-600 dark:text-slate-400 text-sm">MXN</td>
+<td>
+<span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Vigente</span>
+</td>
+</tr>
+<!-- Nested Table for Row 1 -->
+<tr class="bg-slate-50 dark:bg-slate-900">
+<td class="p-0 border-l-4 border-primary" colspan="7">
+<div class="px-10 py-4">
+<h4 class="text-slate-700 dark:text-slate-300 text-xs font-bold mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">link</span>
+                                        Facturas PPD pagadas con este REP
+                                    </h4>
+<div class="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-950">
+<table class="w-full nested-table">
+<thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 uppercase tracking-tighter font-bold">
+<tr>
+<th>UUID Factura</th>
+<th>Folio</th>
+<th class="text-right">Monto Aplicado</th>
+<th class="text-center">Parcialidad</th>
+<th class="text-right">Saldo Insoluto</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+<tr>
+<td class="font-mono text-[10px]">C654-21B4-4D89-A2C1</td>
+<td class="font-bold">INV-4029</td>
+<td class="text-right font-semibold">$80,000.00</td>
+<td class="text-center">1/1</td>
+<td class="text-right text-slate-400">$0.00</td>
+</tr>
+<tr>
+<td class="font-mono text-[10px]">E912-88F1-11C2-55D4</td>
+<td class="font-bold">INV-4102</td>
+<td class="text-right font-semibold">$45,000.00</td>
+<td class="text-center">2/3</td>
+<td class="text-right text-amber-600 dark:text-amber-400 font-bold">$15,500.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors group">
+<td class="text-slate-400 group-hover:text-primary font-bold">
+<span class="material-symbols-outlined transition-transform">chevron_right</span>
+</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">10 Oct 2023</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">Distribuidora Nacional del Norte</td>
+<td class="text-slate-400 dark:text-slate-500 text-xs font-mono">112a7700...F910</td>
+<td class="text-slate-900 dark:text-white text-sm font-bold">$18,250.00</td>
+<td class="text-slate-600 dark:text-slate-400 text-sm">MXN</td>
+<td>
+<span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Vigente</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors group">
+<td class="text-slate-400 group-hover:text-primary font-bold">
+<span class="material-symbols-outlined transition-transform">chevron_right</span>
+</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">08 Oct 2023</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">Logística Express S.A.</td>
+<td class="text-slate-400 dark:text-slate-500 text-xs font-mono">998b3310...A812</td>
+<td class="text-slate-900 dark:text-white text-sm font-bold">$94,200.00</td>
+<td class="text-slate-600 dark:text-slate-400 text-sm">MXN</td>
+<td>
+<span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 border border-rose-200 dark:border-rose-800">Cancelado</span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors group">
+<td class="text-slate-400 group-hover:text-primary font-bold">
+<span class="material-symbols-outlined transition-transform">chevron_right</span>
+</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">05 Oct 2023</td>
+<td class="text-slate-900 dark:text-white text-sm font-medium">Inmobiliaria del Centro</td>
+<td class="text-slate-400 dark:text-slate-500 text-xs font-mono">223d5566...B332</td>
+<td class="text-slate-900 dark:text-white text-sm font-bold">$215,350.00</td>
+<td class="text-slate-600 dark:text-slate-400 text-sm">USD</td>
+<td>
+<span class="px-2 py-1 rounded-full text-[10px] font-bold uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Vigente</span>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination -->
+<div class="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium">Mostrando 1 a 4 de 128 REPs encontrados</p>
+<div class="flex gap-2">
+<button class="px-3 py-1 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 disabled:opacity-50" disabled="">Anterior</button>
+<button class="px-3 py-1 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-primary hover:text-primary transition-colors">1</button>
+<button class="px-3 py-1 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-primary hover:text-primary transition-colors">2</button>
+<button class="px-3 py-1 text-xs font-bold border border-slate-200 dark:border-slate-700 rounded bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-primary hover:text-primary transition-colors">Siguiente</button>
+</div>
+</div>
+</div>
+</main>
+<footer class="border-t border-slate-200 dark:border-slate-800 py-6 text-center">
+<p class="text-slate-400 dark:text-slate-500 text-xs">© 2023 Facturas Pro. Plataforma de Gestión Fiscal Certificada por el SAT.</p>
+</footer>
+</div>
+</div>
+</body></html>

@@ -107,8 +107,12 @@ class BankStatementController extends Controller
             DB::beginTransaction();
 
             $movements = $request->input('movements');
-            $period = now()->format('M-Y');
-            if (!empty($movements)) {
+            $summary = $request->input('summary');
+
+            // Prioritize period from parser
+            $period = $summary['period'] ?? null;
+
+            if (!$period && !empty($movements)) {
                 $firstDate = $movements[0]['fecha'];
                 if (strpos($firstDate, '/') !== false) {
                     $parts = explode('/', $firstDate);
@@ -118,20 +122,34 @@ class BankStatementController extends Controller
                         '09' => 'SEP', '10' => 'OCT', '11' => 'NOV', '12' => 'DIC'
                     ];
                     $mIdx = $parts[1];
-                    $period = ($months[$mIdx] ?? 'MES') . '-' . ($parts[2] ?? '2026');
+                    $period = ($months[$mIdx] ?? 'MES') . '-' . ($parts[2] ?? '2025');
+                }
+                elseif (strpos($firstDate, '-') !== false) {
+                    // Handle YYYY-MM-DD
+                    $parts = explode('-', $firstDate);
+                    $months = [
+                        '01' => 'ENE', '02' => 'FEB', '03' => 'MAR', '04' => 'ABR',
+                        '05' => 'MAY', '06' => 'JUN', '07' => 'JUL', '08' => 'AGO',
+                        '09' => 'SEP', '10' => 'OCT', '11' => 'NOV', '12' => 'DIC'
+                    ];
+                    $mIdx = $parts[1];
+                    $period = ($months[$mIdx] ?? 'MES') . '-' . ($parts[0] ?? '2025');
                 }
             }
+
+            if (!$period)
+                $period = now()->format('M-Y');
 
             $statement = BankStatement::create([
                 'business_id' => $business->id,
                 'bank_name' => $request->input('bank_name'),
-                'account_number' => $request->input('account_number') ?? 'PREDETERMINADA',
+                'account_number' => $summary['account_number'] ?? $request->input('account_number') ?? 'PREDETERMINADA',
                 'file_name' => $request->input('file_name'),
                 'period' => $period,
-                'initial_balance' => $request->input('summary')['initialBalance'] ?? 0,
-                'total_cargos' => $request->input('summary')['totalCargos'] ?? 0,
-                'total_abonos' => $request->input('summary')['totalAbonos'] ?? 0,
-                'final_balance' => $request->input('summary')['finalBalance'] ?? 0,
+                'initial_balance' => $summary['initialBalance'] ?? 0,
+                'total_cargos' => $summary['totalCargos'] ?? 0,
+                'total_abonos' => $summary['totalAbonos'] ?? 0,
+                'final_balance' => $summary['finalBalance'] ?? 0,
             ]);
 
             foreach ($request->input('movements') as $m) {

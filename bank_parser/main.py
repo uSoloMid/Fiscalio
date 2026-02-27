@@ -23,40 +23,46 @@ def main():
         sys.exit(1)
         
     # 2. Extraer Transacciones (dependiendo del banco)
-    transacciones = []
+    result_data = None
     
     if banco == "bbva":
-        transacciones = extract_bbva(pdf_path)
+        result_data = extract_bbva(pdf_path)
     elif banco == "banamex":
-        transacciones = extract_banamex(pdf_path)
-    elif banco == "banbajio":
-         pass
-    elif banco == "hsbc":
-         pass
+        result_data = extract_banamex(pdf_path)
+    
+    # Normalizar resultados (algunos adapters pueden devolver dict con summary)
+    transacciones = []
+    metadata_summary = {}
+    
+    if isinstance(result_data, dict):
+        transacciones = result_data.get("movements", [])
+        metadata_summary = result_data.get("summary", {})
     else:
-        print(json.dumps({"error": f"Banco {banco} detectado pero no soportado aún."}))
-        sys.exit(1)
+        transacciones = result_data or []
 
     # Si no hay transacciones (estamos en prueba), mockeamos para mostrar el flujo
     if not transacciones:
         transacciones = [
-            {"banco": banco, "fecha": "2026-02-15", "concepto": "EJEMPLO EXTRACCION", "referencia": "0000", "cargo": 0.0, "abono": 100.0, "saldo": 100.0}
+            {"banco": banco, "fecha": "2025-01-15", "concepto": "EJEMPLO EXTRACCION", "referencia": "0000", "cargo": 0.0, "abono": 100.0, "saldo": 100.0}
         ]
 
     # 3. Calcular Resumen Financiero
     total_cargos = sum(float(t.get('cargo', 0)) for t in transacciones)
     total_abonos = sum(float(t.get('abono', 0)) for t in transacciones)
     
-    initial_balance = 0
-    final_balance = 0
-    if transacciones:
+    # Usar metadata del adapter si existe, sino calcular
+    initial_balance = metadata_summary.get("initial_balance", 0)
+    final_balance = metadata_summary.get("final_balance", 0)
+    
+    if not initial_balance and transacciones:
         first = transacciones[0]
-        last = transacciones[-1]
-        # Saldo Inicial = Saldo Primero - Abono + Cargo
         initial_balance = float(first.get('saldo', 0)) - float(first.get('abono', 0)) + float(first.get('cargo', 0))
+    
+    if not final_balance and transacciones:
+        last = transacciones[-1]
         final_balance = float(last.get('saldo', 0))
 
-    # 4. Generar Excel Automáticamente (Respaldo)
+    # 4. Generar Excel Automáticamente
     excel_path = pdf_path.replace(".pdf", ".xlsx")
     try:
         df = pd.DataFrame(transacciones)
@@ -67,39 +73,31 @@ def main():
         auto_excel = None
 
     # 5. Exportar resultados
+    result = {
+        "success": True, 
+        "banco": banco, 
+        "transacciones": transacciones,
+        "excel_path": auto_excel,
+        "summary": {
+            "initialBalance": initial_balance,
+            "totalCargos": total_cargos,
+            "totalAbonos": total_abonos,
+            "finalBalance": final_balance,
+            "period": period,
+            "account_number": account_number
+        }
+    }
+    
     if args.output:
         # Si se pidió una ruta específica por parámetro
         try:
             df = pd.DataFrame(transacciones)
             df.to_excel(args.output, index=False)
-            print(json.dumps({
-                "success": True, 
-                "banco": banco, 
-                "output": args.output, 
-                "excel_path": auto_excel,
-                "summary": {
-                    "initialBalance": initial_balance,
-                    "totalCargos": total_cargos,
-                    "totalAbonos": total_abonos,
-                    "finalBalance": final_balance
-                }
-            }))
+            print(json.dumps(result))
         except Exception as e:
             print(json.dumps({"success": False, "error": str(e)}))
     else:
         # Imprime JSON estandarizado para que lo lea PHP/Laravel
-        result = {
-            "success": True, 
-            "banco": banco, 
-            "transacciones": transacciones,
-            "excel_path": auto_excel,
-            "summary": {
-                "initialBalance": initial_balance,
-                "totalCargos": total_cargos,
-                "totalAbonos": total_abonos,
-                "finalBalance": final_balance
-            }
-        }
         print(json.dumps(result, indent=2))
 
 if __name__ == "__main__":

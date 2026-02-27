@@ -75,5 +75,12 @@ Ubicado en `/agent/scraper_sat.js`, es un motor basado en **Puppeteer** diseñad
 - Se configuró el límite de memoria a infinito (`memory_limit = -1`) en el Runner para prevenir muertes súbitas al extraer miles de archivos.
 - Se agregó el botón de **Procesamiento Manual** directo en el Front-End (Historial de solicitudes SAT) para destrabar paquetes en estado "polling" o "downloading" a voluntad, sin depender exclusivamente del cron background.
 
+## 💾 7. Backups y Resiliencia de Datos
+La base de datos SQLite es el corazón del sistema. Se gestiona de la siguiente manera:
+- **Automatización**: Existe un comando `db:backup` en Laravel que se ejecuta periódicamente (vía cron/scheduler).
+- **Retención**: El script mantiene los 3 backups más recientes y elimina los que tengan más de 48 horas de antigüedad.
+- **Backup Permanente**: Existe un archivo `~/Fiscalio/Base_datos/backups/database_PERMANENT.sqlite` que **NUNCA** es borrado por el script automático. 
+- **⚠️ IMPORTANTE**: Siempre que realices cambios masivos o antes de una intervención crítica en la Mini PC, verifica que el `database_PERMANENT.sqlite` esté actualizado o crea uno nuevo. Este archivo es tu seguro de vida si la base de datos principal se corrompe.
+
 ---
 **NOTA PARA ASISTENTES IA:** Si haces un cambio arquitectónico u operativo, actualiza este README para mantener la fuente de la verdad sincronizada.
