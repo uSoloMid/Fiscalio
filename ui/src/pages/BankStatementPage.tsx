@@ -39,6 +39,38 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
         }
     };
 
+    const handleExportExcel = () => {
+        if (!result?.movements || result.movements.length === 0) {
+            alert("No hay movimientos para exportar");
+            return;
+        }
+
+        const headers = ["FECHA", "REFERENCIA", "CONCEPTO", "CARGO", "ABONO", "SALDO"];
+        const rows = result.movements.map((m: any) => [
+            m.fecha,
+            m.referencia || "",
+            m.concepto,
+            m.cargo,
+            m.abono,
+            m.saldo
+        ]);
+
+        const csvContent = [
+            headers.join(","),
+            ...rows.map((r: any) => r.join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Estado_de_Cuenta_${result.banco}_${result.fileName}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const formatCurrency = (amount: number) => {
         return amount.toLocaleString('es-MX', {
             style: 'currency',
@@ -78,7 +110,9 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                             Importar PDF
                             <input type="file" className="hidden" accept=".pdf" onChange={handleFileUpload} disabled={isProcessing} />
                         </label>
-                        <button className="flex items-center gap-3 px-8 py-3.5 bg-white border border-gray-200 text-gray-400 rounded-[20px] font-bold text-sm hover:border-emerald-200 hover:text-emerald-500 hover:shadow-lg hover:shadow-gray-100 transition-all active:scale-[0.98]">
+                        <button
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-3 px-8 py-3.5 bg-white border border-gray-200 text-gray-400 rounded-[20px] font-bold text-sm hover:border-emerald-200 hover:text-emerald-500 hover:shadow-lg hover:shadow-gray-100 transition-all active:scale-[0.98]">
                             <span className="material-symbols-outlined">export_notes</span>
                             Exportar a Excel
                         </button>
@@ -116,7 +150,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
                         </div>
                         <div className="px-4 py-1.5 bg-gray-50 rounded-full">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Filas procesadas: <span className="text-gray-900">{result?.movements.length || 0}</span></span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Filas procesadas: <span className="text-gray-900">{result?.movements?.length || 0}</span></span>
                         </div>
                     </div>
 
@@ -144,16 +178,16 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                         </td>
                                         <td className="px-6 py-5 text-right font-mono">
                                             <span className={`text-sm font-black ${m.cargo > 0 ? 'text-[#FF4D4D]' : 'text-gray-200'}`}>
-                                                {m.cargo > 0 ? `-${m.cargo.toFixed(2)}` : '0.00'}
+                                                {m.cargo > 0 ? `-${(m.cargo || 0).toFixed(2)}` : '0.00'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-5 text-right font-mono">
                                             <span className={`text-sm font-black ${m.abono > 0 ? 'text-[#10B981]' : 'text-gray-200'}`}>
-                                                {m.abono > 0 ? `+${m.abono.toFixed(2)}` : '0.00'}
+                                                {m.abono > 0 ? `+${(m.abono || 0).toFixed(2)}` : '0.00'}
                                             </span>
                                         </td>
                                         <td className="px-10 py-5 text-right font-mono">
-                                            <span className="text-sm font-black text-gray-900">{m.saldo.toFixed(2)}</span>
+                                            <span className="text-sm font-black text-gray-900">{(m.saldo || 0).toFixed(2)}</span>
                                         </td>
                                     </tr>
                                 ))}
