@@ -213,18 +213,66 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                 </div>
             </footer>
 
+            {/* Overlay de procesamiento con animación premium */}
+            {isProcessing && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center">
+                    <div className="absolute inset-0 bg-white/80 backdrop-blur-2xl animate-in fade-in duration-500"></div>
+                    <div className="relative flex flex-col items-center">
+                        {/* Animación de carga central */}
+                        <div className="relative w-48 h-48 mb-12">
+                            {/* Círculo rotando exterior */}
+                            <div className="absolute inset-0 border-[6px] border-emerald-50 rounded-full"></div>
+                            <div className="absolute inset-0 border-[6px] border-emerald-500 rounded-full animate-spin border-t-transparent shadow-lg shadow-emerald-200"></div>
+
+                            {/* Icono de PDF que sube y baja */}
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="material-symbols-outlined text-6xl text-emerald-600 animate-bounce">picture_as_pdf</span>
+                            </div>
+
+                            {/* Partículas de "procesamiento" */}
+                            <div className="absolute top-0 right-0 w-4 h-4 bg-emerald-400 rounded-full animate-ping"></div>
+                            <div className="absolute bottom-0 left-10 w-3 h-3 bg-emerald-300 rounded-full animate-pulse delay-500"></div>
+                        </div>
+
+                        <div className="text-center">
+                            <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight animate-pulse">
+                                Convirtiendo PDF a Datos...
+                            </h2>
+                            <p className="text-sm text-gray-500 font-bold uppercase tracking-[0.3em] italic animate-bounce">
+                                Clasificando Banco y Extrayendo Movimientos
+                            </p>
+
+                            <div className="mt-12 flex items-center justify-center gap-4">
+                                <div className="flex -space-x-3">
+                                    <div className="w-10 h-10 rounded-full bg-blue-100 border-4 border-white flex items-center justify-center shadow-sm">
+                                        <span className="material-symbols-outlined text-blue-500 text-sm">database</span>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-full bg-emerald-100 border-4 border-white flex items-center justify-center shadow-sm">
+                                        <span className="material-symbols-outlined text-emerald-500 text-sm">memory</span>
+                                    </div>
+                                    <div className="w-10 h-10 rounded-full bg-purple-100 border-4 border-white flex items-center justify-center shadow-sm">
+                                        <span className="material-symbols-outlined text-purple-500 text-sm">auto_awesome</span>
+                                    </div>
+                                </div>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Motor Fiscalio v2.0 Activo</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal de confirmación premium (Mockup Style) */}
             {showConfirmModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
                     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl animate-in fade-in duration-300"></div>
                     <div className="relative w-full max-w-lg bg-white rounded-[48px] shadow-2xl overflow-hidden p-12 transition-all animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
                         <div className="flex flex-col items-center text-center">
-                            <div className="w-20 h-20 bg-emerald-50 rounded-[28px] flex items-center justify-center mb-8 shadow-inner">
+                            <div className="w-20 h-20 bg-emerald-50 rounded-[28px] flex items-center justify-center mb-8 shadow-inner border border-emerald-100/50">
                                 <span className="material-symbols-outlined text-[#10B981] text-4xl">account_balance_wallet</span>
                             </div>
                             <h2 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Confirmar Totales Extraídos</h2>
                             <p className="text-sm text-gray-400 leading-relaxed font-medium mb-12">
-                                Por favor, valide que la suma de los movimientos detectados coincida con los totales de su estado de cuenta original.
+                                El procesamiento automático ha finalizado. Por favor valide los resultados antes de guardarlos de forma permanente.
                             </p>
 
                             <div className="w-full space-y-5 mb-12">
