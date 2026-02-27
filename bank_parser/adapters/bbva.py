@@ -15,12 +15,20 @@ def extract_bbva(pdf_path):
             current_tx = None
             stop_all = False
             
-            # Buscar el año global en la primera página
+            # Buscar el año y mes global en la primera página
             first_page_text = pdf.pages[0].extract_text() or ""
             # Ejemplo: DEL 01/02/2025 AL 28/02/2025
             ym = re.search(r"AL (\d{2})/(\d{2})/(\d{4})", first_page_text)
             if ym: 
                 year_str = ym.group(3)
+                month_idx = ym.group(2)
+                # Opcional: Podríamos detectar el periodo aquí y guardarlo
+                # Pero el controlador de Laravel lo recalcula. Aseguramos que el año sea correcto.
+            else:
+                # Intento 2: Buscar Periodo: Enero 2025
+                period_match = re.search(r"Periodo\s*:\s*([A-Za-z]+)\s*(\d{4})", first_page_text, re.I)
+                if period_match:
+                    year_str = period_match.group(2)
 
             for page in pdf.pages:
                 if stop_all: break

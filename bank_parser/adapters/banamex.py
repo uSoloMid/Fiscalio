@@ -14,11 +14,20 @@ def extract_banamex(pdf_path):
             current_tx = None
             stop_all = False
             
-            # Buscar el año global
+            # Buscar el año global y mes
             first_text = pdf.pages[0].extract_text() or ""
-            ym = re.search(r"AL \d{2} DE ([A-Z]+) DE (\d{4})", first_text)
+            # Ejemplo: ESTADO DE CUENTA AL 31 DE ENERO DE 2025
+            ym = re.search(r"AL (\d{2}) DE ([A-Z]+) DE (\d{4})", first_text, re.I)
             if ym: 
-                year_str = ym.group(2)
+                year_str = ym.group(3)
+                month_name = ym.group(2).upper()
+                meses_full = {
+                    "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04",
+                    "MAYO": "05", "JUNIO": "06", "JULIO": "07", "AGOSTO": "08",
+                    "SEPTIEMBRE": "09", "OCTUBRE": "10", "NOVIEMBRE": "11", "DICIEMBRE": "12"
+                }
+                # Si el mes es largo, lo mapeamos para ayudar a la detección si fuera necesario
+                # Aunque Laravel usa la fecha de la primera transacción, tener el year_str correcto es vital.
 
             for page in pdf.pages:
                 if stop_all: break
