@@ -102,10 +102,10 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
 
                 {/* Kardex Cards (Mockup Style) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
-                    <Card title="SALDO INICIAL" amount={result?.summary.initialBalance || 0} icon="swap_horiz" color="gray" />
-                    <Card title="DEPÓSITOS (+)" amount={result?.summary.totalAbonos || 0} icon="add_circle" color="emerald" plus />
-                    <Card title="RETIROS (-)" amount={result?.summary.totalCargos || 0} icon="remove_circle" color="red" minus />
-                    <Card title="SALDO FINAL" amount={result?.summary.finalBalance || 0} icon="check_circle" color="emerald" highlight />
+                    <Card title="SALDO INICIAL" amount={result?.summary?.initialBalance || 0} icon="swap_horiz" color="gray" />
+                    <Card title="DEPÓSITOS (+)" amount={result?.summary?.totalAbonos || 0} icon="add_circle" color="emerald" plus />
+                    <Card title="RETIROS (-)" amount={result?.summary?.totalCargos || 0} icon="remove_circle" color="red" minus />
+                    <Card title="SALDO FINAL" amount={result?.summary?.finalBalance || 0} icon="check_circle" color="emerald" highlight />
                 </div>
 
                 {/* Tabla de movimientos */}
@@ -281,20 +281,20 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                         <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
                                         <span className="text-xs font-black text-emerald-800 tracking-wider">TOTAL ABONOS (+)</span>
                                     </div>
-                                    <span className="text-2xl font-black text-[#10B981]">{formatCurrency(result.summary.totalAbonos)}</span>
+                                    <span className="text-2xl font-black text-[#10B981]">{formatCurrency(result?.summary?.totalAbonos || 0)}</span>
                                 </div>
                                 <div className="bg-[#FF4D4D]/5 p-6 rounded-[32px] flex items-center justify-between border border-[#FF4D4D]/10 group hover:bg-[#FF4D4D]/10 transition-colors">
                                     <div className="flex items-center gap-3">
                                         <div className="h-2 w-2 rounded-full bg-[#FF4D4D]"></div>
                                         <span className="text-xs font-black text-red-800 tracking-wider">TOTAL CARGOS (-)</span>
                                     </div>
-                                    <span className="text-2xl font-black text-[#FF4D4D]">{formatCurrency(result.summary.totalCargos)}</span>
+                                    <span className="text-2xl font-black text-[#FF4D4D]">{formatCurrency(result?.summary?.totalCargos || 0)}</span>
                                 </div>
 
                                 <div className="pt-8 border-t border-dashed border-gray-100 flex flex-col items-center gap-1.5">
                                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-1">Saldo resultante</span>
                                     <h3 className="text-5xl font-black text-gray-900 tracking-tighter">
-                                        {formatCurrency(result.summary.totalAbonos - result.summary.totalCargos)}
+                                        {formatCurrency((result?.summary?.totalAbonos || 0) - (result?.summary?.totalCargos || 0))}
                                     </h3>
                                     <div className="mt-6 flex items-center gap-2.5 px-6 py-2 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black border border-emerald-100 animate-bounce">
                                         <span className="material-symbols-outlined text-sm">check_circle</span>
