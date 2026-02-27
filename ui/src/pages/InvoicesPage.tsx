@@ -33,6 +33,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [isResizing, setIsResizing] = useState(false);
     const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks'>('invoices');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [contabilidadOpen, setContabilidadOpen] = useState(true);
 
     const [showCancelled, setShowCancelled] = useState(false);
     const [showDownloadXmlModal, setShowDownloadXmlModal] = useState(false);
@@ -450,7 +451,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
             {/* Sidebar */}
             <aside className={`fixed md:relative w-64 h-full flex-shrink-0 flex flex-col bg-white border-r border-gray-200 z-30 transition-transform duration-300 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
                 <div className="h-20 flex items-center px-6 border-b border-gray-100 justify-between">
-                    <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
+                    <div
+                        className="flex items-center gap-2 font-bold text-xl tracking-tight cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={onBack || handleRfcChange}
+                    >
                         <img src="/img/fiscalio-logo.png" alt="Fiscalio Logo" className="h-8 object-contain" />
                         <span className="text-gray-900">Fiscalio</span>
                     </div>
@@ -466,35 +470,75 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                         <span className="material-symbols-outlined text-xl">refresh</span>
                         Actualizar Datos
                     </button>
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Principal</div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Módulos</div>
                     <button
                         onClick={() => { setCurrentView('invoices'); setIsSidebarOpen(false); }}
                         className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'invoices' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
                         <span className="material-symbols-outlined text-xl">receipt_long</span>
-                        Facturas
+                        Facturacion
                     </button>
-                    <button
-                        onClick={() => { setCurrentView('accounts'); setIsSidebarOpen(false); }}
-                        className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'accounts' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                    >
-                        <span className="material-symbols-outlined text-xl">account_tree</span>
-                        Cuentas
-                    </button>
-                    <button
-                        onClick={() => { setCurrentView('provisional'); setIsSidebarOpen(false); }}
-                        className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'provisional' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                    >
-                        <span className="material-symbols-outlined text-xl">monitoring</span>
-                        Control Prov.
-                    </button>
-                    <button
-                        onClick={() => { setCurrentView('banks'); setIsSidebarOpen(false); }}
-                        className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'banks' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
-                    >
-                        <span className="material-symbols-outlined text-xl">account_balance</span>
-                        Bancos
-                    </button>
+
+                    <div className="mt-4">
+                        <button
+                            onClick={() => setContabilidadOpen(!contabilidadOpen)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors"
+                        >
+                            Contabilidad
+                            <span className={`material-symbols-outlined text-sm transition-transform ${contabilidadOpen ? 'rotate-180' : ''}`}>expand_more</span>
+                        </button>
+
+                        {contabilidadOpen && (
+                            <div className="flex flex-col gap-1 mt-1 pl-2">
+                                <button
+                                    onClick={() => { setCurrentView('accounts'); setIsSidebarOpen(false); }}
+                                    className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'accounts' ? 'active bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <span className="material-symbols-outlined text-lg">account_tree</span>
+                                    Cuentas
+                                </button>
+                                <button
+                                    onClick={() => { setCurrentView('banks'); setIsSidebarOpen(false); }}
+                                    className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'banks' ? 'active bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                                >
+                                    <span className="material-symbols-outlined text-lg">account_balance</span>
+                                    Bancos
+                                </button>
+                                <button
+                                    className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 cursor-not-allowed"
+                                    title="Próximamente"
+                                >
+                                    <span className="material-symbols-outlined text-lg">sync_alt</span>
+                                    Conciliaciones
+                                </button>
+                                <button
+                                    className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 cursor-not-allowed"
+                                    title="Próximamente"
+                                >
+                                    <span className="material-symbols-outlined text-lg">description</span>
+                                    Pólizas
+                                </button>
+                                <button
+                                    className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 cursor-not-allowed"
+                                    title="Próximamente"
+                                >
+                                    <span className="material-symbols-outlined text-lg">analytics</span>
+                                    Reportes
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="mt-4">
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3 mb-2">Herramientas</div>
+                        <button
+                            onClick={() => { setCurrentView('provisional'); setIsSidebarOpen(false); }}
+                            className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'provisional' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <span className="material-symbols-outlined text-xl">monitoring</span>
+                            Control Prov.
+                        </button>
+                    </div>
                 </nav>
                 <div className="p-4 border-t border-gray-100 mt-auto">
                     <button onClick={() => logout()} title="Cerrar sesión" className="w-full flex items-center justify-start gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-50 text-sm font-medium transition-all">

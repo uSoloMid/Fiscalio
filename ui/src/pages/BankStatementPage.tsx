@@ -4,11 +4,13 @@ import { processBankStatement, confirmBankStatement, listBankStatements, getBank
 export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc: string, clientName: string, onBack: () => void }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+    const [activeView, setActiveView] = useState<'management' | 'detail'>('management');
     const [result, setResult] = useState<any>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [statements, setStatements] = useState<any[]>([]);
     const [bankFilter, setBankFilter] = useState('all');
     const [yearFilter, setYearFilter] = useState('all');
+    const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
         loadStatements();
@@ -27,10 +29,12 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
         setIsProcessing(true);
         try {
             const data = await getBankStatement(id, activeRfc);
-            // Adapt data to match result structure
             setResult({
+                id: data.id,
                 banco: data.bank_name,
                 fileName: data.file_name,
+                period: data.period,
+                account_number: data.account_number,
                 movements: data.movements.map((m: any) => ({
                     fecha: m.date,
                     concepto: m.description,
@@ -46,6 +50,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                     finalBalance: parseFloat(data.final_balance)
                 }
             });
+            setActiveView('detail');
         } catch (e) {
             alert("Error al cargar detalle");
         } finally {
@@ -60,20 +65,14 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
         try {
             await deleteBankStatement(id, activeRfc);
             loadStatements();
-            if (result && result.id === id) setResult(null);
+            if (result && result.id === id) {
+                setResult(null);
+                setActiveView('management');
+            }
         } catch (e) {
             alert("Error al eliminar");
         }
     };
-
-    const filteredStatements = statements.filter(s => {
-        const matchesBank = bankFilter === 'all' || s.bank_name.toLowerCase() === bankFilter.toLowerCase();
-        const matchesYear = yearFilter === 'all' || (s.period && s.period.includes(yearFilter));
-        return matchesBank && matchesYear;
-    });
-
-    const uniqueBanks = Array.from(new Set(statements.map(s => s.bank_name)));
-    const uniqueYears = Array.from(new Set(statements.map(s => s.period?.split('-')[1]).filter(y => y)));
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -84,6 +83,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
             const data = await processBankStatement(file, activeRfc);
             setResult(data);
             setShowConfirmModal(true);
+            setActiveView('detail');
         } catch (err: any) {
             alert(err.message || "Error al procesar el archivo");
         } finally {
@@ -104,6 +104,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
             }, activeRfc);
             setShowConfirmModal(false);
             setResult(null);
+            setActiveView('management');
             alert("¡Estado de cuenta guardado con éxito!");
             loadStatements();
         } catch (err) {
@@ -113,37 +114,28 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
         }
     };
 
-    const handleExportExcel = () => {
-        if (!result?.movements || result.movements.length === 0) {
-            alert("No hay movimientos para exportar");
-            return;
+    const handleBackClick = () => {
+        if (activeView === 'detail' && !showConfirmModal) {
+            setActiveView('management');
+            setResult(null);
+        } else {
+            onBack();
         }
-
-        const headers = ["FECHA", "REFERENCIA", "CONCEPTO", "CARGO", "ABONO", "SALDO"];
-        const rows = result.movements.map((m: any) => [
-            m.fecha,
-            m.referencia || "",
-            m.concepto,
-            m.cargo,
-            m.abono,
-            m.saldo
-        ]);
-
-        const csvContent = [
-            headers.join(","),
-            ...rows.map((r: any) => r.join(","))
-        ].join("\n");
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        const url = URL.createObjectURL(blob);
-        link.setAttribute("href", url);
-        link.setAttribute("download", `Estado_de_Cuenta_${result.banco}_${result.fileName}.csv`);
-        link.style.visibility = 'hidden';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
+
+    const filteredStatements = statements.filter(s => {
+        const matchesBank = bankFilter === 'all' || s.bank_name.toLowerCase() === bankFilter.toLowerCase();
+        const matchesYear = yearFilter === 'all' || (s.period && s.period.includes(yearFilter));
+        const matchesSearch = s.bank_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (s.period && s.period.toLowerCase().includes(searchTerm.toLowerCase()));
+        return matchesBank && matchesYear && matchesSearch;
+    });
+
+    const uniqueBanks = Array.from(new Set(statements.map(s => s.bank_name)));
+    const uniqueYears = Array.from(new Set(statements.map(s => s.period?.split('-')[1]).filter(y => y)));
+
+    const combinedBalance = statements.reduce((acc, s) => acc + parseFloat(s.final_balance), 0);
 
     const formatCurrency = (amount: number) => {
         return amount.toLocaleString('es-MX', {
@@ -154,361 +146,310 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     };
 
     return (
-        <div className="flex-1 flex flex-col h-screen bg-[#F0F2F5] overflow-hidden font-['Inter']">
-            {/* Header premium igual al mockup */}
-            <header className="bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between flex-shrink-0">
-                <div className="flex items-center gap-4">
-                    <button onClick={onBack} className="p-2 hover:bg-gray-50 rounded-xl transition-all">
-                        <span className="material-symbols-outlined text-gray-400">arrow_back</span>
+        <div className="flex-1 flex flex-col h-screen bg-[#F8FAFC] overflow-hidden font-['Inter']">
+            {/* Header mejorado */}
+            <header className="bg-white border-b border-gray-100 px-8 py-5 flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
+                <div className="flex items-center gap-5">
+                    <button onClick={handleBackClick} className="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-2xl transition-all">
+                        <span className="material-symbols-outlined text-xl">arrow_back</span>
                     </button>
                     <div>
-                        <h1 className="text-xl font-bold text-gray-900 tracking-tight">Importar Estado de Cuenta y Exportar a Excel</h1>
-                        <p className="text-xs text-gray-400 font-medium">Panel de procesamiento de estados financieros para <span className="text-emerald-600 font-bold">{clientName}</span></p>
+                        <h1 className="text-xl font-black text-gray-900 tracking-tight uppercase">
+                            {activeView === 'management' ? 'Gestión de Bancos' : `Detalle: ${result?.banco || 'Procesando'}`}
+                        </h1>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-0.5">
+                            {activeView === 'management' ? `Panel contable de ${clientName}` : `${clientName} / ${result?.period || 'Periodo Detectado'}`}
+                        </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-4">
-                        <button className="p-2 text-gray-400 hover:text-gray-600"><span className="material-symbols-outlined">settings</span></button>
-                        <button className="p-2 text-gray-400 hover:text-gray-600"><span className="material-symbols-outlined">help</span></button>
-                        <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs border-2 border-white shadow-sm">JD</div>
-                    </div>
+                <div className="flex items-center gap-4">
+                    <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:bg-gray-50 rounded-xl transition-all relative">
+                        <span className="material-symbols-outlined">notifications</span>
+                        <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></div>
+                    </button>
+                    <label className="flex items-center gap-3 px-6 py-2.5 bg-[#10B981] text-white rounded-[16px] font-black text-[11px] shadow-lg shadow-emerald-100 hover:bg-[#059669] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group uppercase tracking-widest">
+                        <span className="material-symbols-outlined text-lg group-hover:rotate-90 transition-transform duration-300">add_circle</span>
+                        Nuevo Estado
+                        <input type="file" className="hidden" accept=".pdf" onChange={handleFileUpload} disabled={isProcessing} />
+                    </label>
                 </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-                {/* Botones de acción principales */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                        <label className="flex items-center gap-3 px-8 py-3.5 bg-[#10B981] text-white rounded-[20px] font-bold text-sm shadow-xl shadow-emerald-100 hover:bg-[#059669] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer group">
-                            <span className="material-symbols-outlined group-hover:rotate-90 transition-transform duration-300">add_circle</span>
-                            Importar PDF
-                            <input type="file" className="hidden" accept=".pdf" onChange={handleFileUpload} disabled={isProcessing} />
-                        </label>
-                        <button
-                            onClick={handleExportExcel}
-                            className="flex items-center gap-3 px-8 py-3.5 bg-white border border-gray-200 text-gray-400 rounded-[20px] font-bold text-sm hover:border-emerald-200 hover:text-emerald-500 hover:shadow-lg hover:shadow-gray-100 transition-all active:scale-[0.98]">
-                            <span className="material-symbols-outlined">export_notes</span>
-                            Exportar a Excel
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-10">
-                        <div className="flex flex-col items-end">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Periodo</p>
-                            <p className="text-sm font-bold text-gray-900 border-b-2 border-orange-500/30 pb-0.5 uppercase tracking-wide">{result?.period || "DETECCIÓN AUTOMÁTICA"}</p>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Banco</p>
-                            <p className="text-sm font-bold text-gray-900 border-b-2 border-emerald-500/30 pb-0.5 uppercase tracking-wide">{result?.banco || "PENDIENTE"}</p>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Cuenta</p>
-                            <p className="text-sm font-bold text-gray-400 border-b-2 border-gray-100 pb-0.5 tracking-widest">{result?.account_number || "**** 0000"}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Kardex Cards (Mockup Style) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
-                    <Card title="SALDO INICIAL" amount={result?.summary?.initialBalance || 0} icon="swap_horiz" color="gray" />
-                    <Card title="DEPÓSITOS (+)" amount={result?.summary?.totalAbonos || 0} icon="add_circle" color="emerald" plus />
-                    <Card title="RETIROS (-)" amount={result?.summary?.totalCargos || 0} icon="remove_circle" color="red" minus />
-                    <Card title="SALDO FINAL" amount={result?.summary?.finalBalance || 0} icon="check_circle" color="emerald" highlight />
-                </div>
-
-                {/* Tabla de movimientos */}
-                <div className="bg-white rounded-[48px] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col">
-                    <div className="px-10 py-8 border-b border-gray-50 flex items-center justify-between bg-gradient-to-r from-white to-gray-50/30">
-                        <div className="flex items-center gap-3">
-                            <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.3em]">DETALLE DE MOVIMIENTOS</h3>
-                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
-                        </div>
-                        <div className="px-4 py-1.5 bg-gray-50 rounded-full">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Filas procesadas: <span className="text-gray-900">{result?.movements?.length || 0}</span></span>
-                        </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-white">
-                                    <th className="px-10 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">FECHA</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">REFERENCIA</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">DESCRIPCIÓN</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">CARGOS (-)</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">ABONOS (+)</th>
-                                    <th className="px-10 py-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">SALDO</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50/50">
-                                {(result?.movements || []).map((m: any, i: number) => (
-                                    <tr key={i} className="hover:bg-emerald-50/30 transition-all duration-200 group">
-                                        <td className="px-10 py-5 text-xs font-bold text-gray-500 group-hover:text-emerald-700 transition-colors uppercase tracking-tight">{m.fecha}</td>
-                                        <td className="px-6 py-5">
-                                            <span className="px-2.5 py-1 bg-gray-50 text-[10px] font-black text-gray-400 rounded-lg group-hover:bg-white group-hover:text-emerald-500 transition-all border border-transparent group-hover:border-emerald-100">{m.referencia || 'N/A'}</span>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <p className="text-xs font-bold text-gray-900 leading-normal uppercase group-hover:translate-x-1 transition-transform">{m.concepto}</p>
-                                        </td>
-                                        <td className="px-6 py-5 text-right font-mono">
-                                            <span className={`text-sm font-black ${m.cargo > 0 ? 'text-[#FF4D4D]' : 'text-gray-200'}`}>
-                                                {m.cargo > 0 ? `-${(m.cargo || 0).toFixed(2)}` : '0.00'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-5 text-right font-mono">
-                                            <span className={`text-sm font-black ${m.abono > 0 ? 'text-[#10B981]' : 'text-gray-200'}`}>
-                                                {m.abono > 0 ? `+${(m.abono || 0).toFixed(2)}` : '0.00'}
-                                            </span>
-                                        </td>
-                                        <td className="px-10 py-5 text-right font-mono">
-                                            <span className="text-sm font-black text-gray-900">{(m.saldo || 0).toFixed(2)}</span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {result && result.movements?.length === 0 && (
-                            <div className="py-32 flex flex-col items-center justify-center">
-                                <div className="w-24 h-24 bg-red-50 rounded-[32px] flex items-center justify-center mb-6 border-2 border-dashed border-red-100">
-                                    <span className="material-symbols-outlined text-red-200 text-5xl">error</span>
-                                </div>
-                                <h4 className="text-red-400 text-sm font-bold uppercase tracking-[0.2em] mb-2">No se encontraron movimientos</h4>
-                                <p className="text-gray-400 text-xs font-medium italic text-center px-10">El PDF fue leído pero no pudimos identificar las transacciones. <br />Verifica que el PDF no sea una imagen escaneada.</p>
-                            </div>
-                        )}
-
-                        {!result && (
-                            <div className="py-10 px-10">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="flex items-center gap-6">
-                                        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">HISTORIAL DE IMPORTACIONES</h3>
-                                        <div className="flex items-center gap-3">
-                                            <select
-                                                value={bankFilter}
-                                                onChange={e => setBankFilter(e.target.value)}
-                                                className="text-[10px] font-bold bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            >
-                                                <option value="all">TODOS LOS BANCOS</option>
-                                                {uniqueBanks.map(b => <option key={b} value={b}>{b.toUpperCase()}</option>)}
-                                            </select>
-                                            <select
-                                                value={yearFilter}
-                                                onChange={e => setYearFilter(e.target.value)}
-                                                className="text-[10px] font-bold bg-white border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                            >
-                                                <option value="all">TODOS LOS AÑOS</option>
-                                                {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
-                                            </select>
+            <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+                {activeView === 'management' ? (
+                    <div className="p-10 space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Dashboard Stats */}
+                        <div className="bg-white rounded-[40px] p-10 border border-gray-100 shadow-xl shadow-gray-200/40 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full -mr-32 -mt-32 opacity-50 group-hover:scale-110 transition-transform duration-700"></div>
+                            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                                <div>
+                                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-4">SALDO GENERAL COMBINADO</p>
+                                    <h2 className="text-6xl font-black text-gray-900 tracking-tighter mb-2">
+                                        {formatCurrency(combinedBalance)}
+                                    </h2>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs font-bold text-gray-400 tracking-widest uppercase">MXN</span>
+                                        <div className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-full flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[14px]">trending_up</span>
+                                            +12.5%
                                         </div>
                                     </div>
-                                    <span className="px-3 py-1 bg-emerald-50 text-[10px] font-black text-emerald-600 rounded-full border border-emerald-100">Mostrando {filteredStatements.length} registros</span>
                                 </div>
-
-                                <div className="grid grid-cols-1 gap-4">
-                                    {filteredStatements.length > 0 ? filteredStatements.map((s) => (
-                                        <div
-                                            key={s.id}
-                                            onClick={() => handleSelectStatement(s.id)}
-                                            className="bg-white border border-gray-100 p-6 rounded-[32px] flex items-center justify-between hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-100/20 transition-all cursor-pointer group"
-                                        >
-                                            <div className="flex items-center gap-6">
-                                                <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-emerald-50 transition-colors">
-                                                    <span className="material-symbols-outlined text-gray-400 group-hover:text-emerald-500">account_balance</span>
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-sm font-black text-gray-900 uppercase">{s.bank_name}</p>
-                                                        <span className="px-2 py-0.5 bg-orange-50 text-orange-600 text-[9px] font-black rounded-md">{s.period}</span>
-                                                    </div>
-                                                    <p className="text-[10px] font-bold text-gray-400 mt-0.5">{s.file_name.substring(0, 30)}...</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-12">
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Movimientos</p>
-                                                    <p className="text-sm font-black text-gray-900">{s.movements_count || 0}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Saldo Final</p>
-                                                    <p className="text-sm font-black text-emerald-600">{formatCurrency(parseFloat(s.final_balance))}</p>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <button
-                                                        onClick={(e) => handleDeleteStatement(e, s.id)}
-                                                        className="w-10 h-10 rounded-2xl border border-red-50 text-red-100 flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all"
-                                                        title="Eliminar"
-                                                    >
-                                                        <span className="material-symbols-outlined text-base">delete</span>
-                                                    </button>
-                                                    <div className="w-10 h-10 rounded-2xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:border-emerald-200 group-hover:text-emerald-500 transition-all">
-                                                        <span className="material-symbols-outlined text-base">arrow_forward</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )) : (
-                                        <div className="py-20 flex flex-col items-center justify-center bg-gray-50/50 rounded-[40px] border-2 border-dashed border-gray-100">
-                                            <span className="material-symbols-outlined text-gray-200 text-5xl mb-4">history</span>
-                                            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">No hay historial disponible</p>
-                                        </div>
-                                    )}
+                                <div className="flex items-center gap-6">
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">CONCILIADO</p>
+                                        <p className="text-2xl font-black text-gray-900">94.2%</p>
+                                    </div>
+                                    <div className="w-px h-10 bg-gray-100"></div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">PENDIENTE</p>
+                                        <p className="text-2xl font-black text-orange-500">$24,102</p>
+                                    </div>
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {result && (
-                            <div className="py-12 flex flex-col items-center border-t border-gray-50 bg-gradient-to-b from-gray-50/30 to-white">
-                                <div className="h-8 w-px bg-emerald-500/20 mb-4"></div>
-                                <p className="text-[10px] font-black text-gray-400 italic uppercase tracking-[0.3em]">Fin de los registros cargados temporalmente</p>
+                        {/* Search and Filters */}
+                        <div className="bg-white rounded-[32px] p-4 border border-gray-100 shadow-lg shadow-gray-100/50 flex flex-col md:flex-row items-center gap-4">
+                            <div className="flex-1 relative w-full">
+                                <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por cuenta o referencia..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-gray-400"
+                                />
                             </div>
-                        )}
+                            <div className="flex items-center gap-3 w-full md:w-auto">
+                                <select
+                                    value={bankFilter}
+                                    onChange={e => setBankFilter(e.target.value)}
+                                    className="flex-1 md:flex-none text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
+                                >
+                                    <option value="all">Todos los Bancos</option>
+                                    {uniqueBanks.map(b => <option key={b} value={b}>{b}</option>)}
+                                </select>
+                                <select
+                                    value={yearFilter}
+                                    onChange={e => setYearFilter(e.target.value)}
+                                    className="flex-1 md:flex-none text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
+                                >
+                                    <option value="all">Cualquier Año</option>
+                                    {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Grid of Bank Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                            {filteredStatements.length > 0 ? filteredStatements.map((s) => (
+                                <div
+                                    key={s.id}
+                                    onClick={() => handleSelectStatement(s.id)}
+                                    className="bg-white rounded-[40px] border border-gray-100 p-8 hover:border-emerald-200 hover:shadow-2xl hover:shadow-emerald-100/20 transition-all cursor-pointer group flex flex-col justify-between min-h-[320px] relative overflow-hidden"
+                                >
+                                    <div className="absolute top-0 right-0 w-24 h-24 bg-gray-50 rounded-bl-full -tr-10 -mr-10 group-hover:bg-emerald-50 transition-colors"></div>
+
+                                    <div className="relative">
+                                        <div className="flex items-center justify-between mb-8">
+                                            <div className="w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                                                <span className="material-symbols-outlined text-white text-2xl">account_balance</span>
+                                            </div>
+                                            <button
+                                                onClick={(e) => handleDeleteStatement(e, s.id)}
+                                                className="w-10 h-10 rounded-xl text-gray-200 hover:text-red-500 hover:bg-red-50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                            >
+                                                <span className="material-symbols-outlined text-lg">delete</span>
+                                            </button>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight group-hover:text-emerald-600 transition-colors">{s.bank_name}</h3>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">CUENTA: **** {s.account_number?.slice(-4) || '9821'}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-auto border-t border-gray-50 pt-6">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{s.period}</p>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-3xl font-black text-gray-900">{formatCurrency(parseFloat(s.final_balance))}</span>
+                                            <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-sm">
+                                                <span className="material-symbols-outlined text-xl">arrow_forward</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="col-span-full py-40 flex flex-col items-center justify-center bg-gray-50/50 rounded-[60px] border-2 border-dashed border-gray-100">
+                                    <span className="material-symbols-outlined text-gray-200 text-6xl mb-6">history</span>
+                                    <h4 className="text-gray-400 text-sm font-black uppercase tracking-[0.3em]">No hay actividad bancaria registrada</h4>
+                                    <p className="text-gray-400 text-xs font-medium italic mt-2">Sube tu primer PDF para comenzar la gestión financiera.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="p-10 space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">
+                        {/* Detail View Components (Existing Logic Improved) */}
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={handleExportExcel}
+                                    className="flex items-center gap-3 px-8 py-3.5 bg-white border border-gray-200 text-gray-400 rounded-[20px] font-bold text-sm hover:border-emerald-200 hover:text-emerald-500 hover:shadow-lg hover:shadow-gray-100 transition-all active:scale-[0.98]">
+                                    <span className="material-symbols-outlined">export_notes</span>
+                                    Exportar a Excel
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-10">
+                                <div className="flex flex-col items-end">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Periodo Activo</p>
+                                    <p className="text-sm font-black text-orange-500 bg-orange-50 px-3 py-1 rounded-lg uppercase tracking-wide">{result?.period}</p>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Empresa / Cliente</p>
+                                    <p className="text-sm font-black text-gray-900 border-b-2 border-emerald-500/30 pb-0.5 uppercase tracking-tight">{clientName}</p>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Institución</p>
+                                    <p className="text-sm font-black text-gray-400 border-b-2 border-gray-100 pb-0.5 tracking-widest">{result?.banco}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Kardex Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+                            <Card title="SALDO INICIAL" amount={result?.summary?.initialBalance || 0} icon="swap_horiz" color="gray" />
+                            <Card title="DEPÓSITOS (+)" amount={result?.summary?.totalAbonos || 0} icon="add_circle" color="emerald" plus />
+                            <Card title="RETIROS (-)" amount={result?.summary?.totalCargos || 0} icon="remove_circle" color="red" minus />
+                            <Card title="SALDO FINAL" amount={result?.summary?.finalBalance || 0} icon="check_circle" color="emerald" highlight />
+                        </div>
+
+                        {/* Movements Table */}
+                        <div className="bg-white rounded-[48px] border border-gray-100 shadow-2xl shadow-gray-200/50 overflow-hidden flex flex-col">
+                            <div className="px-10 py-8 border-b border-gray-50 flex items-center justify-between bg-gradient-to-r from-white to-gray-50/30">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">REGISTRO DE TRANSACCIONES</h3>
+                                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
+                                </div>
+                                <div className="px-4 py-1.5 bg-emerald-50 rounded-full">
+                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{result?.movements?.length || 0} OPERACIONES DETECTADAS</span>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-white">
+                                            <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">FECHA</th>
+                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">REFERENCIA</th>
+                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">DESCRIPCIÓN</th>
+                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">CARGOS (-)</th>
+                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">ABONOS (+)</th>
+                                            <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">BALANCE</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50/50">
+                                        {(result?.movements || []).map((m: any, i: number) => (
+                                            <tr key={i} className="hover:bg-emerald-50/30 transition-all duration-200 group">
+                                                <td className="px-10 py-6 text-xs font-black text-gray-400 group-hover:text-emerald-700 transition-colors uppercase">{m.fecha}</td>
+                                                <td className="px-6 py-6">
+                                                    <span className="px-2.5 py-1 bg-gray-50 text-[9px] font-black text-gray-400 rounded-lg group-hover:bg-white group-hover:text-emerald-500 transition-all border border-transparent group-hover:border-emerald-100">{m.referencia || 'N/A'}</span>
+                                                </td>
+                                                <td className="px-6 py-6">
+                                                    <p className="text-xs font-bold text-gray-900 leading-normal uppercase group-hover:translate-x-1 transition-transform">{m.concepto}</p>
+                                                </td>
+                                                <td className="px-6 py-6 text-right">
+                                                    <span className={`text-sm font-black ${m.cargo > 0 ? 'text-[#FF4D4D]' : 'text-gray-200'}`}>
+                                                        {m.cargo > 0 ? `-${(m.cargo || 0).toFixed(2)}` : '0.00'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-6 text-right">
+                                                    <span className={`text-sm font-black ${m.abono > 0 ? 'text-[#10B981]' : 'text-gray-200'}`}>
+                                                        {m.abono > 0 ? `+${(m.abono || 0).toFixed(2)}` : '0.00'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-10 py-6 text-right">
+                                                    <span className="text-sm font-black text-gray-900">{(m.saldo || 0).toFixed(2)}</span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Footer de status premium */}
-            <footer className="bg-white border-t border-gray-100 px-8 py-4 flex items-center justify-between flex-shrink-0">
+            {/* Footer de status */}
+            <footer className="bg-white border-t border-gray-100 px-8 py-3 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-10">
                     <div className="flex items-center gap-3">
-                        <div className={`w-2.5 h-2.5 rounded-full ${isProcessing ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400 shadow-sm shadow-emerald-200'}`}></div>
-                        <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">{isProcessing ? 'Procesando datos...' : 'Sistema Listo'}</span>
-                    </div>
-                    <div className="h-4 w-px bg-gray-100 hidden sm:block"></div>
-                    <div className="hidden sm:flex items-center gap-3">
-                        <div className="p-1.5 bg-gray-50 rounded-lg">
-                            <span className="material-symbols-outlined text-gray-400 text-sm">description</span>
-                        </div>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">bank_statement_2024.pdf</span>
+                        <div className={`w-2 h-2 rounded-full ${isProcessing ? 'bg-orange-400 animate-pulse' : 'bg-emerald-400'}`}></div>
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{isProcessing ? 'Procesando Datos...' : 'Motor Bancario Activo'}</span>
                     </div>
                 </div>
-
-                <div className="flex items-center gap-8">
-                    <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center justify-between w-48 px-1">
-                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">MOTOR OCR (TESSERACT)</span>
-                            <span className="text-[9px] font-black text-emerald-500">{isProcessing ? '50%' : '100%'}</span>
-                        </div>
-                        <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div className={`h-full bg-emerald-500 transition-all duration-1000 ease-in-out ${isProcessing ? 'w-1/2' : 'w-full shadow-sm shadow-emerald-200'}`}></div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 group cursor-default">
-                        <span className="material-symbols-outlined text-gray-300 group-hover:text-emerald-400 transition-colors text-xl">public</span>
-                        <span className="text-[10px] font-black text-gray-300 group-hover:text-gray-500 transition-colors uppercase tracking-widest">v1.2.4-stable</span>
-                    </div>
+                <div className="flex items-center gap-6">
+                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Fiscalio v2.1.0-stable</span>
                 </div>
             </footer>
 
-            {/* Overlay de procesamiento con animación premium */}
-            {isProcessing && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center">
-                    <div className="absolute inset-0 bg-white/80 backdrop-blur-2xl animate-in fade-in duration-500"></div>
-                    <div className="relative flex flex-col items-center">
-                        {/* Animación de carga central */}
-                        <div className="relative w-48 h-48 mb-12">
-                            {/* Círculo rotando exterior */}
-                            <div className="absolute inset-0 border-[6px] border-emerald-50 rounded-full"></div>
-                            <div className="absolute inset-0 border-[6px] border-emerald-500 rounded-full animate-spin border-t-transparent shadow-lg shadow-emerald-200"></div>
-
-                            {/* Icono de PDF que sube y baja */}
-                            <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="material-symbols-outlined text-6xl text-emerald-600 animate-bounce">picture_as_pdf</span>
+            {/* Modal de confirmación para nuevos archivos */}
+            {showConfirmModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-xl transition-all">
+                    <div className="relative w-full max-w-lg bg-white rounded-[48px] shadow-2xl overflow-hidden p-12 transition-all animate-in zoom-in-95 duration-500">
+                        <div className="flex flex-col items-center text-center">
+                            <div className="w-20 h-20 bg-emerald-50 rounded-[28px] flex items-center justify-center mb-8 shadow-inner border border-emerald-100/50">
+                                <span className="material-symbols-outlined text-[#10B981] text-4xl">check_circle</span>
                             </div>
-
-                            {/* Partículas de "procesamiento" */}
-                            <div className="absolute top-0 right-0 w-4 h-4 bg-emerald-400 rounded-full animate-ping"></div>
-                            <div className="absolute bottom-0 left-10 w-3 h-3 bg-emerald-300 rounded-full animate-pulse delay-500"></div>
-                        </div>
-
-                        <div className="text-center">
-                            <h2 className="text-3xl font-black text-gray-900 mb-4 tracking-tight animate-pulse">
-                                Convirtiendo PDF a Datos...
-                            </h2>
-                            <p className="text-sm text-gray-500 font-bold uppercase tracking-[0.3em] italic animate-bounce">
-                                Clasificando Banco y Extrayendo Movimientos
+                            <h2 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Confirmar Importación</h2>
+                            <p className="text-sm text-gray-400 leading-relaxed font-medium mb-12">
+                                Valide los totales extraídos del archivo <span className="text-gray-900 font-black">{result?.fileName}</span>
                             </p>
 
-                            <div className="mt-12 flex items-center justify-center gap-4">
-                                <div className="flex -space-x-3">
-                                    <div className="w-10 h-10 rounded-full bg-blue-100 border-4 border-white flex items-center justify-center shadow-sm">
-                                        <span className="material-symbols-outlined text-blue-500 text-sm">database</span>
-                                    </div>
-                                    <div className="w-10 h-10 rounded-full bg-emerald-100 border-4 border-white flex items-center justify-center shadow-sm">
-                                        <span className="material-symbols-outlined text-emerald-500 text-sm">memory</span>
-                                    </div>
-                                    <div className="w-10 h-10 rounded-full bg-purple-100 border-4 border-white flex items-center justify-center shadow-sm">
-                                        <span className="material-symbols-outlined text-purple-500 text-sm">auto_awesome</span>
-                                    </div>
+                            <div className="w-full space-y-4 mb-12">
+                                <div className="bg-emerald-50/50 p-6 rounded-[32px] flex items-center justify-between border border-emerald-100">
+                                    <span className="text-xs font-black text-emerald-800 tracking-wider">ABONOS</span>
+                                    <span className="text-2xl font-black text-emerald-600">{formatCurrency(result?.summary?.totalAbonos || 0)}</span>
                                 </div>
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Motor Fiscalio v2.0 Activo</span>
+                                <div className="bg-red-50/50 p-6 rounded-[32px] flex items-center justify-between border border-red-100">
+                                    <span className="text-xs font-black text-red-800 tracking-wider">CARGOS</span>
+                                    <span className="text-2xl font-black text-red-600">{formatCurrency(result?.summary?.totalCargos || 0)}</span>
+                                </div>
+                                <div className="pt-8 flex flex-col items-center">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">DIFERENCIA</span>
+                                    <h3 className="text-4xl font-black text-gray-900">
+                                        {formatCurrency((result?.summary?.totalAbonos || 0) - (result?.summary?.totalCargos || 0))}
+                                    </h3>
+                                </div>
+                            </div>
+
+                            <div className="w-full space-y-4">
+                                <button
+                                    onClick={handleConfirm}
+                                    disabled={isConfirming}
+                                    className="w-full py-5 bg-[#10B981] text-white font-black rounded-3xl shadow-xl shadow-emerald-200/50 hover:bg-[#059669] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 tracking-widest text-xs uppercase disabled:opacity-50"
+                                >
+                                    {isConfirming ? 'Guardando...' : 'Confirmar y Guardar'}
+                                </button>
+                                <button
+                                    onClick={() => { setShowConfirmModal(false); setResult(null); setActiveView('management'); }}
+                                    className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-red-500 transition-colors"
+                                >
+                                    Cancelar Operación
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Modal de confirmación premium (Mockup Style) */}
-            {showConfirmModal && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-xl animate-in fade-in duration-300"></div>
-                    <div className="relative w-full max-w-lg bg-white rounded-[48px] shadow-2xl overflow-hidden p-12 transition-all animate-in zoom-in-95 slide-in-from-bottom-10 duration-500">
-                        <div className="flex flex-col items-center text-center">
-                            <div className="w-20 h-20 bg-emerald-50 rounded-[28px] flex items-center justify-center mb-8 shadow-inner border border-emerald-100/50">
-                                <span className="material-symbols-outlined text-[#10B981] text-4xl">account_balance_wallet</span>
-                            </div>
-                            <h2 className="text-2xl font-black text-gray-900 mb-3 tracking-tight">Confirmar Totales Extraídos</h2>
-                            <p className="text-sm text-gray-400 leading-relaxed font-medium mb-12">
-                                El procesamiento automático ha finalizado. Por favor valide los resultados antes de guardarlos de forma permanente.
-                            </p>
-
-                            <div className="w-full space-y-5 mb-12">
-                                <div className="bg-[#10B981]/5 p-6 rounded-[32px] flex items-center justify-between border border-[#10B981]/10 group hover:bg-[#10B981]/10 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-2 w-2 rounded-full bg-emerald-500"></div>
-                                        <span className="text-xs font-black text-emerald-800 tracking-wider">TOTAL ABONOS (+)</span>
-                                    </div>
-                                    <span className="text-2xl font-black text-[#10B981]">{formatCurrency(result?.summary?.totalAbonos || 0)}</span>
-                                </div>
-                                <div className="bg-[#FF4D4D]/5 p-6 rounded-[32px] flex items-center justify-between border border-[#FF4D4D]/10 group hover:bg-[#FF4D4D]/10 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-2 w-2 rounded-full bg-[#FF4D4D]"></div>
-                                        <span className="text-xs font-black text-red-800 tracking-wider">TOTAL CARGOS (-)</span>
-                                    </div>
-                                    <span className="text-2xl font-black text-[#FF4D4D]">{formatCurrency(result?.summary?.totalCargos || 0)}</span>
-                                </div>
-
-                                <div className="pt-8 border-t border-dashed border-gray-100 flex flex-col items-center gap-1.5">
-                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-1">Saldo resultante</span>
-                                    <h3 className="text-5xl font-black text-gray-900 tracking-tighter">
-                                        {formatCurrency((result?.summary?.totalAbonos || 0) - (result?.summary?.totalCargos || 0))}
-                                    </h3>
-                                    <div className="mt-6 flex items-center gap-2.5 px-6 py-2 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black border border-emerald-100 animate-bounce">
-                                        <span className="material-symbols-outlined text-sm">check_circle</span>
-                                        COINCIDE CON LA CARÁTULA
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="w-full space-y-5">
-                                <button
-                                    onClick={handleConfirm}
-                                    disabled={isConfirming}
-                                    className="w-full py-5 bg-[#10B981] text-white font-black rounded-[24px] shadow-2xl shadow-emerald-200/50 hover:bg-[#059669] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 tracking-widest text-xs uppercase disabled:opacity-50"
-                                >
-                                    <span className={`material-symbols-outlined ${isConfirming ? 'animate-spin' : ''}`}>
-                                        {isConfirming ? 'sync' : 'verified'}
-                                    </span>
-                                    {isConfirming ? 'Guardando...' : 'Sí, los totales son correctos'}
-                                </button>
-                                <button
-                                    onClick={() => setShowConfirmModal(false)}
-                                    className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-red-500 transition-colors"
-                                >
-                                    No, los montos no coinciden (Volver a procesar)
-                                </button>
-                            </div>
-                        </div>
+            {/* Overlay de procesamiento */}
+            {isProcessing && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-white/60 backdrop-blur-xl">
+                    <div className="flex flex-col items-center">
+                        <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+                        <h2 className="text-xl font-black text-gray-900 uppercase tracking-widest animate-pulse">Analizando PDF...</h2>
                     </div>
                 </div>
             )}
@@ -534,18 +475,18 @@ const Card = ({ title, amount, icon, color, plus, minus, highlight }: any) => {
         }
     } else if (color === 'red') {
         iconBg = "bg-red-50 text-red-500";
-        textAmount = "text-[#FF4D4D] font-black";
+        textAmount = "text-red-500 font-black";
     }
 
     return (
-        <div className={`${bg} rounded-[40px] border p-10 transition-all duration-300 hover:scale-[1.05] hover:shadow-2xl cursor-default flex flex-col justify-between h-52`}>
+        <div className={`${bg} rounded-[40px] border p-10 transition-all duration-300 hover:scale-[1.02] cursor-default flex flex-col justify-between h-52`}>
             <div className="flex items-center justify-between">
                 <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${labelColor}`}>{title}</span>
                 <div className={`p-3 rounded-2xl ${iconBg}`}>
                     <span className="material-symbols-outlined text-2xl">{icon}</span>
                 </div>
             </div>
-            <div className="mt-10 overflow-hidden">
+            <div className="mt-auto">
                 <h4 className={`text-4xl font-black ${textAmount} tracking-tighter truncate leading-none`}>
                     {plus ? '+ ' : minus ? '- ' : ''}${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </h4>
