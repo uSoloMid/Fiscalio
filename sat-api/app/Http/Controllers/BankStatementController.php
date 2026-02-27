@@ -25,8 +25,7 @@ class BankStatementController extends Controller
         $absolutePath = storage_path('app/' . $tempPath);
 
         // Call python script
-        // Note: On Mini PC, python3 is available. We need the path to the bank_parser/main.py
-        $scriptPath = base_path('../bank_parser/main.py');
+        $scriptPath = base_path('bank_parser/main.py');
         $command = "python3 " . escapeshellarg($scriptPath) . " " . escapeshellarg($absolutePath) . " 2>&1";
 
         Log::info("Executing bank parser: " . $command);

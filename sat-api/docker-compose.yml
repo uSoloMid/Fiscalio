@@ -17,6 +17,7 @@ services:
       - ./:/var/www
       - ../Base_datos:/var/www/Base_datos
       - ./secrets:/var/www/secrets
+      - ../bank_parser:/var/www/bank_parser
 
     networks:
       - fiscalio-network
