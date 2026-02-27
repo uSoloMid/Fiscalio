@@ -13,8 +13,7 @@ import { RecentRequests } from '../components/RecentRequests';
 
 export const DashboardPage = ({
     onSelectClient,
-    onViewHistory,
-    onViewBanks
+    onViewHistory
 }: {
     onSelectClient: (rfc: string, name: string, lastSyncAt: string, validUntil: string) => void,
     onViewHistory: () => void
