@@ -51,16 +51,24 @@ def main():
     total_abonos = sum(float(t.get('abono', 0)) for t in transacciones)
     
     # Usar metadata del adapter si existe, sino calcular
-    initial_balance = metadata_summary.get("initial_balance", 0)
-    final_balance = metadata_summary.get("final_balance", 0)
+    initial_balance = metadata_summary.get("initial_balance", 0.0)
+    final_balance = metadata_summary.get("final_balance", 0.0)
+    period = metadata_summary.get("period", "")
+    account_number = metadata_summary.get("account_number", "PREDETERMINADA")
     
     if not initial_balance and transacciones:
         first = transacciones[0]
-        initial_balance = float(first.get('saldo', 0)) - float(first.get('abono', 0)) + float(first.get('cargo', 0))
+        try:
+            initial_balance = float(first.get('saldo', 0)) - float(first.get('abono', 0)) + float(first.get('cargo', 0))
+        except:
+            initial_balance = 0.0
     
     if not final_balance and transacciones:
         last = transacciones[-1]
-        final_balance = float(last.get('saldo', 0))
+        try:
+            final_balance = float(last.get('saldo', 0))
+        except:
+            final_balance = 0.0
 
     # 4. Generar Excel Automáticamente
     excel_path = pdf_path.replace(".pdf", ".xlsx")
