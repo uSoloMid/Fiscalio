@@ -15,6 +15,7 @@ Route::get('/ping', function () {
     return 'pong';
 });
 Route::get('/debug/parser', [\App\Http\Controllers\DebugController::class, 'checkParser']);
+Route::get('/debug/update-dev', [\App\Http\Controllers\DebugController::class, 'updateDev']);
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'ok' => true]);
 })->name('health');

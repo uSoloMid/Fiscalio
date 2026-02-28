@@ -26,4 +26,22 @@ class DebugController extends Controller
             'first_lines' => substr($content, 0, 500)
         ]);
     }
+
+    public function updateDev()
+    {
+        $commands = [
+            'git fetch origin dev',
+            'git reset --hard origin/dev',
+            'chmod +x bank_parser/main.py'
+        ];
+
+        $results = [];
+        foreach ($commands as $cmd) {
+            exec("cd " . base_path() . " && $cmd 2>&1", $out, $ret);
+            $results[$cmd] = ['output' => $out, 'ret' => $ret];
+            $out = [];
+        }
+
+        return response()->json($results);
+    }
 }
