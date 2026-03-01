@@ -76,22 +76,31 @@ def main():
             ]
 
         # 3. Calcular Resumen Financiero con safe_float
+        # Usamos None para distinguir entre "no encontrado" y "encontrado como 0.0"
+        raw_initial = metadata_summary.get("initial_balance")
+        raw_final = metadata_summary.get("final_balance")
+        
+        initial_balance = safe_float(raw_initial, None) if raw_initial is not None else None
+        final_balance = safe_float(raw_final, None) if raw_final is not None else None
+        
         total_cargos = sum(safe_float(t.get('cargo', 0)) for t in transacciones)
         total_abonos = sum(safe_float(t.get('abono', 0)) for t in transacciones)
         
-        initial_balance = safe_float(metadata_summary.get("initial_balance", 0.0))
-        final_balance = safe_float(metadata_summary.get("final_balance", 0.0))
         period = metadata_summary.get("period", "")
         account_number = metadata_summary.get("account_number", "PREDETERMINADA")
         
-        if not initial_balance and transacciones:
+        if initial_balance is None and transacciones:
             first = transacciones[0]
             # Saldo Inicial = Saldo Primero - Abono + Cargo
             initial_balance = safe_float(first.get('saldo', 0)) - safe_float(first.get('abono', 0)) + safe_float(first.get('cargo', 0))
+        elif initial_balance is None:
+            initial_balance = 0.0
         
-        if not final_balance and transacciones:
+        if final_balance is None and transacciones:
             last = transacciones[-1]
             final_balance = safe_float(last.get('saldo', 0))
+        elif final_balance is None:
+            final_balance = 0.0
 
         # 4. Generar Excel Automáticamente
         excel_path = pdf_path.replace(".pdf", ".xlsx")

@@ -9,8 +9,8 @@ def extract_bbva(pdf_path):
                  "JUL": "07", "AGO": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DIC": "12"}
     
     summary = {
-        "initial_balance": 0.0,
-        "final_balance": 0.0,
+        "initial_balance": None,
+        "final_balance": None,
         "total_cargos": 0.0,
         "total_abonos": 0.0,
         "account_number": "PREDETERMINADA",
