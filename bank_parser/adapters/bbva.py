@@ -21,47 +21,64 @@ def extract_bbva(pdf_path):
         with pdfplumber.open(pdf_path) as pdf:
             year_str = "2025"
             
-            # --- PARTE 1: ESCANEAR CARÁTULA (Página 1) ---
-            first_page = pdf.pages[0]
-            first_text = first_page.extract_text() or ""
-            
-            # 1. Detectar Periodo
-            # Formato: DEL 01/01/2025 AL 31/01/2025
-            # El usuario dice que está en la parte superior derecha.
-            period_match = re.search(r"AL (\d{2})/(\d{2})/(\d{4})", first_text)
-            if period_match:
-                d, m, y = period_match.groups()
-                year_str = y
-                months_map = {
-                    "01": "ENE", "02": "FEB", "03": "MAR", "04": "ABR", "05": "MAY", "06": "JUN",
-                    "07": "JUL", "08": "AGO", "09": "SEP", "10": "OCT", "11": "NOV", "12": "DIC"
-                }
-                summary["period"] = f"{months_map.get(m, 'MES')}-{y}"
+            # --- PARTE 1: ESCANEAR RESUMEN (Primeras 4 páginas) ---
+            found_summary = False
+            for p_idx in range(min(4, len(pdf.pages))):
+                if found_summary: break
+                page = pdf.pages[p_idx]
+                page_text = page.extract_text() or ""
+                
+                # 1. Detectar Periodo (solo si no se tiene)
+                if not summary["period"]:
+                    period_match = re.search(r"AL (\d{2})/(\d{2})/(\d{4})", page_text)
+                    if period_match:
+                        d, m, y = period_match.groups()
+                        year_str = y
+                        months_map = {"01":"ENE","02":"FEB","03":"MAR","04":"ABR","05":"MAY","06":"JUN","07":"JUL","08":"AGO","09":"SEP","10":"OCT","11":"NOV","12":"DIC"}
+                        summary["period"] = f"{months_map.get(m, 'MES')}-{y}"
 
-            # 3. Detectar Saldo Anterior (Inicial) e Inicial/Final
-            words = first_page.extract_words()
-            for i, w in enumerate(words):
-                txt = w['text'].upper()
-                
-                # Buscar Saldo Anterior o Inicial
-                if "ANTERIOR" in txt or "INICIAL" in txt:
-                    if summary["initial_balance"] == 0: # Solo si no se ha encontrado
-                        for next_w in words[i+1:i+10]:
-                            if abs(next_w['top'] - w['top']) < 10:
-                                val_str = next_w['text'].replace("$", "").replace(",", "")
-                                try:
-                                    summary["initial_balance"] = float(val_str)
-                                    break
+                # 2. Detectar Balances en la tabla de "Comportamiento" o "Información Financiera"
+                if "COMPORTAMIENTO" in page_text.upper() or "INFORMACION FINANCIERA" in page_text.upper():
+                    words = page.extract_words()
+                    for i, w in enumerate(words):
+                        txt = w['text'].upper()
+                        # Buscar Saldo Anterior (Inicial)
+                        if "ANTERIOR" in txt or ("LIQUIDACI" in txt and "INICIAL" in txt):
+                            # El valor suele ser el último número en la misma línea (y)
+                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
+                            if line_vals:
+                                # Tomar el que esté más a la derecha y parezca número
+                                for cand in reversed(line_vals):
+                                    clean = cand['text'].replace("$","").replace(",","")
+                                    try:
+                                        summary["initial_balance"] = float(clean)
+                                        found_summary = True 
+                                        break
+                                    except: pass
+                        
+                        # Buscar Saldo Final
+                        if "FINAL" in txt and "EXTRACTO" not in txt:
+                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
+                            if line_vals:
+                                for cand in reversed(line_vals):
+                                    clean = cand['text'].replace("$","").replace(",","")
+                                    try:
+                                        summary["final_balance"] = float(clean)
+                                        break
+                                    except: pass
+                        
+                        # Buscar Totales (opcional, para validación)
+                        if "ABONOS" in txt and "+" in txt:
+                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
+                            if line_vals:
+                                clean = line_vals[-1]['text'].replace("$","").replace(",","")
+                                try: summary["total_abonos"] = float(clean)
                                 except: pass
-                
-                if "FINAL" in txt:
-                    if summary["final_balance"] == 0:
-                        for next_w in words[i+1:i+10]:
-                            if abs(next_w['top'] - w['top']) < 10:
-                                val_str = next_w['text'].replace("$", "").replace(",", "")
-                                try:
-                                    summary["final_balance"] = float(val_str)
-                                    break
+                        if "CARGOS" in txt and "-" in txt:
+                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
+                            if line_vals:
+                                clean = line_vals[-1]['text'].replace("$","").replace(",","")
+                                try: summary["total_cargos"] = float(clean)
                                 except: pass
 
             # --- PARTE 2: EXTRAER MOVIMIENTOS ---
