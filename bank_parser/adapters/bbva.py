@@ -37,24 +37,36 @@ def extract_bbva(pdf_path):
                         months_map = {"01":"ENE","02":"FEB","03":"MAR","04":"ABR","05":"MAY","06":"JUN","07":"JUL","08":"AGO","09":"SEP","10":"OCT","11":"NOV","12":"DIC"}
                         summary["period"] = f"{months_map.get(m, 'MES')}-{y}"
 
-                # 2. Detectar Bloque de Resumen
-                header_match = None
+                # 2. Detectar Bloque de Resumen (Comportamiento es el ancla real)
                 words = page.extract_words()
+                anchor = None
                 for w in words:
-                    if "COMPORTAMIENTO" in w['text'].upper() or "INFORMACION FINANCIERA" in w['text'].upper():
-                        header_match = w
+                    if "COMPORTAMIENTO" in w['text'].upper():
+                        anchor = w
                         break
                 
-                if header_match:
-                    # Buscamos solo palabras debajo del header (max 200px)
-                    box_words = [nw for nw in words if nw['top'] > header_match['top'] and nw['top'] < header_match['top'] + 200]
-                    # Agrupar por líneas
+                if not anchor: # Fallback a Información Financiera si no está Comportamiento
+                    for w in words:
+                        if "INFORMACION FINANCIERA" in w['text'].upper():
+                            anchor = w
+                            break
+                
+                if anchor:
+                    # Limitar búsqueda al lado derecho si es Comportamiento (x > 300 aprox)
+                    # Si es Info Financiera, Comportamiento suele estar a la derecha
+                    x_start = anchor['x0'] - 5 
+                    if "INFORMACION" in anchor['text'].upper():
+                        x_start = page.width / 2 # Forzar mitad derecha
+                        
+                    box_words = [nw for nw in words if nw['top'] > anchor['top'] and nw['top'] < anchor['top'] + 250 and nw['x0'] > x_start]
+                    
+                    # Agrupar por líneas (Y)
                     y_groups = {}
                     for bw in box_words:
                         line_y = round(bw['top'])
                         found_y = False
                         for ky in y_groups.keys():
-                            if abs(ky - line_y) < 5:
+                            if abs(ky - line_y) < 6:
                                 y_groups[ky].append(bw)
                                 found_y = True
                                 break
@@ -65,26 +77,31 @@ def extract_bbva(pdf_path):
                         line.sort(key=lambda x: x['x0'])
                         line_txt = " ".join([lw['text'].upper() for lw in line])
                         
-                        # Extraer el valor numérico más a la derecha
+                        # El valor de dinero siempre está al final (derecha)
                         nums_in_line = []
                         for lw in reversed(line):
                             clean = lw['text'].replace("$","").replace(",","")
-                            try:
-                                val = float(clean)
-                                nums_in_line.append(val)
-                            except: pass
+                            # Validar que parezca un monto (con .xx o .00)
+                            if re.match(r"^-?[\d,]+\.\d{2}$", clean) or clean == "0.00" or clean == "0":
+                                try:
+                                    val = float(clean)
+                                    nums_in_line.append(val)
+                                except: pass
                         
                         if not nums_in_line: continue
                         
-                        if "ANTERIOR" in line_txt or ("LIQUIDACI" in line_txt and "INICIAL" in line_txt):
-                            summary["initial_balance"] = nums_in_line[0]
+                        # Tomar el valor más a la derecha
+                        target_val = nums_in_line[0]
+                        
+                        if "ANTERIOR" in line_txt:
+                            summary["initial_balance"] = target_val
                             found_summary = True
-                        elif "FINAL" in line_txt and "EXTRACTO" not in line_txt:
-                            summary["final_balance"] = nums_in_line[0]
-                        elif ("ABONOS" in line_txt or "DEPÓSITOS" in line_txt) and "+" in line_txt:
-                            summary["total_abonos"] = nums_in_line[0]
-                        elif ("CARGOS" in line_txt or "RETIROS" in line_txt) and "-" in line_txt:
-                            summary["total_cargos"] = nums_in_line[0]
+                        elif "FINAL" in line_txt and "(+)" in line_txt:
+                            summary["final_balance"] = target_val
+                        elif "ABONOS" in line_txt:
+                            summary["total_abonos"] = target_val
+                        elif "CARGOS" in line_txt:
+                            summary["total_cargos"] = target_val
 
             # --- PARTE 2: EXTRAER MOVIMIENTOS ---
             in_details = False
