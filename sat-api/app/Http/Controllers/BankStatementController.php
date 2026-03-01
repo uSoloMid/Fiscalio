@@ -38,36 +38,28 @@ class BankStatementController extends Controller
         Log::info("Executing bank parser: " . $command);
 
         exec($command, $output, $returnVar);
-
-        if ($returnVar !== 0) {
-            Log::error("Bank parser failed with code $returnVar. Output: " . implode("\n", $output));
-            return response()->json([
-                'error' => 'Error al procesar el estado de cuenta',
-                'details' => $output
-            ], 500);
-        }
-
         $rawOutput = implode("\n", $output);
         Log::info("Bank parser raw output: " . $rawOutput);
 
-        // Clean JSON output
+        // Clean JSON output (find the first { and the last })
         $startPos = strpos($rawOutput, '{');
         $endPos = strrpos($rawOutput, '}');
+        $data = null;
 
         if ($startPos !== false && $endPos !== false && $endPos > $startPos) {
             $jsonResult = substr($rawOutput, $startPos, $endPos - $startPos + 1);
             $data = json_decode($jsonResult, true);
         }
-        else {
-            $data = null;
-        }
 
-        if (!$data) {
-            Log::error("Failed to decode JSON from bank parser. Cleaned output: " . ($jsonResult ?? 'N/A'));
+        // Error handling: if return code is not 0 OR data couldn't be decoded OR success is false
+        if ($returnVar !== 0 || !$data || (isset($data['success']) && !$data['success'])) {
+            $errorMessage = $data['error'] ?? 'Error desconocido al procesar el estado de cuenta';
+            Log::error("Bank parser failed. Code: $returnVar. Error: $errorMessage. Output: $rawOutput");
+
             return response()->json([
-                'error' => 'No se pudo decodificar el resultado del procesador',
-                'raw' => $jsonResult,
-                'details' => $output
+                'error' => $errorMessage,
+                'details' => $output,
+                'raw' => $rawOutput
             ], 500);
         }
 
@@ -117,20 +109,37 @@ class BankStatementController extends Controller
                 if (strpos($firstDate, '/') !== false) {
                     $parts = explode('/', $firstDate);
                     $months = [
-                        '01' => 'ENE', '02' => 'FEB', '03' => 'MAR', '04' => 'ABR',
-                        '05' => 'MAY', '06' => 'JUN', '07' => 'JUL', '08' => 'AGO',
-                        '09' => 'SEP', '10' => 'OCT', '11' => 'NOV', '12' => 'DIC'
+                        '01' => 'ENE',
+                        '02' => 'FEB',
+                        '03' => 'MAR',
+                        '04' => 'ABR',
+                        '05' => 'MAY',
+                        '06' => 'JUN',
+                        '07' => 'JUL',
+                        '08' => 'AGO',
+                        '09' => 'SEP',
+                        '10' => 'OCT',
+                        '11' => 'NOV',
+                        '12' => 'DIC'
                     ];
                     $mIdx = $parts[1];
                     $period = ($months[$mIdx] ?? 'MES') . '-' . ($parts[2] ?? '2025');
-                }
-                elseif (strpos($firstDate, '-') !== false) {
+                } elseif (strpos($firstDate, '-') !== false) {
                     // Handle YYYY-MM-DD
                     $parts = explode('-', $firstDate);
                     $months = [
-                        '01' => 'ENE', '02' => 'FEB', '03' => 'MAR', '04' => 'ABR',
-                        '05' => 'MAY', '06' => 'JUN', '07' => 'JUL', '08' => 'AGO',
-                        '09' => 'SEP', '10' => 'OCT', '11' => 'NOV', '12' => 'DIC'
+                        '01' => 'ENE',
+                        '02' => 'FEB',
+                        '03' => 'MAR',
+                        '04' => 'ABR',
+                        '05' => 'MAY',
+                        '06' => 'JUN',
+                        '07' => 'JUL',
+                        '08' => 'AGO',
+                        '09' => 'SEP',
+                        '10' => 'OCT',
+                        '11' => 'NOV',
+                        '12' => 'DIC'
                     ];
                     $mIdx = $parts[1];
                     $period = ($months[$mIdx] ?? 'MES') . '-' . ($parts[0] ?? '2025');
@@ -176,8 +185,7 @@ class BankStatementController extends Controller
             DB::commit();
 
             return response()->json(['success' => true, 'id' => $statement->id]);
-        }
-        catch (\Exception $e) {
+        } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Error confirming bank statement: " . $e->getMessage());
             return response()->json(['error' => $e->getMessage()], 500);

@@ -36,11 +36,11 @@ ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no fiscalio@100.123.107.90
 Para despliegues automatizados desde scripts, se recomienda usar el archivo `deploy_dev.py` que ya incluye estas protecciones.
 
 ## 🌿 3. Flujo de Ramas (Branches) y Deploy
-Usamos dos ramas principales para proteger el servidor del cliente:
+**⚠️ REGLA DE ORO**: No se prueban cambios en el entorno local (Windows). Todo el desarrollo se sube directamente a la rama `dev` para ser validado en el entorno real (Mini PC) mediante la UI de Vercel.
 
 1. **`dev` (Desarrollo / Staging)**
-   - Aquí se programa.
-   - Cada commit que haces a `dev` genera un despliegue automático de "Preview" en Vercel.
+   - Aquí se desarrolla.
+   - Cada commit que envías a `dev` genera un despliegue automático de "Preview" en Vercel.
    - **ADVERTENCIA**: La UI de preview de Vercel en `dev` apunta a los mismos datos de la Mini PC, ¡cualquier cambio manipula datos reales de la BD!
 2. **`main` (Producción)**
    - Es sagrada. Solo se actualiza tras probar en `dev`.

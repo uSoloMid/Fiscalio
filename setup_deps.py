@@ -7,7 +7,7 @@ def setup_python_deps():
     
     # Install packages with --break-system-packages
     commands = [
-        "docker exec -u root api pip3 install pdfplumber pandas openpyxl --break-system-packages"
+        "docker exec -u root api pip3 install pdfplumber pandas openpyxl pymupdf --break-system-packages"
     ]
     
     ssh = paramiko.SSHClient()
