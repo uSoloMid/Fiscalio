@@ -25,6 +25,16 @@ ssh fiscalio@100.123.107.90
 ```
 *(Si usas llaves SSH puedes omitir la contraseña una vez configuradas).*
 
+**⚠️ Solución de Problemas de Conexión (Flags Recomendados):**
+Si la conexión falla por verificación de host o timeout, usa estos flags para forzar el acceso:
+```bash
+ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no fiscalio@100.123.107.90
+```
+- `ConnectTimeout=10`: Espera 10 segundos antes de rendirse (útil en redes inestables o Tailscale lento).
+- `StrictHostKeyChecking=no`: Ignora si la "huella" del servidor cambió (común al reinstalar o mover la Mini PC).
+
+Para despliegues automatizados desde scripts, se recomienda usar el archivo `deploy_dev.py` que ya incluye estas protecciones.
+
 ## 🌿 3. Flujo de Ramas (Branches) y Deploy
 Usamos dos ramas principales para proteger el servidor del cliente:
 
