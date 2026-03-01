@@ -38,33 +38,31 @@ def extract_bbva(pdf_path):
                 }
                 summary["period"] = f"{months_map.get(m, 'MES')}-{y}"
 
-            # 2. Detectar No. de Cuenta
-            acc_match = re.search(r"No\. de Cuenta\s+(\d+)", first_text)
-            if acc_match:
-                summary["account_number"] = acc_match.group(1)
-
-            # 3. Detectar Saldo Anterior (Inicial)
-            # En la captura se ve "Saldo Anterior" y el monto a la derecha.
+            # 3. Detectar Saldo Anterior (Inicial) e Inicial/Final
             words = first_page.extract_words()
             for i, w in enumerate(words):
-                txt = w['text']
-                if "Anterior" in txt:
-                    # El monto suele estar a la derecha en la misma línea
-                    for next_w in words[i+1:i+15]:
-                        if abs(next_w['top'] - w['top']) < 8: # misma línea (margen 8px)
-                            # Intentar limpiar el texto para ver si es un número: $ 98,394.46
-                            clean_val = next_w['text'].replace("$", "").replace(",", "")
-                            if re.match(r"^-?\d+\.\d{2}$", clean_val):
-                                summary["initial_balance"] = float(clean_val)
-                                break
+                txt = w['text'].upper()
                 
-                if "Final" in txt:
-                    for next_w in words[i+1:i+15]:
-                        if abs(next_w['top'] - w['top']) < 8:
-                            clean_val = next_w['text'].replace("$", "").replace(",", "")
-                            if re.match(r"^-?\d+\.\d{2}$", clean_val):
-                                summary["final_balance"] = float(clean_val)
-                                break
+                # Buscar Saldo Anterior o Inicial
+                if "ANTERIOR" in txt or "INICIAL" in txt:
+                    if summary["initial_balance"] == 0: # Solo si no se ha encontrado
+                        for next_w in words[i+1:i+10]:
+                            if abs(next_w['top'] - w['top']) < 10:
+                                val_str = next_w['text'].replace("$", "").replace(",", "")
+                                try:
+                                    summary["initial_balance"] = float(val_str)
+                                    break
+                                except: pass
+                
+                if "FINAL" in txt:
+                    if summary["final_balance"] == 0:
+                        for next_w in words[i+1:i+10]:
+                            if abs(next_w['top'] - w['top']) < 10:
+                                val_str = next_w['text'].replace("$", "").replace(",", "")
+                                try:
+                                    summary["final_balance"] = float(val_str)
+                                    break
+                                except: pass
 
             # --- PARTE 2: EXTRAER MOVIMIENTOS ---
             in_details = False

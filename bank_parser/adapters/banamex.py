@@ -7,6 +7,13 @@ def extract_banamex(pdf_path):
     meses_str = {"ENE": "01", "FEB": "02", "MAR": "03", "ABR": "04", "MAY": "05", "JUN": "06", 
                  "JUL": "07", "AGO": "08", "SEP": "09", "OCT": "10", "NOV": "11", "DIC": "12"}
     
+    summary = {
+        "initial_balance": 0.0,
+        "final_balance": 0.0,
+        "period": "",
+        "account_number": "PREDETERMINADA"
+    }
+    
     try:
         with pdfplumber.open(pdf_path) as pdf:
             year_str = "2026"
@@ -14,26 +21,47 @@ def extract_banamex(pdf_path):
             current_tx = None
             stop_all = False
             
-            # Buscar el año global y mes
-            first_text = pdf.pages[0].extract_text() or ""
-            # Ejemplo: ESTADO DE CUENTA AL 31 DE ENERO DE 2025
+            # --- PARTE 1: METADATOS (Página 1) ---
+            first_page = pdf.pages[0]
+            first_text = first_page.extract_text() or ""
+            
+            # 1. Detectar Periodo: AL 31 DE ENERO DE 2026
             ym = re.search(r"AL (\d{2}) DE ([A-Z]+) DE (\d{4})", first_text, re.I)
             if ym: 
                 year_str = ym.group(3)
                 month_name = ym.group(2).upper()
-                meses_full = {
-                    "ENERO": "01", "FEBRERO": "02", "MARZO": "03", "ABRIL": "04",
-                    "MAYO": "05", "JUNIO": "06", "JULIO": "07", "AGOSTO": "08",
-                    "SEPTIEMBRE": "09", "OCTUBRE": "10", "NOVIEMBRE": "11", "DICIEMBRE": "12"
-                }
-                # Si el mes es largo, lo mapeamos para ayudar a la detección si fuera necesario
-                # Aunque Laravel usa la fecha de la primera transacción, tener el year_str correcto es vital.
+                summary["period"] = f"{month_name[:3]}-{year_str}"
+            
+            # 2. Detectar No. Cuenta o Cliente
+            acc_match = re.search(r"CLIENTE:\s+(\d+)", first_text, re.I)
+            if acc_match: summary["account_number"] = acc_match.group(1)
 
+            # 3. Detectar Balances en carátula si existen
+            words = first_page.extract_words()
+            for i, w in enumerate(words):
+                txt = w['text'].upper()
+                if "ANTERIOR" in txt:
+                    for next_w in words[i+1:i+10]:
+                        if abs(next_w['top'] - w['top']) < 10:
+                            clean = next_w['text'].replace("$","").replace(",","")
+                            try:
+                                summary["initial_balance"] = float(clean)
+                                break
+                            except: pass
+                if "ACTUAL" in txt or "FINAL" in txt:
+                    for next_w in words[i+1:i+10]:
+                        if abs(next_w['top'] - w['top']) < 10:
+                            clean = next_w['text'].replace("$","").replace(",","")
+                            try:
+                                summary["final_balance"] = float(clean)
+                                break
+                            except: pass
+
+            # --- PARTE 2: MOVIMIENTOS ---
             for page in pdf.pages:
                 if stop_all: break
                 
-                # Extraemos las palabras exactas con su ubicación X e Y (evita usar layout=True ambiguo)
-                words = page.extract_words(x_tolerance=2, y_tolerance=3, keep_blank_chars=False)
+                words = page.extract_words(x_tolerance=2, y_tolerance=3)
                 if not words: continue
                 
                 lines = []
@@ -46,56 +74,41 @@ def extract_banamex(pdf_path):
                     else:
                         lines.append(current_line)
                         current_line = [w]
-                if current_line:
-                    lines.append(current_line)
+                if current_line: lines.append(current_line)
 
-                # --- BARRERA GEOMÉTRICA (COORDENADA Y) ---
-                # Como lo sugirió el usuario, encontramos la altura (Y) exacta donde empieza el área de saldos promedio / comisiones
-                # y cortamos la hoja entera a esa altura.
                 cutoff_y = page.height
                 for line_words in lines:
-                    text_line = " ".join([w['text'] for w in line_words])
-                    if any(kw in text_line for kw in ["Banca Electrónica Empresarial", "SALDO PROMEDIO MINIMO", "COMISIONES COBRADAS"]):
-                        cutoff_y = min(cutoff_y, line_words[0]['top'] - 2) # Margen de 2 pixeles hacia arriba
-                        stop_all = True # Que ya no lea más páginas después de esta
+                    text_line = " ".join([w['text'] for w in line_words]).upper()
+                    if any(kw in text_line for kw in ["BANCA ELECTRÓNICA", "SALDO PROMEDIO MINIMO", "COMISIONES COBRADAS"]):
+                        cutoff_y = min(cutoff_y, line_words[0]['top'] - 2)
+                        stop_all = True
                         break
                         
-                # Filtramos las líneas que están más abajo de la barrera
                 valid_lines = [lw for lw in lines if lw[0]['top'] < cutoff_y]
 
                 for line_words in valid_lines:
                     text_line = " ".join([w['text'] for w in line_words])
                     
-                    if "DETALLE DE OPERACIONES" in text_line:
+                    if "DETALLE DE OPERACIONES" in text_line.upper():
                         in_details = True
                         continue
                     
                     if not in_details: continue
-                    
-                    if "SALDO ANTERIOR" in text_line:
-                        continue
+                    if "SALDO ANTERIOR" in text_line.upper(): continue
                         
                     first_word = line_words[0]
                     date_match = None
-                    
-                    # Una fecha suele estar pegada al margen izquierdo (x0 < 60)
-                    if first_word['x0'] < 60 and len(line_words) >= 2:
+                    if first_word['x0'] < 70 and len(line_words) >= 2:
                         match_str = f"{line_words[0]['text']} {line_words[1]['text']}"
-                        date_match = re.match(r"^(\d{2}) ([A-Z]{3})$", match_str)
+                        date_match = re.match(r"^(\d{2}) ([A-Z]{3})$", match_str.upper())
                         
-                    # Si detectamos inicio de un movimiento nuevo
-                    if date_match and "SALDO" not in text_line and "CAJA" not in text_line:
-                        # Guardar el movimiento que ya traíamos
-                        if current_tx:
-                            transacciones.append(current_tx)
-                            
+                    if date_match and "SALDO" not in text_line.upper():
+                        if current_tx: transacciones.append(current_tx)
                         dia = date_match.group(1)
                         mes = meses_str.get(date_match.group(2), "01")
-                        fecha_format = f"{year_str}-{mes}-{dia}"
-                        
                         current_tx = {
                             "banco": "BANAMEX",
-                            "fecha": fecha_format,
+                            "fecha": f"{year_str}-{mes}-{dia}",
                             "concepto": "",
                             "referencia": "",
                             "cargo": 0.0,
@@ -106,43 +119,35 @@ def extract_banamex(pdf_path):
                     if current_tx:
                         desc_parts = []
                         for i, w in enumerate(line_words):
-                            text_w = w['text']
+                            tw = w['text']
                             x1 = w['x1']
                             x0 = w['x0']
                             
-                            # Ignorar las primeras palabras si son "06 ENE" pegadas a la izquierda
-                            if i < 2 and x0 < 60 and text_w in [current_tx["fecha"][-2:], meses_str.get(date_match.group(2) if date_match else "", "")] or (date_match and i < 2):
-                                continue
+                            if date_match and i < 2 and x0 < 70: continue
                             
-                            # Regex estricto: ¿Esta palabra es Cifra Financiera (.00)?
-                            if re.match(r"^-?\d{1,3}(,\d{3})*\.\d{2}$", text_w):
-                                val = float(text_w.replace(",", ""))
-                                
-                                # LECTURA GEOMÉTRICA (En milímetros desde la izquierda)
-                                # Cargos (Retiros): x1 suele estar cerca del pixel 316
-                                # Abonos (Depositos): x1 suele estar cerca del pixel 395
-                                # Saldo: x1 suele estar cerca del pixel 472
-                                if 250 <= x1 <= 330:
+                            # Regex flexible para cifras
+                            if re.match(r"^-?[\d,]+\.\d{2}$", tw):
+                                val = float(tw.replace(",", ""))
+                                # Banamex: Retiros (x1~320), Depositos (x1~400), Saldo (x1~480)
+                                if 240 <= x1 <= 345:
                                     current_tx["cargo"] = val
-                                elif 331 <= x1 <= 410:
+                                elif 346 <= x1 <= 435:
                                     current_tx["abono"] = val
-                                elif x1 >= 411:
+                                elif x1 >= 436:
                                     current_tx["saldo"] = val
                             else:
-                                # Todo lo demas es parte de las descripciones del banco (sucursal, etc.)
-                                desc_parts.append(text_w)
+                                desc_parts.append(tw)
                                 
-                        concepto_limpio = " ".join(desc_parts)
-                        current_tx["concepto"] = (current_tx["concepto"] + " " + concepto_limpio).strip()
+                        inc_desc = " ".join(desc_parts)
+                        if inc_desc:
+                            current_tx["concepto"] = (current_tx["concepto"] + " " + inc_desc).strip()
                         
-                        # Intentar sacar referencia limpia de RASTREO: o REF.
-                        ref_match = re.search(r"(REF\.|RASTREO:)\s*([A-Z0-9]+)", current_tx["concepto"])
+                        ref_match = re.search(r"(REF\.|RASTREO:)\s*([A-Z0-9]+)", current_tx["concepto"].upper())
                         if ref_match: current_tx["referencia"] = ref_match.group(2)
 
-            if current_tx:
-                transacciones.append(current_tx)
+            if current_tx: transacciones.append(current_tx)
                 
-        return transacciones
+        return {"movements": transacciones, "summary": summary}
     except Exception as e:
         sys.stderr.write(f"Error procesando Banamex: {e}\n")
-        return []
+        return {"movements": [], "summary": summary}

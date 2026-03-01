@@ -8,16 +8,18 @@ from adapters.bbva import extract_bbva
 from adapters.banamex import extract_banamex
 
 def safe_float(val, default=0.0):
-    if val is None:
-        return default
-    if isinstance(val, (int, float)):
-        return float(val)
     try:
         # Limpiar caracteres comunes en estados de cuenta
-        clean_val = str(val).replace('$', '').replace(',', '').replace(' ', '').replace('--', '0')
-        if not clean_val or clean_val == '-':
+        if val is None: return default
+        s = str(val).strip().replace('$', '').replace(',', '').replace(' ', '')
+        if not s or s == '-' or s == '--':
             return default
-        return float(clean_val)
+        # Manejar negativos representados como (100.00) o 100.00-
+        if s.startswith('(') and s.endswith(')'):
+            s = '-' + s[1:-1]
+        elif s.endswith('-'):
+            s = '-' + s[:-1]
+        return float(s)
     except (ValueError, TypeError):
         return default
 
@@ -35,11 +37,11 @@ def main():
             banco = identify_bank(pdf_path)
         except Exception as e:
             sys.stderr.write(f"Error clasificando banco: {e}\n")
-            banco = None
+            banco = "desconocido"
         
-        if not banco:
-            print(json.dumps({"success": False, "error": "No se pudo identificar el banco del PDF."}))
-            sys.exit(0) # Salir con 0 para que PHP pueda leer el JSON de error correctamente
+        if not banco or banco == "desconocido":
+            # Si no se identifica, intentamos proceder
+            pass
             
         # 2. Extraer Transacciones
         try:
@@ -48,9 +50,13 @@ def main():
                 result_data = extract_bbva(pdf_path)
             elif banco == "banamex":
                 result_data = extract_banamex(pdf_path)
-            # Otros bancos...
+            else:
+                # Intento ciego si se forzó o algo
+                result_data = {"movements": [], "summary": {}}
         except Exception as e:
-            print(json.dumps({"success": False, "error": f"Error en adapter {banco}: {str(e)}"}))
+            import traceback
+            sys.stderr.write(f"Error en adapter {banco}: {traceback.format_exc()}\n")
+            print(json.dumps({"success": False, "error": f"Error en procesador {banco}: {str(e)}"}))
             sys.exit(0)
             
         # Normalizar resultados
