@@ -28,7 +28,7 @@ def extract_bbva(pdf_path):
                 page = pdf.pages[p_idx]
                 page_text = page.extract_text() or ""
                 
-                # 1. Detectar Periodo (solo si no se tiene)
+                # 1. Detectar Periodo
                 if not summary["period"]:
                     period_match = re.search(r"AL (\d{2})/(\d{2})/(\d{4})", page_text)
                     if period_match:
@@ -37,49 +37,54 @@ def extract_bbva(pdf_path):
                         months_map = {"01":"ENE","02":"FEB","03":"MAR","04":"ABR","05":"MAY","06":"JUN","07":"JUL","08":"AGO","09":"SEP","10":"OCT","11":"NOV","12":"DIC"}
                         summary["period"] = f"{months_map.get(m, 'MES')}-{y}"
 
-                # 2. Detectar Balances en la tabla de "Comportamiento" o "Información Financiera"
-                if "COMPORTAMIENTO" in page_text.upper() or "INFORMACION FINANCIERA" in page_text.upper():
-                    words = page.extract_words()
-                    for i, w in enumerate(words):
-                        txt = w['text'].upper()
-                        # Buscar Saldo Anterior (Inicial)
-                        if "ANTERIOR" in txt or ("LIQUIDACI" in txt and "INICIAL" in txt):
-                            # El valor suele ser el último número en la misma línea (y)
-                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
-                            if line_vals:
-                                # Tomar el que esté más a la derecha y parezca número
-                                for cand in reversed(line_vals):
-                                    clean = cand['text'].replace("$","").replace(",","")
-                                    try:
-                                        summary["initial_balance"] = float(clean)
-                                        found_summary = True 
-                                        break
-                                    except: pass
+                # 2. Detectar Bloque de Resumen
+                header_match = None
+                words = page.extract_words()
+                for w in words:
+                    if "COMPORTAMIENTO" in w['text'].upper() or "INFORMACION FINANCIERA" in w['text'].upper():
+                        header_match = w
+                        break
+                
+                if header_match:
+                    # Buscamos solo palabras debajo del header (max 200px)
+                    box_words = [nw for nw in words if nw['top'] > header_match['top'] and nw['top'] < header_match['top'] + 200]
+                    # Agrupar por líneas
+                    y_groups = {}
+                    for bw in box_words:
+                        line_y = round(bw['top'])
+                        found_y = False
+                        for ky in y_groups.keys():
+                            if abs(ky - line_y) < 5:
+                                y_groups[ky].append(bw)
+                                found_y = True
+                                break
+                        if not found_y: y_groups[line_y] = [bw]
+                    
+                    for y_coord in sorted(y_groups.keys()):
+                        line = y_groups[y_coord]
+                        line.sort(key=lambda x: x['x0'])
+                        line_txt = " ".join([lw['text'].upper() for lw in line])
                         
-                        # Buscar Saldo Final
-                        if "FINAL" in txt and "EXTRACTO" not in txt:
-                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
-                            if line_vals:
-                                for cand in reversed(line_vals):
-                                    clean = cand['text'].replace("$","").replace(",","")
-                                    try:
-                                        summary["final_balance"] = float(clean)
-                                        break
-                                    except: pass
+                        # Extraer el valor numérico más a la derecha
+                        nums_in_line = []
+                        for lw in reversed(line):
+                            clean = lw['text'].replace("$","").replace(",","")
+                            try:
+                                val = float(clean)
+                                nums_in_line.append(val)
+                            except: pass
                         
-                        # Buscar Totales (opcional, para validación)
-                        if "ABONOS" in txt and "+" in txt:
-                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
-                            if line_vals:
-                                clean = line_vals[-1]['text'].replace("$","").replace(",","")
-                                try: summary["total_abonos"] = float(clean)
-                                except: pass
-                        if "CARGOS" in txt and "-" in txt:
-                            line_vals = [nw for nw in words if abs(nw['top'] - w['top']) < 8 and nw['x0'] > w['x1']]
-                            if line_vals:
-                                clean = line_vals[-1]['text'].replace("$","").replace(",","")
-                                try: summary["total_cargos"] = float(clean)
-                                except: pass
+                        if not nums_in_line: continue
+                        
+                        if "ANTERIOR" in line_txt or ("LIQUIDACI" in line_txt and "INICIAL" in line_txt):
+                            summary["initial_balance"] = nums_in_line[0]
+                            found_summary = True
+                        elif "FINAL" in line_txt and "EXTRACTO" not in line_txt:
+                            summary["final_balance"] = nums_in_line[0]
+                        elif ("ABONOS" in line_txt or "DEPÓSITOS" in line_txt) and "+" in line_txt:
+                            summary["total_abonos"] = nums_in_line[0]
+                        elif ("CARGOS" in line_txt or "RETIROS" in line_txt) and "-" in line_txt:
+                            summary["total_cargos"] = nums_in_line[0]
 
             # --- PARTE 2: EXTRAER MOVIMIENTOS ---
             in_details = False
