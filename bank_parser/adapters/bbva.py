@@ -37,71 +37,55 @@ def extract_bbva(pdf_path):
                         months_map = {"01":"ENE","02":"FEB","03":"MAR","04":"ABR","05":"MAY","06":"JUN","07":"JUL","08":"AGO","09":"SEP","10":"OCT","11":"NOV","12":"DIC"}
                         summary["period"] = f"{months_map.get(m, 'MES')}-{y}"
 
-                # 2. Detectar Bloque de Resumen (Comportamiento es el ancla real)
+                # 2. Búsqueda Quirúrgica de Balances
                 words = page.extract_words()
-                anchor = None
+                
+                # Definimos los labels y las claves del summary
+                # Buscamos combinaciones para mayor robustez
+                targets = [
+                    (r"SALDO\s+ANTERIOR", "initial_balance"),
+                    (r"SALDO\s+DE\s+LIQUIDACI.N\s+INICIAL", "initial_balance"),
+                    (r"SALDO\s+DE\s+OPERACI.N\s+INICIAL", "initial_balance"),
+                    (r"SALDO\s+FINAL", "final_balance"),
+                    (r"DEP.SITOS\s+/\s+ABONOS", "total_abonos"),
+                    (r"RETIROS\s+/\s+CARGOS", "total_cargos")
+                ]
+
+                # Agrupar palabras por líneas para facilitar el emparejamiento
+                lines = {}
                 for w in words:
-                    if "COMPORTAMIENTO" in w['text'].upper():
-                        anchor = w
-                        break
-                
-                if not anchor: # Fallback a Información Financiera si no está Comportamiento
-                    for w in words:
-                        if "INFORMACION FINANCIERA" in w['text'].upper():
-                            anchor = w
+                    y = round(w['top'])
+                    found_y = False
+                    for ky in lines.keys():
+                        if abs(ky - y) < 6:
+                            lines[ky].append(w)
+                            found_y = True
                             break
+                    if not found_y: lines[y] = [w]
+
+                for y_coord in sorted(lines.keys()):
+                    line_words = sorted(lines[y_coord], key=lambda x: x['x0'])
+                    line_txt = " ".join([lw['text'].upper() for lw in line_words])
+                    
+                    for pattern, key in targets:
+                        if re.search(pattern, line_txt):
+                            # El valor debe estar a la derecha de la página (x1 > 450)
+                            # y ser el último número financiero de la línea
+                            for cand in reversed(line_words):
+                                clean = cand['text'].replace("$", "").replace(",", "")
+                                # Solo aceptamos si parece dinero o es 0/0.00
+                                if re.match(r"^-?[\d,]+\.\d{2}$", clean) or clean in ["0", "0.00"]:
+                                    # Y que esté en la zona de montos (derecha)
+                                    if cand['x1'] > 480:
+                                        summary[key] = float(clean)
+                                        if key == "initial_balance": found_summary = True
+                                        break
+                            if found_summary and key == "initial_balance": break
                 
-                if anchor:
-                    # Limitar búsqueda al lado derecho si es Comportamiento (x > 300 aprox)
-                    # Si es Info Financiera, Comportamiento suele estar a la derecha
-                    x_start = anchor['x0'] - 5 
-                    if "INFORMACION" in anchor['text'].upper():
-                        x_start = page.width / 2 # Forzar mitad derecha
-                        
-                    box_words = [nw for nw in words if nw['top'] > anchor['top'] and nw['top'] < anchor['top'] + 250 and nw['x0'] > x_start]
-                    
-                    # Agrupar por líneas (Y)
-                    y_groups = {}
-                    for bw in box_words:
-                        line_y = round(bw['top'])
-                        found_y = False
-                        for ky in y_groups.keys():
-                            if abs(ky - line_y) < 6:
-                                y_groups[ky].append(bw)
-                                found_y = True
-                                break
-                        if not found_y: y_groups[line_y] = [bw]
-                    
-                    for y_coord in sorted(y_groups.keys()):
-                        line = y_groups[y_coord]
-                        line.sort(key=lambda x: x['x0'])
-                        line_txt = " ".join([lw['text'].upper() for lw in line])
-                        
-                        # El valor de dinero siempre está al final (derecha)
-                        nums_in_line = []
-                        for lw in reversed(line):
-                            clean = lw['text'].replace("$","").replace(",","")
-                            # Validar que parezca un monto (con .xx o .00)
-                            if re.match(r"^-?[\d,]+\.\d{2}$", clean) or clean == "0.00" or clean == "0":
-                                try:
-                                    val = float(clean)
-                                    nums_in_line.append(val)
-                                except: pass
-                        
-                        if not nums_in_line: continue
-                        
-                        # Tomar el valor más a la derecha
-                        target_val = nums_in_line[0]
-                        
-                        if "ANTERIOR" in line_txt:
-                            summary["initial_balance"] = target_val
-                            found_summary = True
-                        elif "FINAL" in line_txt and "(+)" in line_txt:
-                            summary["final_balance"] = target_val
-                        elif "ABONOS" in line_txt:
-                            summary["total_abonos"] = target_val
-                        elif "CARGOS" in line_txt:
-                            summary["total_cargos"] = target_val
+                # 3. Detectar No. de Cuenta si no se tiene
+                if summary["account_number"] == "PREDETERMINADA":
+                    acc_match = re.search(r"No\. de Cuenta\s+(\d+)", page_text, re.I)
+                    if acc_match: summary["account_number"] = acc_match.group(1)
 
             # --- PARTE 2: EXTRAER MOVIMIENTOS ---
             in_details = False
