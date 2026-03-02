@@ -69,7 +69,25 @@ class SatRunnerCommand extends Command
     {
         $this->info("[Runner] Procesando Request {$req->id} (RFC: {$req->rfc}) - Estado: {$req->state}");
         try {
-            $this->satService = new SatDescargaMasivaService($req->rfc);
+            // Incrementar intentos
+            $req->attempts = ($req->attempts ?? 0) + 1;
+
+            // Si el password o certificado es inválido, fallamos de inmediato para no buclear
+            try {
+                $this->satService = new SatDescargaMasivaService($req->rfc);
+            }
+            catch (Exception $authError) {
+                $authMsg = $authError->getMessage();
+                if (str_contains($authMsg, 'Certificado') || str_contains($authMsg, 'firma') || str_contains($authMsg, 'key') || str_contains($authMsg, 'passphrase')) {
+                    $req->state = 'failed';
+                    $req->last_error = "Error de Credenciales: " . $authMsg;
+                    $req->save();
+                    $this->error("[Fatal] Error de autenticación para {$req->rfc}: " . $authMsg);
+                    return;
+                }
+                throw $authError; // Re-throw to be caught by the outer block if it's another type of error
+            }
+
             $this->xmlProcessor = new XmlProcessorService();
 
             switch ($req->state) {
@@ -83,18 +101,31 @@ class SatRunnerCommand extends Command
                     $this->stepDownload($req);
                     break;
             }
+
+            // Reset error if successful step
+            $req->last_error = null;
+            $req->save();
+
         }
         catch (Exception $e) {
             $msg = $e->getMessage();
             $this->error("[Error] " . $msg);
+            $req->last_error = $msg;
 
             // Si el SAT rechaza porque no hay información, detenemos el proceso (se marca completado con 0 XMLs)
-            if (str_contains($msg, 'Solicitud rechazada') || str_contains($msg, 'No se encontró la información')) {
+            if (str_contains($msg, 'Solicitud rechazada') || str_contains($msg, 'No se encontró la información') || str_contains($msg, 'vencida')) {
                 $req->state = 'completed';
-                $this->info("Marcando Request {$req->id} como completado (Sin información/Rechazada por SAT).");
+                $this->info("Marcando Request {$req->id} como completado (Sin información/Rechazada/Vencida por SAT).");
             }
             else {
-                $req->next_retry_at = now()->addMinutes(1);
+                // Si ya van muchos intentos, marcar como fallida para que no estorbe en la cola
+                if ($req->attempts >= 5) {
+                    $req->state = 'failed';
+                    $this->error("Máximo de intentos (5) alcanzado para Request {$req->id}.");
+                }
+                else {
+                    $req->next_retry_at = now()->addMinutes(2);
+                }
             }
 
             $req->save();
