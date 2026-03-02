@@ -189,10 +189,14 @@ class ProvisionalControlController extends Controller
     {
         $alerts = [];
         $business = DB::table('businesses')->where('rfc', $rfc)->first();
-        
-        // 1. Regime Alert
-        if ($business && $business->regimen_fiscal === '626') {
-            if ($business->tipo_persona === 'F') {
+        if (!$business) return [];
+
+        // 1. Regime Alert - Check if properties exist to avoid undefined property errors
+        $regimen = $business->regimen_fiscal ?? null;
+        $tipoPersona = $business->tipo_persona ?? null;
+
+        if ($regimen === '626') {
+            if ($tipoPersona === 'F') {
                 $alerts[] = [
                     'type' => 'warning',
                     'title' => 'Régimen RESICO P. Física',
