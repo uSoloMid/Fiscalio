@@ -475,6 +475,7 @@ class ProvisionalControlController extends Controller
             $details = [
                 'ingresos' => collect(),
                 'egresos' => collect(),
+                'no_deducibles' => collect(),
             ];
 
             foreach(['ingresos_total_pue', 'ingresos_total_rep'] as $b) {
@@ -483,10 +484,16 @@ class ProvisionalControlController extends Controller
                 $details['ingresos'] = $details['ingresos']->concat($items);
             }
 
-            foreach(['egresos_total_pue', 'egresos_total_rep'] as $b) {
+            foreach(['egresos_total_pue', 'egresos_total_ppd', 'egresos_total_rep'] as $b) {
                 $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
                 $details['egresos'] = $details['egresos']->concat($items);
+            }
+
+            foreach(['egresos_nodeducibles_pue', 'egresos_nodeducibles_ppd', 'egresos_nodeducibles_rep'] as $b) {
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $items = collect($this->getBucketDetails($req)->original);
+                $details['no_deducibles'] = $details['no_deducibles']->concat($items);
             }
 
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
@@ -520,6 +527,12 @@ class ProvisionalControlController extends Controller
             $bucket = (string)$request->query('bucket');
 
             $items = $this->getBucketDetails($request)->original;
+
+            foreach(['egresos_nodeducibles_pue', 'egresos_nodeducibles_ppd', 'egresos_nodeducibles_rep'] as $b) {
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $items = collect($this->getBucketDetails($req)->original);
+                $details['no_deducibles'] = $details['no_deducibles']->concat($items);
+            }
 
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
             $clientName = $client ? $client->name : $rfc;
