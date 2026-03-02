@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class SatSyncAllCommand extends Command
 {
-    protected $signature = 'sat:sync-all';
+    protected $signature = 'sat:sync-all {--force : Forzar sincronización ignorando el umbral de 12h}';
     protected $description = 'Dispara el proceso de sincronización para todos los contribuyentes activos (respeta el umbral de 12h)';
 
     public function handle(BusinessSyncService $service)
@@ -16,8 +16,10 @@ class SatSyncAllCommand extends Command
         $businesses = Business::all();
         $this->info("Iniciando revisión de sincronización para " . $businesses->count() . " contribuyentes...");
 
+        $force = $this->option('force') ?? false;
+
         foreach ($businesses as $business) {
-            $result = $service->syncIfNeeded($business);
+            $result = $service->syncIfNeeded($business, $force);
 
             if ($result['status'] === 'success') {
                 $this->info("[{$business->rfc}] Sincronización encolada: {$result['requests_created']} nuevas solicitudes.");
