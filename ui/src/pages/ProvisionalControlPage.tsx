@@ -181,8 +181,9 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         });
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(amount);
+    const formatCurrency = (amount: any) => {
+        const val = typeof amount === 'number' ? amount : (parseFloat(amount) || 0);
+        return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
     };
 
     const months = [
@@ -562,9 +563,9 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                     </div>
                                                 </div>
                                                 <div className="text-right flex-shrink-0">
-                                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Base: {formatCurrency(item.subtotal)}</div>
-                                                    <div className="text-2xl font-black text-gray-900 tracking-tighter">{formatCurrency(item.total)}</div>
-                                                    <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">IVA: {formatCurrency(item.iva)}</div>
+                                                    <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Base: {formatCurrency(item?.subtotal)}</div>
+                                                    <div className="text-2xl font-black text-gray-900 tracking-tighter">{formatCurrency(item?.total)}</div>
+                                                    <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-0.5">IVA: {formatCurrency(item?.iva)}</div>
                                                 </div>
 
                                                 <div className="flex items-center gap-2 pl-6 border-l border-gray-50">
