@@ -202,6 +202,8 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         const totalStyle = mode === 'ingresos' ? "text-xs font-black text-emerald-600" : "text-xs font-black text-blue-600";
         const pendingStyle = "text-xs font-bold text-orange-500";
 
+        if (!data) return null;
+
         return (
             <tr className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                 <td className={mainLabelStyle}>{label}</td>
@@ -336,7 +338,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                     </div>
                                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ingresos del Mes</div>
                                     <div className="text-4xl font-black text-gray-900 tracking-tighter">
-                                        {formatCurrency(summary?.ingresos.total_efectivo || 0)}
+                                        {summary?.ingresos ? formatCurrency(summary.ingresos.total_efectivo) : '$0.00'}
                                     </div>
                                 </div>
 
@@ -352,7 +354,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                     </div>
                                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Gastos del Mes</div>
                                     <div className="text-4xl font-black text-gray-900 tracking-tighter">
-                                        {formatCurrency(summary?.egresos.total_efectivo || 0)}
+                                        {summary?.egresos ? formatCurrency(summary.egresos.total_efectivo) : '$0.00'}
                                     </div>
                                 </div>
 
@@ -363,18 +365,18 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                                             Balance Operativo (Estimado)
                                         </div>
-                                        <div className={`text-4xl font-black tracking-tighter ${((summary?.ingresos.total_efectivo || 0) - (summary?.egresos.total_efectivo || 0)) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                            {formatCurrency((summary?.ingresos.total_efectivo || 0) - (summary?.egresos.total_efectivo || 0))}
+                                        <div className={`text-4xl font-black tracking-tighter ${((summary?.ingresos?.total_efectivo || 0) - (summary?.egresos?.total_efectivo || 0)) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                            {formatCurrency((summary?.ingresos?.total_efectivo || 0) - (summary?.egresos?.total_efectivo || 0))}
                                         </div>
                                     </div>
                                     <div className="border-l border-gray-100 pl-6 space-y-3">
                                         <div className="text-right">
                                             <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">IVA Trasladado</div>
-                                            <div className="text-sm font-black text-emerald-600">{formatCurrency(summary?.ingresos.iva.suma_efectivo || 0)}</div>
+                                            <div className="text-sm font-black text-emerald-600">{summary?.ingresos?.iva ? formatCurrency(summary.ingresos.iva.suma_efectivo) : '$0.00'}</div>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">IVA Acreditable</div>
-                                            <div className="text-sm font-black text-blue-600">{formatCurrency(summary?.egresos.iva.suma_efectivo || 0)}</div>
+                                            <div className="text-sm font-black text-blue-600">{summary?.egresos?.iva ? formatCurrency(summary.egresos.iva.suma_efectivo) : '$0.00'}</div>
                                         </div>
                                     </div>
                                 </div>
