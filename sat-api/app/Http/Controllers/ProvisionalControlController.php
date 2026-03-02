@@ -14,20 +14,20 @@ class ProvisionalControlController extends Controller
     public function getSummary(Request $request)
     {
         try {
-            $rfc = (string)$request->query('rfc');
+            $rfc = strtoupper((string)$request->query('rfc'));
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
 
             if (!$rfc || !$year || !$month) {
-                $alertas = $this->calculateAlerts($rfc, $startDate, $endDate);
-
-            return response()->json(['error' => 'Missing parameters'], 400);
+                                        return response()->json(['error' => 'Missing parameters'], 400);
             }
 
             $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
             $startDate = "{$year}-{$strMonth}-01 00:00:00";
             $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
             $endDate = $carbonEnd->format('Y-m-d 23:59:59');
+
+            $alertas = $this->calculateAlerts($rfc, $startDate, $endDate);
 
             $tcSql = "CASE WHEN moneda = 'MXN' OR moneda IS NULL THEN 1 ELSE COALESCE(NULLIF(tipo_cambio, 0), 1) END";
 
@@ -135,7 +135,7 @@ class ProvisionalControlController extends Controller
                 return ['pue' => $vP, 'ppd' => $vD, 'rep' => $vR, 'suma_devengado' => $vP + $vD, 'suma_efectivo' => $vP + $vR, 'pendiente' => $vN];
             };
 
-            return response()->json([
+                        return response()->json([
                 'ingresos' => [
                     'total_efectivo' => $totalEfectivoIng,
                     'subtotal' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'subtotal'),
@@ -159,14 +159,14 @@ class ProvisionalControlController extends Controller
                 'alertas' => $alertas
             ]);
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function getBucketDetails(Request $request)
     {
         try {
-            $rfc = (string)$request->query('rfc');
+            $rfc = strtoupper((string)$request->query('rfc'));
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
             $bucket = (string)$request->query('bucket'); 
@@ -176,8 +176,10 @@ class ProvisionalControlController extends Controller
             $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
             $endDate = $carbonEnd->format('Y-m-d 23:59:59');
 
+            $alertas = $this->calculateAlerts($rfc, $startDate, $endDate);
+
             $parts = explode('_', $bucket);
-            if (count($parts) < 2) return response()->json([]);
+                        if (count($parts) < 2) return response()->json([]);
             
             $dir = $parts[0]; 
             $cat = $parts[1]; 
@@ -256,7 +258,7 @@ class ProvisionalControlController extends Controller
 
             return response()->json($results->values());
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -265,9 +267,9 @@ class ProvisionalControlController extends Controller
         try {
             $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
             $cfdi->update(['is_deductible' => $request->input('is_deductible'), 'deduction_type' => $request->input('deduction_type', $cfdi->deduction_type)]);
-            return response()->json(['ok' => true]);
+                        return response()->json(['ok' => true]);
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -296,9 +298,9 @@ class ProvisionalControlController extends Controller
                 return $c;
             });
 
-            return response()->json(['data' => $results]);
+                        return response()->json(['data' => $results]);
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -326,16 +328,16 @@ class ProvisionalControlController extends Controller
                 return $c;
             });
 
-            return response()->json(['data' => $results]);
+                        return response()->json(['data' => $results]);
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function exportExcel(Request $request)
     {
         try {
-            $rfc = (string)$request->query('rfc');
+            $rfc = strtoupper((string)$request->query('rfc'));
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
 
@@ -455,14 +457,14 @@ class ProvisionalControlController extends Controller
                 ->header('Content-Disposition', 'attachment; filename="ControlProvisional_'.$rfc.'_'.$month.'_'.$year.'.xls"');
 
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function exportPdfSummary(Request $request)
     {
         try {
-            $rfc = (string)$request->query('rfc');
+            $rfc = strtoupper((string)$request->query('rfc'));
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
 
@@ -505,14 +507,14 @@ class ProvisionalControlController extends Controller
 
             return $pdf->download("ResumenProvisional_{$rfc}_{$month}_{$year}.pdf");
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function exportDetailedBucketPdf(Request $request)
     {
         try {
-            $rfc = (string)$request->query('rfc');
+            $rfc = strtoupper((string)$request->query('rfc'));
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
             $bucket = (string)$request->query('bucket');
@@ -548,7 +550,7 @@ class ProvisionalControlController extends Controller
             return $pdf->download("Detalle_{$bucket}_{$rfc}_{$month}_{$year}.pdf");
 
         } catch (Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
+                        return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -558,8 +560,8 @@ class ProvisionalControlController extends Controller
         $business = \DB::table('businesses')->where('rfc', $rfc)->first();
         if (!$business) return [];
 
-        $regimen = $business->regimen_fiscal ?? null;
-        $tipoPersona = $business->tipo_persona ?? null;
+        $regimen = isset($business->regimen_fiscal) ? $business->regimen_fiscal : null;
+        $tipoPersona = isset($business->tipo_persona) ? $business->tipo_persona : null;
 
         if ($regimen === '626') {
             if ($tipoPersona === 'F') {
