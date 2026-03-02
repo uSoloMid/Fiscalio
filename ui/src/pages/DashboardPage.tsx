@@ -32,6 +32,7 @@ export const DashboardPage = ({
     const [isManageTagsOpen, setIsManageTagsOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<any>(null);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
 
     // Filter states (Persisted)
     const [search, setSearch] = useState(localStorage.getItem('dash_search') || '');
@@ -373,14 +374,49 @@ export const DashboardPage = ({
                         </div>
 
                         <div className="flex-1 w-full md:max-w-md lg:max-w-xl md:mx-4 relative order-3 md:order-2">
-                            <span className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none material-symbols-outlined text-gray-400 text-xl">search</span>
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none material-symbols-outlined text-gray-400 text-xl">search</span>
                             <input
-                                className="block w-full pl-12 pr-4 py-2.5 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/10 focus:border-[#10B981] transition-all text-sm"
-                                placeholder="Buscar por Alias o RFC..."
+                                className="block w-full pl-12 pr-4 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-[#10B981] focus:bg-white transition-all text-sm shadow-sm"
+                                placeholder="Buscar alias, RFC o razón social..."
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
+                                onFocus={() => setIsSearchFocused(true)}
+                                onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                             />
+
+                            {/* Quick Search Results Dropdown */}
+                            {isSearchFocused && search.length > 0 && clients.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl border border-gray-100 shadow-2xl z-[100] max-h-[400px] overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="p-3 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-2">Resultados rápidos</span>
+                                        <span className="text-[10px] font-medium text-gray-300 pr-2">{clients.length} encontrados</span>
+                                    </div>
+                                    <div className="overflow-y-auto py-2 no-scrollbar">
+                                        {clients.slice(0, 8).map((client) => (
+                                            <button
+                                                key={client.rfc}
+                                                className="w-full flex items-center gap-4 px-4 py-3 hover:bg-emerald-50 transition-colors text-left group"
+                                                onClick={() => onSelectClient(client.rfc, client.legal_name, client.last_sync_at || '', client.valid_until || '')}
+                                            >
+                                                <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                                                    <span className="material-symbols-outlined text-xl">corporate_fare</span>
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-bold text-gray-900 truncate">{client.common_name || client.legal_name}</div>
+                                                    <div className="text-[10px] font-mono text-gray-400 group-hover:text-emerald-600 transition-colors uppercase">{client.rfc}</div>
+                                                </div>
+                                                <span className="material-symbols-outlined text-gray-300 group-hover:text-emerald-500 transition-all -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100">arrow_forward</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {clients.length > 8 && (
+                                        <div className="p-3 text-center border-t border-gray-50">
+                                            <p className="text-[10px] font-bold text-gray-400">Escribe más para filtrar mejor...</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <button
