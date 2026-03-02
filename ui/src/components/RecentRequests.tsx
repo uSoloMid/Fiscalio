@@ -1,24 +1,14 @@
 import { useEffect, useState } from 'react';
 import { getRecentRequests, deleteSatRequest, getRunnerStatus, verifySatRequest } from '../services';
-
-interface SatRequest {
-    id: string;
-    rfc: string;
-    business_name: string;
-    type: string;
-    start_date: string;
-    end_date: string;
-    state: string;
-    created_at: string;
-    updated_at: string;
-    package_count: number;
-}
+import type { SatRequest } from '../models';
+import { RequestDetailsModal } from './RequestDetailsModal';
 
 export function RecentRequests({ onViewHistory }: { onViewHistory: () => void }) {
     const [requests, setRequests] = useState<SatRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [selectedRequest, setSelectedRequest] = useState<SatRequest | null>(null);
 
     const fetchRequests = async () => {
         try {
@@ -217,8 +207,12 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
                                                 )}
                                             </button>
                                         )}
-                                        <button className="text-gray-400 hover:text-gray-600 p-1" title="Ver detalles">
-                                            👁️
+                                        <button
+                                            onClick={() => setSelectedRequest(req)}
+                                            className="text-[#10B981] hover:bg-emerald-50 p-2 rounded-xl transition-all"
+                                            title="Ver detalles"
+                                        >
+                                            <span className="material-symbols-outlined text-sm font-black">visibility</span>
                                         </button>
                                         <button
                                             onClick={(e) => handleDelete(req.id, e)}
@@ -241,6 +235,14 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
                     </tbody>
                 </table>
             </div>
+
+            {selectedRequest && (
+                <RequestDetailsModal
+                    request={selectedRequest}
+                    isOpen={!!selectedRequest}
+                    onClose={() => setSelectedRequest(null)}
+                />
+            )}
         </div>
     );
 }

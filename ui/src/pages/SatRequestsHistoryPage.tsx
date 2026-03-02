@@ -1,18 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listSatRequests, verifySatRequest, getRunnerStatus } from '../services';
-
-interface SatRequest {
-    id: string;
-    rfc: string;
-    business_name: string;
-    type: string;
-    start_date: string;
-    end_date: string;
-    state: string;
-    created_at: string;
-    updated_at: string;
-    package_count: number;
-}
+import type { SatRequest } from '../models';
+import { RequestDetailsModal } from '../components/RequestDetailsModal';
 
 export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [requests, setRequests] = useState<SatRequest[]>([]);
@@ -21,6 +10,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [totalPages, setTotalPages] = useState(1);
     const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [selectedRequest, setSelectedRequest] = useState<SatRequest | null>(null);
 
     const fetchRequests = async () => {
         try {
@@ -184,6 +174,14 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                                                     Procesar
                                                 </button>
                                             )}
+                                            <button
+                                                onClick={() => setSelectedRequest(req)}
+                                                className="inline-flex items-center gap-2 px-3 py-1.5 text-[#10B981] hover:bg-emerald-50 text-xs font-bold rounded-lg transition-all"
+                                                title="Ver todos los detalles y errores"
+                                            >
+                                                <span className="material-symbols-outlined text-sm font-black">visibility</span>
+                                                Detalles
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}
@@ -225,6 +223,14 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                     )}
                 </div>
             </main>
+
+            {selectedRequest && (
+                <RequestDetailsModal
+                    request={selectedRequest}
+                    isOpen={!!selectedRequest}
+                    onClose={() => setSelectedRequest(null)}
+                />
+            )}
         </div>
     );
 }

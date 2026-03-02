@@ -72,3 +72,21 @@ export interface Account {
     // UI fields
     children?: Account[];
 }
+
+export interface SatRequest {
+    id: string;
+    rfc: string;
+    business_name: string;
+    type: string;
+    start_date: string;
+    end_date: string;
+    state: string;
+    sat_status?: string;
+    package_count: number;
+    xml_count: number;
+    attempts: number;
+    last_error?: string;
+    created_at: string;
+    updated_at: string;
+    next_retry_at?: string;
+}
