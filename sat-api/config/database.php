@@ -45,7 +45,7 @@ return [
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
             'options' => extension_loaded('pdo_sqlite') ? [
-                \PDO::ATTR_TIMEOUT => 10,
+                \PDO::ATTR_TIMEOUT => 60,
             ] : [],
         ],
 
