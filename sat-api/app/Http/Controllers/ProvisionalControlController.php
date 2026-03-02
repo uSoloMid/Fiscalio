@@ -131,27 +131,6 @@ class ProvisionalControlController extends Controller
                 return ['pue' => $vP, 'ppd' => $vD, 'rep' => $vR, 'suma_devengado' => $vP + $vD, 'suma_efectivo' => $vP + $vR, 'pendiente' => $vN];
             };
 
-            return response()->json([
-                'ingresos' => [
-                    'total_efectivo' => $totalEfectivoIng,
-                    'subtotal' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'subtotal'),
-                    'iva' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'iva'),
-                    'retenciones' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'retenciones'),
-                    'total' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'total'),
-                ],
-                'egresos' => [
-                    'total_efectivo' => $totalEfectivoEgr,
-                    'subtotal' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'subtotal'),
-                    'iva' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'iva'),
-                    'retenciones' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'retenciones'),
-                    'total' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'total'),
-                ],
-                'no_deducibles' => [
-                    'total_efectivo' => (float)($ndPue?->total ?? 0) + (float)($ndRep?->total ?? 0),
-                    'total_pendiente' => (float)($ndPend['total'] ?? 0),
-                    'subtotal' => $formatRow($ndPue, $ndPpd, $ndRep, $ndPend, 'subtotal'),
-                    'total' => $formatRow($ndPue, $ndPpd, $ndRep, $ndPend, 'total'),
-                ],
             $alertas = $this->calculateAlerts($rfc, $startDate, $endDate);
 
             return response()->json([
