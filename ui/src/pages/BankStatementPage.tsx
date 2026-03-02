@@ -10,6 +10,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const [statements, setStatements] = useState<any[]>([]);
     const [bankFilter, setBankFilter] = useState('all');
     const [yearFilter, setYearFilter] = useState('all');
+    const [monthFilter, setMonthFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
@@ -167,16 +168,29 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const filteredStatements = statements.filter(s => {
         const matchesBank = bankFilter === 'all' || s.bank_name.toLowerCase() === bankFilter.toLowerCase();
         const matchesYear = yearFilter === 'all' || (s.period && s.period.includes(yearFilter));
+        const matchesMonth = monthFilter === 'all' || (s.period && s.period.split('-')[0] === monthFilter);
         const matchesSearch = s.bank_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             s.file_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (s.period && s.period.toLowerCase().includes(searchTerm.toLowerCase()));
-        return matchesBank && matchesYear && matchesSearch;
+        return matchesBank && matchesYear && matchesMonth && matchesSearch;
     });
 
+    const monthsOrder = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
     const uniqueBanks = Array.from(new Set(statements.map(s => s.bank_name)));
-    const uniqueYears = Array.from(new Set(statements.map(s => s.period?.split('-')[1]).filter(y => y)));
+    const uniqueYears = Array.from(new Set(statements.map(s => s.period?.split('-')[1]).filter(y => y))).sort();
+    const uniqueMonths = Array.from(new Set(statements.map(s => s.period?.split('-')[0]).filter(m => m)))
+        .sort((a, b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
 
-    const combinedBalance = statements.reduce((acc, s) => acc + parseFloat(s.final_balance), 0);
+    // Combined balance: sum the latest statement for each bank+account in the filtered set
+    const latestPerBank = filteredStatements.reduce((acc, s) => {
+        const key = `${s.bank_name}-${s.account_number}`;
+        if (!acc[key] || new Date(s.created_at) > new Date(acc[key].created_at)) {
+            acc[key] = s;
+        }
+        return acc;
+    }, {} as Record<string, any>);
+
+    const combinedBalance = Object.values(latestPerBank).reduce((acc: number, s: any) => acc + parseFloat(s.final_balance), 0);
 
     const formatCurrency = (amount: number) => {
         return amount.toLocaleString('es-MX', {
@@ -268,15 +282,23 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                     onChange={e => setBankFilter(e.target.value)}
                                     className="flex-1 md:flex-none text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
                                 >
-                                    <option value="all">Todos los Bancos</option>
+                                    <option value="all">Bancos</option>
                                     {uniqueBanks.map(b => <option key={b} value={b}>{b}</option>)}
+                                </select>
+                                <select
+                                    value={monthFilter}
+                                    onChange={e => setMonthFilter(e.target.value)}
+                                    className="flex-1 md:flex-none text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
+                                >
+                                    <option value="all">Cualquier Mes</option>
+                                    {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
                                 <select
                                     value={yearFilter}
                                     onChange={e => setYearFilter(e.target.value)}
                                     className="flex-1 md:flex-none text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
                                 >
-                                    <option value="all">Cualquier Año</option>
+                                    <option value="all">Año</option>
                                     {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
                                 </select>
                             </div>
@@ -288,12 +310,12 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                 <div
                                     key={s.id}
                                     onClick={() => handleSelectStatement(s.id)}
-                                    className="bg-white rounded-[40px] border border-gray-100 p-8 hover:border-emerald-200 hover:shadow-2xl hover:shadow-emerald-100/20 transition-all cursor-pointer group flex flex-col justify-between min-h-[320px] relative overflow-hidden"
+                                    className="bg-white rounded-[40px] border border-gray-100 p-8 hover:border-emerald-200 hover:shadow-2xl hover:shadow-emerald-100/20 transition-all cursor-pointer group flex flex-col justify-between min-h-[400px] relative overflow-hidden"
                                 >
                                     <div className="absolute top-0 right-0 w-24 h-24 bg-gray-50 rounded-bl-full -tr-10 -mr-10 group-hover:bg-emerald-50 transition-colors"></div>
 
                                     <div className="relative">
-                                        <div className="flex items-center justify-between mb-8">
+                                        <div className="flex items-center justify-between mb-6">
                                             <div className="w-14 h-14 bg-gray-900 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
                                                 <span className="material-symbols-outlined text-white text-2xl">account_balance</span>
                                             </div>
@@ -304,16 +326,35 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                                 <span className="material-symbols-outlined text-lg">delete</span>
                                             </button>
                                         </div>
-                                        <div>
+                                        <div className="mb-6">
                                             <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight group-hover:text-emerald-600 transition-colors">{s.bank_name}</h3>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">CUENTA: **** {s.account_number?.slice(-4) || '9821'}</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">CUENTA: **** {s.account_number?.slice(-4) || 'NADA'}</p>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4 pb-6 border-b border-gray-50">
+                                            <div>
+                                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">INICIAL</p>
+                                                <p className="text-sm font-black text-gray-600">{formatCurrency(parseFloat(s.initial_balance))}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">FINAL</p>
+                                                <p className="text-sm font-black text-emerald-600">{formatCurrency(parseFloat(s.final_balance))}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-1">CARGOS (-)</p>
+                                                <p className="text-sm font-black text-red-500">-{formatCurrency(parseFloat(s.total_cargos))}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">ABONOS (+)</p>
+                                                <p className="text-sm font-black text-emerald-500">+{formatCurrency(parseFloat(s.total_abonos))}</p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="mt-auto border-t border-gray-50 pt-6">
+                                    <div className="mt-6">
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{s.period}</p>
                                         <div className="flex items-center justify-between">
-                                            <span className="text-3xl font-black text-gray-900">{formatCurrency(parseFloat(s.final_balance))}</span>
+                                            <span className="text-xs font-black text-gray-300 uppercase tracking-[0.2em]">Resumen del periodo</span>
                                             <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-500 group-hover:text-white transition-all shadow-sm">
                                                 <span className="material-symbols-outlined text-xl">arrow_forward</span>
                                             </div>
