@@ -409,9 +409,9 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <TableRow label="Base (Subtotal)" data={summary?.ingresos.subtotal} bucketPrefix="ingresos_subtotal" />
-                                                <TableRow label="IVA (16%)" data={summary?.ingresos.iva} bucketPrefix="ingresos_iva" />
-                                                <TableRow label="Total Facturado" data={summary?.ingresos.total} bucketPrefix="ingresos_total" />
+                                                <TableRow label="Base (Subtotal)" data={summary?.ingresos?.subtotal} bucketPrefix="ingresos_subtotal" />
+                                                <TableRow label="IVA (16%)" data={summary?.ingresos?.iva} bucketPrefix="ingresos_iva" />
+                                                <TableRow label="Total Facturado" data={summary?.ingresos?.total} bucketPrefix="ingresos_total" />
                                             </tbody>
                                         </table>
                                     </div>
@@ -442,9 +442,9 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                <TableRow label="Base (Subtotal)" data={summary?.egresos.subtotal} bucketPrefix="egresos_subtotal" mode="egresos" />
-                                                <TableRow label="IVA (16%)" data={summary?.egresos.iva} bucketPrefix="egresos_iva" mode="egresos" />
-                                                <TableRow label="Total Gastado" data={summary?.egresos.total} bucketPrefix="egresos_total" mode="egresos" />
+                                                <TableRow label="Base (Subtotal)" data={summary?.egresos?.subtotal} bucketPrefix="egresos_subtotal" mode="egresos" />
+                                                <TableRow label="IVA (16%)" data={summary?.egresos?.iva} bucketPrefix="egresos_iva" mode="egresos" />
+                                                <TableRow label="Total Gastado" data={summary?.egresos?.total} bucketPrefix="egresos_total" mode="egresos" />
                                             </tbody>
                                         </table>
                                     </div>
@@ -463,13 +463,13 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                         <button onClick={() => loadBucketDetail('egresos_nodeducibles')} className="text-left group/item">
                                             <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3">Pagados (PUE/REP)</div>
                                             <div className="text-5xl font-black group-hover:text-blue-300 transition-colors tracking-tighter">
-                                                {formatCurrency(summary?.no_deducibles.total_efectivo || 0)}
+                                                {formatCurrency(summary?.no_deducibles?.total_efectivo || 0)}
                                             </div>
                                         </button>
                                         <button onClick={() => loadBucketDetail('egresos_nodeducibles_pendiente')} className="text-left group/item">
                                             <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3">Pendientes (CxP)</div>
                                             <div className="text-5xl font-black text-white/40 group-hover:text-orange-300 transition-colors tracking-tighter">
-                                                {formatCurrency(summary?.no_deducibles.total_pendiente || 0)}
+                                                {formatCurrency(summary?.no_deducibles?.total_pendiente || 0)}
                                             </div>
                                         </button>
                                     </div>
