@@ -38,7 +38,7 @@ interface SummaryData {
         total_efectivo: number;
         total_pendiente: number;
     };
-    alertas: Array<{ type: string, message: string }>;
+    alertas: Array<{ type: string, title?: string, message: string }>;
 }
 
 const USO_CFDI: Record<string, string> = {
@@ -66,6 +66,31 @@ const USO_CFDI: Record<string, string> = {
     'P01': 'Por definir',
     'S01': 'Sin efectos fiscales',
     'CP01': 'Pagos'
+};
+
+const FORMA_PAGO: Record<string, string> = {
+    '01': 'Efectivo',
+    '02': 'Nominativo',
+    '03': 'Transferencia',
+    '04': 'Tarjeta de Crédito',
+    '05': 'Monedero Electrónico',
+    '06': 'Dinero Electrónico',
+    '08': 'Vales de despensa',
+    '12': 'Dación en pago',
+    '13': 'Pago por subrogación',
+    '14': 'Pago por consignación',
+    '15': 'Condonación',
+    '17': 'Compensación',
+    '23': 'Novación',
+    '24': 'Confusión',
+    '25': 'Remisión de deuda',
+    '26': 'Prescripción o caducidad',
+    '27': 'A satisfacción del acreedor',
+    '28': 'Tarjeta de débito',
+    '29': 'Tarjeta de servicios',
+    '30': 'Aplicación de anticipos',
+    '31': 'Intermediario pagos',
+    '99': 'Por definir'
 };
 
 interface ProvisionalControlPageProps {
@@ -273,6 +298,30 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                         </div>
                     ) : (
                         <>
+                            {/* Alertas section */}
+                            {summary?.alertas && summary.alertas.length > 0 && (
+                                <div className="space-y-3">
+                                    {summary.alertas.map((alerta, idx) => (
+                                        <div key={idx} className={`p-5 rounded-[1.8rem] border flex items-center gap-5 animate-in fade-in slide-in-from-top-4 duration-700 ease-out ${alerta.type === 'danger' ? 'bg-rose-50 border-rose-100 text-rose-900 shadow-sm' :
+                                            alerta.type === 'warning' ? 'bg-amber-50 border-amber-100 text-amber-900 shadow-sm' :
+                                                'bg-blue-50 border-blue-100 text-blue-900 shadow-sm'
+                                            }`}>
+                                            <div className="flex-shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center bg-white shadow-sm border border-inherit">
+                                                {alerta.type === 'danger' ? (
+                                                    <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                ) : (
+                                                    <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                )}
+                                            </div>
+                                            <div className="flex-1">
+                                                <div className="text-[10px] font-black uppercase tracking-[0.1em] opacity-40 mb-0.5">{alerta.title || 'Advertencia SAT'}</div>
+                                                <div className="text-sm font-bold tracking-tight">{alerta.message}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
                             {/* Top row cards matching image */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {/* Card 1: Ingresos */}
@@ -480,6 +529,14 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                         <span className={`text-[10px] font-black px-3 py-1.5 rounded-lg tracking-widest uppercase ${item.metodo_pago === 'PUE' ? 'bg-emerald-50 text-emerald-600' : item.metodo_pago === 'REP' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
                                                             {item.metodo_pago}
                                                         </span>
+
+                                                        {item.warning && (
+                                                            <div className="flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-100 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight animate-pulse">
+                                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                                                {item.warning}
+                                                            </div>
+                                                        )}
+
                                                         <span className="text-[9px] font-bold text-gray-300 truncate tracking-wider">
                                                             UUID: {item.uuid}
                                                         </span>
@@ -492,7 +549,14 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                     </div>
                                                     <div className="text-base font-black text-gray-900 truncate mb-1 uppercase tracking-tight">{item.nombre}</div>
                                                     <div className="flex items-center gap-4 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                                                        <span>{USO_CFDI[item.uso_cfdi] || item.uso_cfdi}</span>
+                                                        <span className="flex items-center gap-1">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                                            {USO_CFDI[item.uso_cfdi] || item.uso_cfdi}
+                                                        </span>
+                                                        <span className="flex items-center gap-1">
+                                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                                                            {FORMA_PAGO[item.forma_pago] || item.forma_pago}
+                                                        </span>
                                                     </div>
                                                 </div>
                                                 <div className="text-right flex-shrink-0">
