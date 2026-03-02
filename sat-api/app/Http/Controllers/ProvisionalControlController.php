@@ -409,7 +409,7 @@ class ProvisionalControlController extends Controller
             
             $buckets = ['ingresos_total_pue', 'ingresos_total_rep'];
             foreach($buckets as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = $this->getBucketDetails($req)->original;
                 foreach($items as $item) {
                     $xml .= '<Row>';
@@ -433,7 +433,7 @@ class ProvisionalControlController extends Controller
             
             $buckets = ['egresos_total_pue', 'egresos_total_rep'];
             foreach($buckets as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = $this->getBucketDetails($req)->original;
                 foreach($items as $item) {
                     if(!($item['is_deductible'] ?? true)) continue;
@@ -479,19 +479,19 @@ class ProvisionalControlController extends Controller
             ];
 
             foreach(['ingresos_total_pue', 'ingresos_total_rep'] as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
                 $details['ingresos'] = $details['ingresos']->concat($items);
             }
 
             foreach(['egresos_total_pue', 'egresos_total_ppd', 'egresos_total_rep'] as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
                 $details['egresos'] = $details['egresos']->concat($items);
             }
 
             foreach(['egresos_nodeducibles_pue', 'egresos_nodeducibles_ppd', 'egresos_nodeducibles_rep'] as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
                 $details['no_deducibles'] = $details['no_deducibles']->concat($items);
             }
@@ -528,19 +528,12 @@ class ProvisionalControlController extends Controller
 
             $items = $this->getBucketDetails($request)->original;
 
-            foreach(['egresos_nodeducibles_pue', 'egresos_nodeducibles_ppd', 'egresos_nodeducibles_rep'] as $b) {
-                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
-                $items = collect($this->getBucketDetails($req)->original);
-                $details['no_deducibles'] = $details['no_deducibles']->concat($items);
-            }
-
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
-            $clientName = $client ? $client->name : $rfc;
+            $clientName = $client ? ($client->legal_name ?? $client->common_name ?? $rfc) : $rfc;
 
             $months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             $periodName = $months[$month - 1];
 
-            // Reusing the same logic for a simple detailed list
             $html = "<h1>Detalle: " . strtoupper(str_replace('_', ' ', $bucket)) . "</h1>";
             $html .= "<h3>Cliente: $clientName ($rfc) | Periodo: $periodName $year</h3>";
             $html .= "<table border='1' width='100%' style='border-collapse:collapse; font-size:10px;'>";
@@ -565,7 +558,8 @@ class ProvisionalControlController extends Controller
         } catch (Throwable $e) {
                         return response()->json(['error' => $e->getMessage()], 500);
         }
-    }
+    
+        }
 
     private function calculateAlerts($rfc, $startDate, $endDate)
     {
