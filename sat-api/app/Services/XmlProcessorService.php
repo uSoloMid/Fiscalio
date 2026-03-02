@@ -291,29 +291,32 @@ class XmlProcessorService
             $fecha = new DateTimeImmutable($fechaStr);
             $fechaFiscal = $fecha;
 
-        // GLOBAL NODE LOGIC REMOVED UPON USER REQUEST (2026-02-17)
-        // The user wants the invoice to be reflected in the month of emission, regardless of the Global Information node.
+            // Si hay información global, la fecha fiscal de acumulación es la del periodo reportado
+            if ($globalYear && $globalMeses) {
+                // El campo Meses puede venir como '01'..'12' para mensuales o '13'..'18' para bimestrales
+                // Mapeamos a un mes calendario real para la fecha fiscal (el primer mes del periodo)
+                $mesMapeado = (int)$globalMeses;
+                if ($mesMapeado >= 13 && $mesMapeado <= 18) {
+                    // 13: Ene-Feb, 14: Mar-Abr, 15: May-Jun, 16: Jul-Ago, 17: Sep-Oct, 18: Nov-Dic
+                    $mesMapeado = (($mesMapeado - 13) * 2) + 1;
+                }
+                elseif ($mesMapeado > 12) {
+                    // Fallback para periodicidades no mensuales/bimestrales (Ej: Diaria, Semanal, Quincenal)
+                    // En estos casos el mes es real (01-12) según el catálogo del SAT, 
+                    // pero si viniera algo inesperado > 12, usamos el mes de la fecha original.
+                    $mesMapeado = (int)$fecha->format('m');
+                }
 
-        /*
-         // Si hay información global, la fecha fiscal de acumulación es la del periodo reportado
-         if ($globalYear && $globalMeses) {
-         // El campo Meses puede venir como '01'..'12' o '13'..'18' para bimestrales
-         // Mapeamos a un mes calendario real para la fecha fiscal (el primer mes del periodo)
-         $mesMapeado = (int)$globalMeses;
-         if ($mesMapeado > 12) {
-         // 13: Ene-Feb, 14: Mar-Abr, etc.
-         $mesMapeado = (($mesMapeado - 13) * 2) + 1;
-         }
-         // Asegurar que el año y mes sean válidos para crear la fecha fiscal
-         try {
-         $fechaFiscal = $fechaFiscal->setDate($globalYear, $mesMapeado, 1)->setTime(0, 0, 0);
-         }
-         catch (\Exception $e) {
-         // Fallback a fecha original si hay error en datos globales
-         $fechaFiscal = $fecha;
-         }
-         }
-         */
+                // Asegurar que el año y mes sean válidos para crear la fecha fiscal
+                try {
+                    // Creamos una nueva fecha basada en el año global y el mes reportado
+                    $fechaFiscal = $fechaFiscal->setDate($globalYear, $mesMapeado, 1)->setTime(0, 0, 0);
+                }
+                catch (Exception $e) {
+                    // Fallback a fecha original si hay error en datos globales
+                    $fechaFiscal = $fecha;
+                }
+            }
         }
         catch (Exception $e) {
             $fecha = new DateTimeImmutable();
