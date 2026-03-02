@@ -7,6 +7,31 @@ php -m
 echo "==> Iniciando Entrypoint Profesional (Debug Mode)..."
 # Trigger new deploy for cache clearing
 
+echo "==> Configurando OpenSSL Legacy Provider..."
+cat <<EOF > /tmp/openssl.cnf
+openssl_conf = openssl_init
+[openssl_init]
+providers = provider_sect
+[provider_sect]
+default = default_sect
+legacy = legacy_sect
+[default_sect]
+activate = 1
+[legacy_sect]
+activate = 1
+EOF
+
+# Intentar encontrar la ruta de openssl.cnf y sobreescribirla
+CONF_PATH=$(openssl version -d | cut -d'"' -f2)/openssl.cnf
+if [ -f "$CONF_PATH" ]; then
+    cp /tmp/openssl.cnf "$CONF_PATH"
+    echo "    Actualizado $CONF_PATH"
+else
+    # Fallback
+    cp /tmp/openssl.cnf /etc/ssl/openssl.cnf
+    echo "    Actualizado /etc/ssl/openssl.cnf"
+fi
+
 # 1. Preparar almacenamiento
 mkdir -p /var/www/storage/app/public /var/www/storage/framework/{cache,sessions,views} /var/www/storage/logs /var/www/bootstrap/cache
 
