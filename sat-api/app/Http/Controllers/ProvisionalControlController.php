@@ -557,23 +557,9 @@ class ProvisionalControlController extends Controller
     private function calculateAlerts($rfc, $startDate, $endDate)
     {
         $alerts = [];
-        $business = \DB::table('businesses')->where('rfc', $rfc)->first();
-        if (!$business) return [];
-
-        $regimen = isset($business->regimen_fiscal) ? $business->regimen_fiscal : null;
-        $tipoPersona = isset($business->tipo_persona) ? $business->tipo_persona : null;
-
-        if ($regimen === '626') {
-            if ($tipoPersona === 'F') {
-                $alerts[] = [
-                    'type' => 'warning',
-                    'title' => 'Régimen RESICO P. Física',
-                    'message' => 'El ISR se determina sobre ingresos brutos cobrados. Las deducciones mostradas son solo para efectos de IVA y no restarán base para el cálculo de ISR mensual.'
-                ];
-            }
-        }
-
-        $cashOverLimit = \DB::table('cfdis')
+        
+        // 1. Alerta de Deducciones en Efectivo > $2,000
+        $resultsCount = \DB::table('cfdis')
             ->where('rfc_receptor', $rfc)
             ->where('metodo_pago', 'PUE')
             ->where('forma_pago', '01') 
@@ -582,14 +568,15 @@ class ProvisionalControlController extends Controller
             ->whereBetween('fecha_fiscal', [$startDate, $endDate])
             ->count();
 
-        if ($cashOverLimit > 0) {
+        if ($resultsCount > 0) {
             $alerts[] = [
                 'type' => 'danger',
                 'title' => 'Deducciones en Efectivo > $2,000',
-                'message' => "Se detectaron $cashOverLimit facturas PUE pagadas en efectivo con importe mayor a $2,000. Estas no cumplen con los requisitos de forma para ser deducibles."
+                'message' => "Se detectaron $resultsCount facturas PUE pagadas en efectivo con importe mayor a $2,000. Estas no cumplen con los requisitos de forma para ser deducibles."
             ];
         }
 
+        // 2. Alerta de Combustible en Efectivo
         $fuelCash = \DB::table('cfdis')
             ->where('rfc_receptor', $rfc)
             ->where('forma_pago', '01')
