@@ -117,7 +117,12 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         setLoading(true);
         try {
             const data = await getProvisionalSummary(activeRfc, period.year, period.month);
-            setSummary(data);
+            if (data && data.error) {
+                console.error("Provisional Summary Error:", data.error);
+                setSummary(null);
+            } else {
+                setSummary(data);
+            }
         } catch (error) {
             console.error("Error fetching provisional summary", error);
         } finally {
@@ -339,7 +344,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                     </div>
                                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ingresos del Mes</div>
                                     <div className="text-4xl font-black text-gray-900 tracking-tighter">
-                                        {summary?.ingresos ? formatCurrency(summary.ingresos.total_efectivo) : '$0.00'}
+                                        {formatCurrency(summary?.ingresos?.total_efectivo || 0)}
                                     </div>
                                 </div>
 
@@ -355,7 +360,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                     </div>
                                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Gastos del Mes</div>
                                     <div className="text-4xl font-black text-gray-900 tracking-tighter">
-                                        {summary?.egresos ? formatCurrency(summary.egresos.total_efectivo) : '$0.00'}
+                                        {formatCurrency(summary?.egresos?.total_efectivo || 0)}
                                     </div>
                                 </div>
 
@@ -373,11 +378,11 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                     <div className="border-l border-gray-100 pl-6 space-y-3">
                                         <div className="text-right">
                                             <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">IVA Trasladado</div>
-                                            <div className="text-sm font-black text-emerald-600">{summary?.ingresos?.iva ? formatCurrency(summary.ingresos.iva.suma_efectivo) : '$0.00'}</div>
+                                            <div className="text-sm font-black text-emerald-600">{formatCurrency(summary?.ingresos?.iva?.suma_efectivo || 0)}</div>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">IVA Acreditable</div>
-                                            <div className="text-sm font-black text-blue-600">{summary?.egresos?.iva ? formatCurrency(summary.egresos.iva.suma_efectivo) : '$0.00'}</div>
+                                            <div className="text-sm font-black text-blue-600">{formatCurrency(summary?.egresos?.iva?.suma_efectivo || 0)}</div>
                                         </div>
                                     </div>
                                 </div>
