@@ -42,7 +42,14 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
                 
                 if ($direction === 'egresos') {
-                    $query->where('is_deductible', $onlyDeductible);
+                    if ($onlyDeductible) {
+                        $query->where(function($q) {
+                            $q->where('is_deductible', '!=', 0)
+                              ->orWhereNull('is_deductible');
+                        });
+                    } else {
+                        $query->where('is_deductible', 0);
+                    }
                 }
 
                 return $query->select(
@@ -65,7 +72,14 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
                 if ($direction === 'egresos') {
-                    $query->where('ppds.is_deductible', $onlyDeductible);
+                    if ($onlyDeductible) {
+                        $query->where(function($q) {
+                            $q->where('ppds.is_deductible', '!=', 0)
+                              ->orWhereNull('ppds.is_deductible');
+                        });
+                    } else {
+                        $query->where('ppds.is_deductible', 0);
+                    }
                 }
 
                 return $query->select(
