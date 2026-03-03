@@ -44,11 +44,11 @@ class ProvisionalControlController extends Controller
                 
                 if ($direction === 'egresos') {
                     if ($onlyDeductible) {
-                        $query->where(function($q) {
-                            $q->where('is_deductible', '!=', 0)
-                              ->orWhereNull('is_deductible');
-                        });
-                    } else {
+                    $query->where(function($q) {
+                        $q->where('is_deductible', '!=', 0)
+                          ->orWhereNull('is_deductible');
+                    });
+                } else {
                         $query->where('is_deductible', 0);
                     }
                 }
@@ -74,11 +74,11 @@ class ProvisionalControlController extends Controller
 
                 if ($direction === 'egresos') {
                     if ($onlyDeductible) {
-                        $query->where(function($q) {
-                            $q->where('ppds.is_deductible', '!=', 0)
-                              ->orWhereNull('ppds.is_deductible');
-                        });
-                    } else {
+                    $query->where(function($q) {
+                        $q->where('ppds.is_deductible', '!=', 0)
+                          ->orWhereNull('ppds.is_deductible');
+                    });
+                } else {
                         $query->where('ppds.is_deductible', 0);
                     }
                 }
@@ -102,11 +102,11 @@ class ProvisionalControlController extends Controller
 
                 if ($direction === 'egresos') {
                     if ($onlyDeductible) {
-                        $query->where(function($q) {
-                            $q->where('is_deductible', '!=', 0)
-                              ->orWhereNull('is_deductible');
-                        });
-                    } else {
+                    $query->where(function($q) {
+                        $q->where('is_deductible', '!=', 0)
+                          ->orWhereNull('is_deductible');
+                    });
+                } else {
                         $query->where('is_deductible', 0);
                     }
                 }
@@ -225,10 +225,7 @@ class ProvisionalControlController extends Controller
                 }
 
                 if ($onlyNonDeductible) {
-                    $query->where(function($q) {
-                        $q->where('is_deductible', 0)
-                          ->orWhereNotNull('deduction_type');
-                    });
+                    $query->where('is_deductible', 0);
                 }
                 if ($onlyDeductible) {
                     $query->where(function($q) {
@@ -260,10 +257,7 @@ class ProvisionalControlController extends Controller
                     ->where('reps.' . $fieldRfc, $rfc)->where('reps.es_cancelado', false)->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
                 if ($onlyNonDeductible) {
-                    $query->where(function($q) {
-                        $q->where('ppds.is_deductible', 0)
-                          ->orWhereNotNull('ppds.deduction_type');
-                    });
+                    $query->where('ppds.is_deductible', 0);
                 }
                 if ($onlyDeductible) {
                     $query->where(function($q) {
@@ -302,10 +296,7 @@ class ProvisionalControlController extends Controller
             if (!$metodo || $metodo === 'PENDIENTE') {
                 $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false)->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN '{$startDate}' AND '{$endDate}'");
                 if ($onlyNonDeductible) {
-                    $query->where(function($q) {
-                        $q->where('is_deductible', 0)
-                          ->orWhereNotNull('deduction_type');
-                    });
+                    $query->where('is_deductible', 0);
                 }
                 if ($onlyDeductible) {
                     $query->where(function($q) {
