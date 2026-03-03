@@ -38,9 +38,9 @@ class ProvisionalControlController extends Controller
                 $query = DB::table('cfdis')
                     ->where($field, $rfc)
                     ->where('tipo', 'I')
-                    ->where('metodo_pago', $metodo)
+                    ->whereIn('metodo_pago', [$metodo, $metodo . ' '])
                     ->where('es_cancelado', false)
-                    ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
+                    ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN '{$startDate}' AND '{$endDate}'");
                 
                 if ($direction === 'egresos') {
                     if ($onlyDeductible) {
@@ -98,7 +98,7 @@ class ProvisionalControlController extends Controller
                     ->where('tipo', 'I')
                     ->where('metodo_pago', 'PPD')
                     ->where('es_cancelado', false)
-                    ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
+                    ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN '{$startDate}' AND '{$endDate}'");
 
                 if ($direction === 'egresos') {
                     if ($onlyDeductible) {
@@ -210,14 +210,14 @@ class ProvisionalControlController extends Controller
             $onlyNonDeductible = ($dir === 'egresos' && $cat === 'nodeducibles');
             // En egresos, mostramos todo en las cubetas normales para gestión, 
             // pero filtramos estrictamente en la de nodeducibles.
-            $onlyDeductible = false; 
+            $onlyDeductible = ($dir === 'egresos' && $cat !== 'nodeducibles'); 
 
             $results = collect();
 
             if (!$metodo || $metodo === 'PUE' || $metodo === 'PPD' || $metodo === 'PAGADOS') {
-                $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('es_cancelado', false)->whereBetween('fecha_fiscal', [$startDate, $endDate]);
+                $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('es_cancelado', false)->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN '{$startDate}' AND '{$endDate}'");
                 if ($metodo === 'PUE' || $metodo === 'PPD') {
-                    $query->where('metodo_pago', $metodo);
+                    $query->whereIn('metodo_pago', [$metodo, $metodo . ' ']);
                 } elseif ($metodo === 'PAGADOS') {
                     $query->where('metodo_pago', 'PUE'); // Solo PUE, omitir PPD
                 } else {
@@ -225,7 +225,16 @@ class ProvisionalControlController extends Controller
                 }
 
                 if ($onlyNonDeductible) {
-                    $query->where('is_deductible', 0);
+                    $query->where(function($q) {
+                        $q->where('is_deductible', 0)
+                          ->orWhereNotNull('deduction_type');
+                    });
+                }
+                if ($onlyDeductible) {
+                    $query->where(function($q) {
+                        $q->where('is_deductible', '!=', 0)
+                          ->orWhereNull('is_deductible');
+                    });
                 }
 
                 $resInvoices = $query->get()->map(function($c) use ($dir) {
@@ -251,7 +260,16 @@ class ProvisionalControlController extends Controller
                     ->where('reps.' . $fieldRfc, $rfc)->where('reps.es_cancelado', false)->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
                 if ($onlyNonDeductible) {
-                    $query->where('ppds.is_deductible', 0);
+                    $query->where(function($q) {
+                        $q->where('ppds.is_deductible', 0)
+                          ->orWhereNotNull('ppds.deduction_type');
+                    });
+                }
+                if ($onlyDeductible) {
+                    $query->where(function($q) {
+                        $q->where('ppds.is_deductible', '!=', 0)
+                          ->orWhereNull('ppds.is_deductible');
+                    });
                 }
 
                 $resReps = $query->select('cfdi_payments.*', 'reps.forma_pago as rep_forma_pago', 'ppds.name_receptor', 'ppds.name_emisor', 'ppds.subtotal as ppd_sub', 'ppds.iva as ppd_iva', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc', 'ppds.is_deductible', 'ppds.uso_cfdi', 'ppds.concepto', 'ppds.deduction_type')
@@ -282,9 +300,18 @@ class ProvisionalControlController extends Controller
             }
 
             if (!$metodo || $metodo === 'PENDIENTE') {
-                $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false)->whereBetween('fecha_fiscal', [$startDate, $endDate]);
+                $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false)->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN '{$startDate}' AND '{$endDate}'");
                 if ($onlyNonDeductible) {
-                    $query->where('is_deductible', 0);
+                    $query->where(function($q) {
+                        $q->where('is_deductible', 0)
+                          ->orWhereNotNull('deduction_type');
+                    });
+                }
+                if ($onlyDeductible) {
+                    $query->where(function($q) {
+                        $q->where('is_deductible', '!=', 0)
+                          ->orWhereNull('is_deductible');
+                    });
                 }
 
                 $resPend = $query->get()->map(function($c) use ($endDate, $dir) {
@@ -615,6 +642,7 @@ class ProvisionalControlController extends Controller
     private function calculateAlerts($rfc, $startDate, $endDate)
     {
         $alerts = [];
+        $rfc = trim($rfc);
         
         // 1. Alerta de Deducciones en Efectivo > $2,000
         $resultsCount = \DB::table('cfdis')
@@ -623,12 +651,9 @@ class ProvisionalControlController extends Controller
             ->whereIn('forma_pago', ['01', '1', '01 ']) 
             ->where('total', '>', 2000)
             ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->count();
             
-        // Log para depuración
-        Log::info("calculateAlerts Efectivo > 2000: RFC=$rfc, count=$resultsCount");
-
         if ($resultsCount > 0) {
             $alerts[] = [
                 'type' => 'danger',
@@ -642,7 +667,7 @@ class ProvisionalControlController extends Controller
             ->where('rfc_receptor', $rfc)
             ->whereIn('forma_pago', ['01', '1', '01 '])
             ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->where(function($q) {
                 $q->where('concepto', 'like', '%GASOLINA%')
                   ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
@@ -664,7 +689,7 @@ class ProvisionalControlController extends Controller
         $personalesCount = \DB::table('cfdis')
             ->where('rfc_receptor', $rfc)
             ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->where('uso_cfdi', 'like', 'D%')
             ->count();
 
@@ -675,23 +700,39 @@ class ProvisionalControlController extends Controller
                 'message' => "Se detectaron $personalesCount facturas con Uso de CFDI tipo 'D' (Honorarios médicos, dentales, etc.). Estas se han marcado automáticamente como gastos no deducibles para el cálculo provisional, pero serán útiles en la Declaración Anual."
             ];
         }
+
+        // 4. Alerta de REPs en Efectivo
+        $cashRepsCount = \DB::table('cfdi_payments')
+            ->join('cfdis as reps', 'cfdi_payments.uuid_pago', '=', 'reps.uuid')
+            ->where('reps.rfc_receptor', $rfc)
+            ->whereIn('reps.forma_pago', ['01', '1', '01 '])
+            ->where('reps.es_cancelado', false)
+            ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate])
+            ->count();
+
+        if ($cashRepsCount > 0) {
             $alerts[] = [
                 'type' => 'danger',
-                'title' => 'Combustible en Efectivo',
-                'message' => "Se detectaron $fuelCash facturas de combustible pagadas en efectivo. La ley del ISR exige que el combustible se pague siempre con medios electrónicos para ser deducible."
+                'title' => 'Complementos de Pago en Efectivo',
+                'message' => "Se detectaron $cashRepsCount complementos de pago (REP) liquidados en efectivo. Si la factura relacionada es mayor a $2,000 o es combustible, el gasto no es deducible."
             ];
         }
 
+        return $alerts;
+    }
+    private function performAudit($rfc, $startDate, $endDate)
     {
         Log::info("Iniciando auditoria para RFC: $rfc | Periodo: $startDate - $endDate");
 
-        // 1. Marcar efectivo > 2000 como no deducible
-        $res1 = Cfdi::where('rfc_receptor', trim($rfc))
+        $rfc = trim($rfc);
+
+        // 1. Marcar efectivo > 2000 como no deducible (PUE)
+        $res1 = Cfdi::where('rfc_receptor', $rfc)
             ->whereIn('metodo_pago', ['PUE', 'PUE '])
-            ->whereIn('forma_pago', ['01', '1', '01 '])
+            ->whereIn('forma_pago', ['01', '1', '01 ']) 
             ->where('total', '>', 2000)
             ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->where(function($q) {
                 $q->whereNull('deduction_type')
                   ->orWhere('deduction_type', '!=', 'manual');
@@ -699,10 +740,10 @@ class ProvisionalControlController extends Controller
             ->update(['is_deductible' => 0, 'deduction_type' => 'auto_cash_gt_2000']);
 
         // 2. Marcar combustible en efectivo
-        $res2 = Cfdi::where('rfc_receptor', trim($rfc))
+        $res2 = Cfdi::where('rfc_receptor', $rfc)
             ->whereIn('forma_pago', ['01', '1', '01 '])
             ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->where(function($q) {
                 $q->whereNull('deduction_type')
                   ->orWhere('deduction_type', '!=', 'manual');
@@ -717,9 +758,9 @@ class ProvisionalControlController extends Controller
             ->update(['is_deductible' => 0, 'deduction_type' => 'auto_fuel_cash']);
 
         // 3. Marcar deducciones personales
-        $res3 = Cfdi::where('rfc_receptor', trim($rfc))
+        $res3 = Cfdi::where('rfc_receptor', $rfc)
             ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->where('uso_cfdi', 'like', 'D%')
             ->where(function($q) {
                 $q->whereNull('deduction_type')
@@ -727,7 +768,27 @@ class ProvisionalControlController extends Controller
             })
             ->update(['is_deductible' => 0, 'deduction_type' => 'auto_personal_deduction']);
 
-        Log::info("Auditoria finalizada. Efectivo>2000: $res1, Combustible: $res2, Personales: $res3");
+        // 4. Marcar REPs pagados en efectivo (Deducción no válida para PPD relacionado)
+        $cashReps = DB::table('cfdi_payments')
+            ->join('cfdis as reps', 'cfdi_payments.uuid_pago', '=', 'reps.uuid')
+            ->where('reps.rfc_receptor', $rfc)
+            ->whereIn('reps.forma_pago', ['01', '1', '01 '])
+            ->where('reps.es_cancelado', false)
+            ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate])
+            ->pluck('cfdi_payments.uuid_relacionado')
+            ->unique();
+
+        $res4 = 0;
+        if ($cashReps->count() > 0) {
+            $res4 = Cfdi::whereIn('uuid', $cashReps)
+                ->where(function($q) {
+                    $q->whereNull('deduction_type')
+                      ->orWhere('deduction_type', '!=', 'manual');
+                })
+                ->update(['is_deductible' => 0, 'deduction_type' => 'auto_rep_cash']);
+        }
+
+        Log::info("Auditoria finalizada. E>2000: $res1, Comb: $res2, Pers: $res3, REP_Cash: $res4");
     }
 
     private function getWarningForCfdi($c)
