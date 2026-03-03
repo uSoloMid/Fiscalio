@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listSatRequests, verifySatRequest, getRunnerStatus, bulkDeleteSatRequests } from '../services';
+import { listSatRequests, verifySatRequest, getRunnerStatus, bulkDeleteSatRequests, listClients, createManualRequest } from '../services';
 
 interface SatRequest {
     id: string;
@@ -14,6 +14,12 @@ interface SatRequest {
     package_count: number;
 }
 
+interface Client {
+    rfc: string;
+    legal_name?: string;
+    common_name?: string;
+}
+
 export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [requests, setRequests] = useState<SatRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -22,6 +28,17 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Manual Request Modal State
+    const [showModal, setShowModal] = useState(false);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [manualRequest, setManualRequest] = useState({
+        rfc: '',
+        start_date: '',
+        end_date: '',
+        type: 'all'
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchRequests = async () => {
         try {
@@ -36,6 +53,36 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
             console.error('Error loading requests', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleOpenModal = async () => {
+        setShowModal(true);
+        try {
+            const data = await listClients();
+            setClients(data);
+        } catch (e) {
+            console.error('Error loading clients', e);
+        }
+    };
+
+    const handleManualSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!manualRequest.rfc || !manualRequest.start_date || !manualRequest.end_date) {
+            alert('Por favor completa todos los campos');
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+            await createManualRequest(manualRequest.rfc, manualRequest.start_date, manualRequest.end_date, manualRequest.type);
+            alert('Solicitud creada correctamente. Aparecerá en el historial en unos momentos.');
+            setShowModal(false);
+            await fetchRequests();
+        } catch (error: any) {
+            alert(error.message || 'Error al crear solicitud manual');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -139,18 +186,28 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleBulkDelete}
-                        disabled={isDeleting || requests.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-black rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wider"
-                    >
-                        {isDeleting ? (
-                            <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
-                        ) : (
-                            <span className="material-symbols-outlined text-sm">delete_sweep</span>
-                        )}
-                        Limpiar Historial
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleOpenModal}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 text-xs font-black rounded-xl transition-all uppercase tracking-wider"
+                        >
+                            <span className="material-symbols-outlined text-sm">add_circle</span>
+                            Solicitud Manual
+                        </button>
+
+                        <button
+                            onClick={handleBulkDelete}
+                            disabled={isDeleting || requests.length === 0}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-black rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wider"
+                        >
+                            {isDeleting ? (
+                                <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                            ) : (
+                                <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                            )}
+                            Limpiar Historial
+                        </button>
+                    </div>
                 </div>
             </header>
 
@@ -254,6 +311,97 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                     )}
                 </div>
             </main>
+
+            {/* Manual Request Modal */}
+            {showModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-[32px] shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Solicitud Manual SAT</h3>
+                                <p className="text-xs text-gray-500 font-medium">Define el RFC y el rango de fechas</p>
+                            </div>
+                            <button
+                                onClick={() => setShowModal(false)}
+                                className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-gray-600 transition-all border border-transparent hover:border-gray-100"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleManualSubmit} className="p-8 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Cliente / RFC</label>
+                                <select
+                                    className="w-full bg-gray-50 border-0 rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 transition-all appearance-none cursor-pointer"
+                                    value={manualRequest.rfc}
+                                    onChange={e => setManualRequest({ ...manualRequest, rfc: e.target.value })}
+                                    required
+                                >
+                                    <option value="">Selecciona un cliente...</option>
+                                    {clients.map(c => (
+                                        <option key={c.rfc} value={c.rfc}>{c.common_name || c.legal_name || c.rfc} ({c.rfc})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Fecha Inicio</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-50 border-0 rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 transition-all"
+                                        value={manualRequest.start_date}
+                                        onChange={e => setManualRequest({ ...manualRequest, start_date: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Fecha Fin</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-50 border-0 rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 transition-all"
+                                        value={manualRequest.end_date}
+                                        onChange={e => setManualRequest({ ...manualRequest, end_date: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Tipo de Facturas</label>
+                                <div className="flex gap-2 p-1 bg-gray-50 rounded-2xl">
+                                    {['all', 'issued', 'received'].map(t => (
+                                        <button
+                                            key={t}
+                                            type="button"
+                                            onClick={() => setManualRequest({ ...manualRequest, type: t })}
+                                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${manualRequest.type === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                        >
+                                            {t === 'all' ? 'Ambas' : t === 'issued' ? 'Emitidas' : 'Recibidas'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="w-full py-5 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 group shadow-lg shadow-gray-200"
+                            >
+                                {isSubmitting ? (
+                                    <span className="material-symbols-outlined animate-spin">refresh</span>
+                                ) : (
+                                    <>
+                                        <span>Crear Solicitud</span>
+                                        <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                                    </>
+                                )}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -524,6 +524,21 @@ class InvoiceController extends Controller
         $force = (bool)$request->input('force', false);
         return response()->json($service->syncIfNeeded(\App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail(), $force));
     }
+
+    public function manualRequest(Request $request, \App\Services\BusinessSyncService $service)
+    {
+        $rfc = $request->input('rfc');
+        $start = $request->input('start_date');
+        $end = $request->input('end_date');
+        $type = $request->input('type', 'all');
+
+        if (!$rfc || !$start || !$end) {
+            return response()->json(['error' => 'RFC, start_date and end_date are required'], 400);
+        }
+
+        $business = \App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail();
+        return response()->json($service->createManualRequest($business, $start, $end, $type));
+    }
     public function verifyStatus(Request $request, \App\Services\BusinessSyncService $service)
     {
         $rfc = $request->input('rfc');

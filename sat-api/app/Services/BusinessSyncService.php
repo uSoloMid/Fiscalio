@@ -209,4 +209,30 @@ class BusinessSyncService
             'changes' => $changes
         ];
     }
+
+    public function createManualRequest(Business $business, $startDate, $endDate, $type = 'all')
+    {
+        $start = Carbon::parse($startDate)->startOfDay();
+        $end = Carbon::parse($endDate)->endOfDay();
+
+        $types = ($type === 'all') ? ['issued', 'received'] : [$type];
+        $requestCount = 0;
+
+        foreach ($types as $t) {
+            SatRequest::create([
+                'id' => (string)\Illuminate\Support\Str::uuid(),
+                'rfc' => $business->rfc,
+                'type' => $t,
+                'start_date' => $start,
+                'end_date' => $end,
+                'state' => 'created'
+            ]);
+            $requestCount++;
+        }
+
+        return [
+            'status' => 'success',
+            'requests_created' => $requestCount
+        ];
+    }
 }

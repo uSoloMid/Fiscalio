@@ -44,6 +44,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     Route::get('/sat/requests/{id}', [InvoiceController::class , 'showRequest']);
     Route::post('/sat/sync', [InvoiceController::class , 'startSync']);
+    Route::post('/sat/manual-request', [InvoiceController::class , 'manualRequest']);
     Route::post('/sat/verify-status', [InvoiceController::class , 'verifyStatus']);
     Route::get('/sat/active-requests', [InvoiceController::class , 'getActiveRequests']);
     Route::get('/sat/recent-requests', [InvoiceController::class , 'getRecentRequests']);
@@ -117,7 +118,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/bank-statements', [\App\Http\Controllers\BankStatementController::class , 'index']);
         Route::get('/bank-statements/{id}', [\App\Http\Controllers\BankStatementController::class , 'show']);
         Route::delete('/bank-statements/{id}', [\App\Http\Controllers\BankStatementController::class , 'destroy']);
-        Route::put('/bank-movements/{id}', [\App\Http\Controllers\BankStatementController::class , 'updateMovement']);    });
+        Route::put('/bank-movements/{id}', [\App\Http\Controllers\BankStatementController::class , 'updateMovement']);
+    });
 
 require __DIR__ . '/debug_routes.php';
 require __DIR__ . '/debug_cwd.php';
