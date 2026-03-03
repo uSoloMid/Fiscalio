@@ -157,9 +157,10 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         setUpdatingUuid(item.uuid);
         try {
             await updateDeductibility(item.uuid, {
-                is_deductible: !item.is_deductible
+                is_deductible: !item.is_deductible,
+                deduction_type: 'manual'
             });
-            setDetailData(prev => prev.map(i => i.uuid === item.uuid ? { ...i, is_deductible: !i.is_deductible } : i));
+            setDetailData(prev => prev.map(i => i.uuid === item.uuid ? { ...i, is_deductible: !i.is_deductible, deduction_type: i.is_deductible ? i.deduction_type : 'manual' } : i));
             fetchSummary();
         } catch (error) {
             console.error("Error updating deductibility", error);
