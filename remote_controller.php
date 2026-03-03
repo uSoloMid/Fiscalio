@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
-use App\Models\Cfdi;
+use Carbon\Carbon;
 use Throwable;
 
 class ProvisionalControlController extends Controller
@@ -14,23 +13,18 @@ class ProvisionalControlController extends Controller
     public function getSummary(Request $request)
     {
         try {
-            $rfc = trim(strtoupper((string)$request->query('rfc')));
-
+            $rfc = (string)$request->query('rfc');
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
 
             if (!$rfc || !$year || !$month) {
-                                        return response()->json(['error' => 'Missing parameters'], 400);
+                return response()->json(['error' => 'Missing parameters'], 400);
             }
 
             $strMonth = str_pad($month, 2, '0', STR_PAD_LEFT);
             $startDate = "{$year}-{$strMonth}-01 00:00:00";
             $carbonEnd = Carbon::createFromDate($year, $month, 1)->endOfMonth();
             $endDate = $carbonEnd->format('Y-m-d 23:59:59');
-
-            $alertas = $this->calculateAlerts($rfc, $startDate, $endDate);
-            $this->performAudit($rfc, $startDate, $endDate);
-
             $tcSql = "CASE WHEN moneda = 'MXN' OR moneda IS NULL THEN 1 ELSE COALESCE(NULLIF(tipo_cambio, 0), 1) END";
 
             $getInvoicesSum = function ($direction, $metodo, $onlyDeductible = true) use ($rfc, $startDate, $endDate, $tcSql) {
@@ -43,18 +37,11 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
                 
                 if ($direction === 'egresos') {
-                    if ($onlyDeductible) {
-                        $query->where(function($q) {
-                            $q->where('is_deductible', '!=', 0)
-                              ->orWhereNull('is_deductible');
-                        });
-                    } else {
-                        $query->where('is_deductible', 0);
-                    }
+                    $query->where('is_deductible', $onlyDeductible);
                 }
 
                 return $query->select(
-                        DB::raw("SUM(subtotal * $tcSql) as subtotal"),
+                        DB::raw("SUM((subtotal - COALESCE(descuento, 0)) * $tcSql) as subtotal"),
                         DB::raw("SUM(iva * $tcSql) as iva"),
                         DB::raw("SUM(retenciones * $tcSql) as retenciones"),
                         DB::raw("SUM(total * $tcSql) as total")
@@ -73,18 +60,11 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
                 if ($direction === 'egresos') {
-                    if ($onlyDeductible) {
-                        $query->where(function($q) {
-                            $q->where('ppds.is_deductible', '!=', 0)
-                              ->orWhereNull('ppds.is_deductible');
-                        });
-                    } else {
-                        $query->where('ppds.is_deductible', 0);
-                    }
+                    $query->where('ppds.is_deductible', $onlyDeductible);
                 }
 
                 return $query->select(
-                        DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.subtotal / NULLIF(ppds.total, 0)) * $tcPago) as subtotal"),
+                        DB::raw("SUM(cfdi_payments.monto_pagado * ((ppds.subtotal - COALESCE(ppds.descuento, 0)) / NULLIF(ppds.total, 0)) * $tcPago) as subtotal"),
                         DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.iva / NULLIF(ppds.total, 0)) * $tcPago) as iva"),
                         DB::raw("SUM(cfdi_payments.monto_pagado * (ppds.retenciones / NULLIF(ppds.total, 0)) * $tcPago) as retenciones"),
                         DB::raw("SUM(cfdi_payments.monto_pagado * $tcPago) as total")
@@ -101,14 +81,7 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
 
                 if ($direction === 'egresos') {
-                    if ($onlyDeductible) {
-                        $query->where(function($q) {
-                            $q->where('is_deductible', '!=', 0)
-                              ->orWhereNull('is_deductible');
-                        });
-                    } else {
-                        $query->where('is_deductible', 0);
-                    }
+                    $query->where('is_deductible', $onlyDeductible);
                 }
 
                 $invoices = $query->get();
@@ -116,7 +89,7 @@ class ProvisionalControlController extends Controller
                 $res = ['subtotal' => 0, 'iva' => 0, 'retenciones' => 0, 'total' => 0];
                 foreach ($invoices as $c) {
                     $moneda = strtoupper($c->moneda ?? 'MXN');
-                    $tc = ($moneda === 'MXN') ? 1.0 : (float)($c->tipo_cambio ?? 1);
+                    $tc = ($moneda === 'MXN') ? 1.0 : (float)($c->tipo_cambio ?? 1.0);
                     if ($tc <= 0) $tc = 1.0;
 
                     $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->where('fecha_pago', '<=', $endDate)->sum('monto_pagado');
@@ -124,7 +97,7 @@ class ProvisionalControlController extends Controller
                     if ($balance < 0.05) continue;
                     $ratio = $c->total > 0 ? ($balance / (float)$c->total) : 0;
                     
-                    $res['subtotal'] += (float)$c->subtotal * $ratio * $tc;
+                    $res['subtotal'] += ((float)$c->subtotal - (float)($c->descuento ?? 0)) * $ratio * $tc;
                     $res['iva'] += (float)$c->iva * $ratio * $tc;
                     $res['retenciones'] += (float)$c->retenciones * $ratio * $tc;
                     $res['total'] += (float)$c->total * $ratio * $tc;
@@ -147,18 +120,20 @@ class ProvisionalControlController extends Controller
             $ndRep = $getRepSum('egresos', false);
             $ndPend = $getPendSum('egresos', false);
 
-            $totalEfectivoIng = (float)($ingPue?->total ?? 0) + (float)($ingRep?->total ?? 0);
-            $totalEfectivoEgr = (float)($egrPue?->total ?? 0) + (float)($egrRep?->total ?? 0);
+            $totalEfectivoIng = (float)($ingPue->total ?? 0) + (float)($ingRep->total ?? 0);
+            $totalEfectivoEgr = (float)($egrPue->total ?? 0) + (float)($egrRep->total ?? 0);
 
             $formatRow = function($pue, $ppd, $rep, $pend, $field) {
-                $vP = (float)($pue?->$field ?? 0); 
-                $vD = (float)($ppd?->$field ?? 0); 
-                $vR = (float)($rep?->$field ?? 0); 
-                $vN = (float)($pend[$field] ?? 0);
+                $vP = isset($pue->$field) ? (float)$pue->$field : 0; 
+                $vD = isset($ppd->$field) ? (float)$ppd->$field : 0;
+                $vR = isset($rep->$field) ? (float)$rep->$field : 0;
+                $vN = isset($pend[$field]) ? (float)$pend[$field] : 0;
                 return ['pue' => $vP, 'ppd' => $vD, 'rep' => $vR, 'suma_devengado' => $vP + $vD, 'suma_efectivo' => $vP + $vR, 'pendiente' => $vN];
             };
 
-                        return response()->json([
+            $alertas = $this->calculateAlerts($rfc, $startDate, $endDate);
+
+            return response()->json([
                 'ingresos' => [
                     'total_efectivo' => $totalEfectivoIng,
                     'subtotal' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'subtotal'),
@@ -182,14 +157,158 @@ class ProvisionalControlController extends Controller
                 'alertas' => $alertas
             ]);
         } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 200);
         }
+    }
+
+    private function calculateAlerts($rfc, $startDate, $endDate)
+    {
+        $alerts = [];
+        $business = DB::table('businesses')->where('rfc', $rfc)->first();
+        
+        // 1. Regime Alert
+        if ($business && $business->regimen_fiscal === '626') {
+            if ($business->tipo_persona === 'F') {
+                $alerts[] = [
+                    'type' => 'warning',
+                    'title' => 'Régimen RESICO P. Física',
+                    'message' => 'El ISR se determina sobre ingresos brutos cobrados. Las deducciones mostradas son solo para efectos de IVA y no restarán base para el cálculo de ISR mensual.'
+                ];
+            }
+        }
+
+        // 2. Cash Limit Alert (> 2000)
+        $cashOverLimit = DB::table('cfdis')
+            ->where('rfc_receptor', $rfc)
+            ->where('metodo_pago', 'PUE')
+            ->where('forma_pago', '01') 
+            ->where('total', '>', 2000)
+            ->where('es_cancelado', false)
+            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->count();
+
+        if ($cashOverLimit > 0) {
+            $alerts[] = [
+                'type' => 'danger',
+                'title' => 'Deducciones en Efectivo > $2,000',
+                'message' => "Se detectaron $cashOverLimit facturas PUE pagadas en efectivo con importe mayor a $2,000. Estas no cumplen con los requisitos de forma para ser deducibles."
+            ];
+        }
+
+        // 3. Fuel Alert (Always non-deductible if Cash)
+        $fuelCash = DB::table('cfdis')
+            ->where('rfc_receptor', $rfc)
+            ->where('forma_pago', '01')
+            ->where('es_cancelado', false)
+            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->where(function($q) {
+                $q->where('concepto', 'like', '%GASOLINA%')
+                  ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
+                  ->orWhere('concepto', 'like', '%DIESEL%')
+                  ->orWhere('concepto', 'like', '%MAGNA%')
+                  ->orWhere('concepto', 'like', '%PREMIUM%');
+            })
+            ->count();
+
+        if ($fuelCash > 0) {
+            $alerts[] = [
+                'type' => 'danger',
+                'title' => 'Combustible en Efectivo',
+                'message' => "Se detectaron $fuelCash facturas de combustible pagadas en efectivo. La ley del ISR exige que el combustible se pague siempre con medios electrónicos para ser deducible."
+            ];
+        }
+
+        // 4. Restaurants Alert
+        $restaurants = DB::table('cfdis')
+            ->where('rfc_receptor', $rfc)
+            ->where('es_cancelado', false)
+            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->where('concepto', 'like', '%RESTAURANTE%')
+            ->count();
+
+        if ($restaurants > 0) {
+            $alerts[] = [
+                'type' => 'info',
+                'title' => 'Consumo en Restaurantes',
+                'message' => "Se detectaron $restaurants consumos en establecimientos de comida. Recuerda que solo el 8.5% del consumo es deducible (salvo que sea un viático por viaje de trabajo)."
+            ];
+        }
+
+        // 5. General Non-Deductible Stats
+        $ndCount = DB::table('cfdis')
+            ->where('rfc_receptor', $rfc)
+            ->where('is_deductible', false)
+            ->where('es_cancelado', false)
+            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->count();
+        
+        if ($ndCount > 0) {
+             $alerts[] = [
+                'type' => 'info',
+                'title' => 'Gastos No Deducibles',
+                'message' => "Hay $ndCount facturas marcadas como no deducibles en este periodo."
+            ];
+        }
+
+        return $alerts;
+    }
+
+    private function evaluateInvoiceWarnings($c)
+    {
+        $evaluation = [
+            'is_deductible' => true,
+            'reason' => null,
+            'warning' => null
+        ];
+
+        $uso = $c->uso_cfdi ?? '';
+        $forma = $c->forma_pago ?? '';
+        $total = (float)($c->total ?? 0);
+        $concepto = strtoupper($c->concepto ?? '');
+
+        // 1. Initial State (Manual override or Default)
+        if (isset($c->is_deductible)) {
+            $evaluation['is_deductible'] = (bool)$c->is_deductible;
+            $evaluation['reason'] = $c->deduction_type;
+        } else {
+            // Default logic if not set manually
+            if (str_starts_with($uso, 'D')) {
+                $evaluation['is_deductible'] = false;
+                $evaluation['reason'] = 'Gasto Personal (Anual)';
+            } elseif ($uso === 'S01' || $uso === 'P01') {
+                $evaluation['is_deductible'] = false;
+                $evaluation['reason'] = 'Sin efectos fiscales';
+            }
+        }
+
+        // 2. Automated SAT Rule evaluation (Warnings)
+        $isFuel = (str_contains($concepto, 'GASOLINA') || str_contains($concepto, 'COMBUSTIBLE') || str_contains($concepto, 'DIESEL') || str_contains($concepto, 'MAGNA') || str_contains($concepto, 'PREMIUM'));
+
+        if ($forma === '01') { // Efectivo
+            if ($total > 2000) {
+                $evaluation['warning'] = 'Pago en efectivo > $2,000';
+            }
+            if ($isFuel) {
+                $evaluation['warning'] = 'Gasolina en efectivo (No deducible)';
+            }
+        }
+
+        if (str_starts_with($uso, 'D')) {
+             $evaluation['warning'] = 'Deducción Personal (No mensual)';
+        }
+
+        if ($uso === 'S01' || $uso === 'P01') {
+             $evaluation['warning'] = 'Sin efectos fiscales';
+        }
+
+        // If it was manually allowed but still has a warning, keep the warning
+        return $evaluation;
     }
 
     public function getBucketDetails(Request $request)
     {
         try {
-            $rfc = strtoupper((string)$request->query('rfc'));
+            $rfc = (string)$request->query('rfc');
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
             $bucket = (string)$request->query('bucket'); 
@@ -207,10 +326,8 @@ class ProvisionalControlController extends Controller
             $metodo = count($parts) >= 3 ? trim(strtoupper($parts[2])) : null;
             
             $fieldRfc = ($dir === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
+            $onlyDeductible = ($dir === 'egresos' && $cat !== 'nodeducibles');
             $onlyNonDeductible = ($dir === 'egresos' && $cat === 'nodeducibles');
-            // En egresos, mostramos todo en las cubetas normales para gestión, 
-            // pero filtramos estrictamente en la de nodeducibles.
-            $onlyDeductible = false; 
 
             $results = collect();
 
@@ -219,21 +336,29 @@ class ProvisionalControlController extends Controller
                 if ($metodo) $query->where('metodo_pago', $metodo);
                 else $query->whereIn('metodo_pago', ['PUE', 'PPD']);
 
-                if ($onlyNonDeductible) {
-                    $query->where('is_deductible', 0);
-                }
+                if ($onlyDeductible) $query->where('is_deductible', true);
+                if ($onlyNonDeductible) $query->where('is_deductible', false);
 
                 $resInvoices = $query->get()->map(function($c) use ($dir) {
                     $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
                     $nombre = ($dir === 'ingresos') ? $c->name_receptor : $c->name_emisor;
+                    
+                    $evaluation = $this->evaluateInvoiceWarnings($c);
+                    
                     return [
-                        'uuid' => $c->uuid, 'fecha' => substr($c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
-                        'subtotal' => (float)$c->subtotal * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
-                        'total' => (float)$c->total * $tc, 'metodo_pago' => $c->metodo_pago,
-                        'forma_pago' => $c->forma_pago, 'is_deductible' => (bool)($c->is_deductible ?? true), 
-                        'uso_cfdi' => $c->uso_cfdi ?? 'G03',
-                        'warning' => $this->getWarningForCfdi($c),
-                        'reason' => $this->getReasonFriendly($c->deduction_type)
+                        'uuid' => $c->uuid, 
+                        'fecha' => substr($c->fecha_fiscal, 0, 10), 
+                        'nombre' => $nombre,
+                        'subtotal' => ((float)$c->subtotal - (float)($c->descuento ?? 0)) * $tc, 
+                        'iva' => (float)($c->iva ?? 0) * $tc,
+                        'total' => (float)$c->total * $tc, 
+                        'metodo_pago' => $c->metodo_pago,
+                        'forma_pago' => $c->forma_pago, 
+                        'is_deductible' => $evaluation['is_deductible'],
+                        'uso_cfdi' => $c->uso_cfdi ?? 'G03', 
+                        'reason' => $evaluation['reason'],
+                        'warning' => $evaluation['warning'],
+                        'conceptos' => $c->concepto // El campo concepto suele guardar la descripción
                     ];
                 });
                 $results = $results->concat($resInvoices);
@@ -245,32 +370,41 @@ class ProvisionalControlController extends Controller
                     ->join('cfdis as ppds', 'cfdi_payments.uuid_relacionado', '=', 'ppds.uuid')
                     ->where('reps.' . $fieldRfc, $rfc)->where('reps.es_cancelado', false)->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
-                if ($onlyNonDeductible) {
-                    $query->where('ppds.is_deductible', 0);
-                }
+                if ($onlyDeductible) $query->where('ppds.is_deductible', true);
+                if ($onlyNonDeductible) $query->where('ppds.is_deductible', false);
 
-                $resReps = $query->select('cfdi_payments.*', 'reps.forma_pago as rep_forma_pago', 'ppds.name_receptor', 'ppds.name_emisor', 'ppds.subtotal as ppd_sub', 'ppds.iva as ppd_iva', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc', 'ppds.is_deductible', 'ppds.uso_cfdi', 'ppds.concepto', 'ppds.deduction_type')
+                $resReps = $query->select('cfdi_payments.*', 'ppds.name_receptor', 'ppds.name_emisor', 'ppds.subtotal as ppd_sub', 'ppds.iva as ppd_iva', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc', 'ppds.forma_pago', 'ppds.is_deductible', 'ppds.uso_cfdi', 'ppds.descuento as ppd_desc', 'ppds.concepto as ppd_concept', 'ppds.uuid as ppd_uuid')
                     ->get()->map(function($p) use ($dir) {
                         $ratio = $p->ppd_tot > 0 ? ($p->monto_pagado / $p->ppd_tot) : 0;
                         $tc = (strtoupper($p->ppd_mon ?? 'MXN') === 'MXN') ? 1 : ($p->ppd_tc ?: 1);
                         $nombre = ($dir === 'ingresos') ? $p->name_receptor : $p->name_emisor;
                         
-                        // Preparar objeto para validación de warning
-                        $auditObj = (object)[
-                            'metodo_pago' => 'REP',
-                            'forma_pago' => $p->rep_forma_pago,
-                            'total' => $p->monto_pagado,
-                            'concepto' => $p->concepto,
-                            'uso_cfdi' => $p->uso_cfdi
+                        // Note: For REPs, the PPD's data determines deductibility rules
+                        $evalData = (object)[
+                            'uuid' => $p->ppd_uuid,
+                            'total' => $p->ppd_tot,
+                            'forma_pago' => $p->forma_pago,
+                            'uso_cfdi' => $p->uso_cfdi,
+                            'concepto' => $p->ppd_concept,
+                            'is_deductible' => $p->is_deductible,
+                            'deduction_type' => null
                         ];
+                        $evaluation = $this->evaluateInvoiceWarnings($evalData);
 
                         return [
-                            'uuid' => $p->uuid_pago, 'fecha' => substr($p->fecha_pago, 0, 10), 'nombre' => $nombre,
-                            'subtotal' => (float)($p->ppd_sub ?? 0) * $ratio * $tc, 'iva' => (float)($p->ppd_iva ?? 0) * $ratio * $tc,
-                            'total' => (float)$p->monto_pagado, 'metodo_pago' => 'REP', 'forma_pago' => $p->rep_forma_pago ?? '99', 
-                            'is_deductible' => (bool)($p->is_deductible ?? true), 'uso_cfdi' => $p->uso_cfdi ?? 'G03',
-                            'warning' => $this->getWarningForCfdi($auditObj),
-                            'reason' => $this->getReasonFriendly($p->deduction_type ?? null)
+                            'uuid' => $p->uuid_pago, 
+                            'fecha' => substr($p->fecha_pago, 0, 10), 
+                            'nombre' => $nombre,
+                            'subtotal' => ((float)($p->ppd_sub ?? 0) - (float)($p->ppd_desc ?? 0)) * $ratio * $tc, 
+                            'iva' => (float)($p->ppd_iva ?? 0) * $ratio * $tc,
+                            'total' => (float)$p->monto_pagado, 
+                            'metodo_pago' => 'REP', 
+                            'forma_pago' => $p->forma_pago ?? '99', 
+                            'is_deductible' => $evaluation['is_deductible'], 
+                            'uso_cfdi' => $p->uso_cfdi ?? 'G03', 
+                            'reason' => $evaluation['reason'],
+                            'warning' => $evaluation['warning'],
+                            'ppd_uuid' => $p->ppd_uuid
                         ];
                     });
                 $results = $results->concat($resReps);
@@ -278,9 +412,8 @@ class ProvisionalControlController extends Controller
 
             if (!$metodo || $metodo === 'PENDIENTE') {
                 $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false)->whereBetween('fecha_fiscal', [$startDate, $endDate]);
-                if ($onlyNonDeductible) {
-                    $query->where('is_deductible', 0);
-                }
+                if ($onlyDeductible) $query->where('is_deductible', true);
+                if ($onlyNonDeductible) $query->where('is_deductible', false);
 
                 $resPend = $query->get()->map(function($c) use ($endDate, $dir) {
                     $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
@@ -289,14 +422,22 @@ class ProvisionalControlController extends Controller
                     if ($bal < 0.05) return null;
                     $ratio = $c->total > 0 ? ($bal / (float)$c->total) : 0;
                     $nombre = ($dir === 'ingresos') ? $c->name_receptor : $c->name_emisor;
+                    
+                    $evaluation = $this->evaluateInvoiceWarnings($c);
+                    
                     return [
-                        'uuid' => $c->uuid, 'fecha' => substr($c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
-                        'subtotal' => (float)$c->subtotal * $ratio * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
-                        'total' => $bal * $tc, 'metodo_pago' => $c->metodo_pago, 
-                        'is_deductible' => (bool)($c->is_deductible ?? true), 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 
-                        'forma_pago' => $c->forma_pago,
-                        'warning' => $this->getWarningForCfdi($c),
-                        'reason' => $this->getReasonFriendly($c->deduction_type)
+                        'uuid' => $c->uuid, 
+                        'fecha' => substr($c->fecha_fiscal, 0, 10), 
+                        'nombre' => $nombre,
+                        'subtotal' => ((float)$c->subtotal - (float)($c->descuento ?? 0)) * $ratio * $tc, 
+                        'iva' => (float)($c->iva ?? 0) * $ratio * $tc,
+                        'total' => $bal * $tc, 
+                        'metodo_pago' => $c->metodo_pago, 
+                        'is_deductible' => $evaluation['is_deductible'], 
+                        'uso_cfdi' => $c->uso_cfdi ?? 'G03', 
+                        'forma_pago' => $c->forma_pago, 
+                        'reason' => $evaluation['reason'],
+                        'warning' => $evaluation['warning']
                     ];
                 })->filter()->values();
                 $results = $results->concat($resPend);
@@ -311,11 +452,11 @@ class ProvisionalControlController extends Controller
     public function updateDeductibility($uuid, Request $request)
     {
         try {
-            $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
+            $cfdi = \App\Models\Cfdi::where('uuid', $uuid)->firstOrFail();
             $cfdi->update(['is_deductible' => $request->input('is_deductible'), 'deduction_type' => $request->input('deduction_type', $cfdi->deduction_type)]);
-                        return response()->json(['ok' => true]);
+            return response()->json(['ok' => true]);
         } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -344,9 +485,9 @@ class ProvisionalControlController extends Controller
                 return $c;
             });
 
-                        return response()->json(['data' => $results]);
+            return response()->json(['data' => $results]);
         } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -374,16 +515,16 @@ class ProvisionalControlController extends Controller
                 return $c;
             });
 
-                        return response()->json(['data' => $results]);
+            return response()->json(['data' => $results]);
         } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function exportExcel(Request $request)
     {
         try {
-            $rfc = strtoupper((string)$request->query('rfc'));
+            $rfc = (string)$request->query('rfc');
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
 
@@ -455,7 +596,7 @@ class ProvisionalControlController extends Controller
             
             $buckets = ['ingresos_total_pue', 'ingresos_total_rep'];
             foreach($buckets as $b) {
-                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = $this->getBucketDetails($req)->original;
                 foreach($items as $item) {
                     $xml .= '<Row>';
@@ -479,7 +620,7 @@ class ProvisionalControlController extends Controller
             
             $buckets = ['egresos_total_pue', 'egresos_total_rep'];
             foreach($buckets as $b) {
-                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = $this->getBucketDetails($req)->original;
                 foreach($items as $item) {
                     if(!($item['is_deductible'] ?? true)) continue;
@@ -503,14 +644,14 @@ class ProvisionalControlController extends Controller
                 ->header('Content-Disposition', 'attachment; filename="ControlProvisional_'.$rfc.'_'.$month.'_'.$year.'.xls"');
 
         } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function exportPdfSummary(Request $request)
     {
         try {
-            $rfc = strtoupper((string)$request->query('rfc'));
+            $rfc = (string)$request->query('rfc');
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
 
@@ -518,32 +659,50 @@ class ProvisionalControlController extends Controller
             $data = json_decode($summaryResponse->getContent(), true);
 
             // Fetch details to include in the PDF
+// Fetch details to include in the PDF
             $details = [
-                'ingresos' => collect(),
-                'egresos' => collect(),
-                'no_deducibles' => collect(),
+                'ingresos_considerados' => collect(),
+                'egresos_considerados' => collect(),
+                'ingresos_pendientes' => collect(),
+                'egresos_pendientes' => collect(),
+                'no_deducibles' => collect()
             ];
 
+            // Ingresos Considerados (PUE + REP)
+            $details['ingresos_considerados'] = collect();
             foreach(['ingresos_total_pue', 'ingresos_total_rep'] as $b) {
-                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
-                $details['ingresos'] = $details['ingresos']->concat($items);
+                $details['ingresos_considerados'] = $details['ingresos_considerados']->concat($items);
             }
 
-            foreach(['egresos_total_pue', 'egresos_total_ppd', 'egresos_total_rep'] as $b) {
-                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
+            // Egresos Considerados (PUE + REP)
+            $details['egresos_considerados'] = collect();
+            foreach(['egresos_total_pue', 'egresos_total_rep'] as $b) {
+                $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
-                $details['egresos'] = $details['egresos']->concat($items);
+                $details['egresos_considerados'] = $details['egresos_considerados']->concat($items);
             }
 
-            foreach(['egresos_nodeducibles_pue', 'egresos_nodeducibles_ppd', 'egresos_nodeducibles_rep'] as $b) {
-                $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
-                $items = collect($this->getBucketDetails($req)->original);
-                $details['no_deducibles'] = $details['no_deducibles']->concat($items);
-            }
+            // Pendientes Ingresos
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'ingresos_pendiente']);
+            $details['ingresos_pendientes'] = collect($this->getBucketDetails($req)->original);
+
+            // Pendientes Egresos
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_pendiente']);
+            $details['egresos_pendientes'] = collect($this->getBucketDetails($req)->original);
+
+            // No deducibles 
+            $req = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_nodeducibles']);
+            $nd1 = collect($this->getBucketDetails($req)->original);
+            $req2 = new Request(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_nodeducibles_pendiente']);
+            $nd2 = collect($this->getBucketDetails($req2)->original);
+            $details['no_deducibles'] = $nd1->concat($nd2);
+
+
 
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
-            $clientName = $client ? $client->name : $rfc;
+            $clientName = $client ? $client->legal_name : $rfc;
 
             $months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             $periodName = $months[$month - 1];
@@ -560,14 +719,14 @@ class ProvisionalControlController extends Controller
 
             return $pdf->download("ResumenProvisional_{$rfc}_{$month}_{$year}.pdf");
         } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
     }
 
     public function exportDetailedBucketPdf(Request $request)
     {
         try {
-            $rfc = strtoupper((string)$request->query('rfc'));
+            $rfc = (string)$request->query('rfc');
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
             $bucket = (string)$request->query('bucket');
@@ -575,11 +734,12 @@ class ProvisionalControlController extends Controller
             $items = $this->getBucketDetails($request)->original;
 
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
-            $clientName = $client ? ($client->legal_name ?? $client->common_name ?? $rfc) : $rfc;
+            $clientName = $client ? $client->legal_name : $rfc;
 
             $months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             $periodName = $months[$month - 1];
 
+            // Reusing the same logic for a simple detailed list
             $html = "<h1>Detalle: " . strtoupper(str_replace('_', ' ', $bucket)) . "</h1>";
             $html .= "<h3>Cliente: $clientName ($rfc) | Periodo: $periodName $year</h3>";
             $html .= "<table border='1' width='100%' style='border-collapse:collapse; font-size:10px;'>";
@@ -602,146 +762,7 @@ class ProvisionalControlController extends Controller
             return $pdf->download("Detalle_{$bucket}_{$rfc}_{$month}_{$year}.pdf");
 
         } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json(['error' => $e->getMessage()], 500);
         }
-    
-        }
-
-    private function calculateAlerts($rfc, $startDate, $endDate)
-    {
-        $alerts = [];
-        
-        // 1. Alerta de Deducciones en Efectivo > $2,000
-        $resultsCount = \DB::table('cfdis')
-            ->where('rfc_receptor', $rfc)
-            ->whereIn('metodo_pago', ['PUE', 'PUE '])
-            ->whereIn('forma_pago', ['01', '1', '01 ']) 
-            ->where('total', '>', 2000)
-            ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
-            ->count();
-            
-        // Log para depuración
-        Log::info("calculateAlerts Efectivo > 2000: RFC=$rfc, count=$resultsCount");
-
-        if ($resultsCount > 0) {
-            $alerts[] = [
-                'type' => 'danger',
-                'title' => 'Deducciones en Efectivo > $2,000',
-                'message' => "Se detectaron $resultsCount facturas PUE pagadas en efectivo con importe mayor a $2,000. Estas no cumplen con los requisitos de forma para ser deducibles."
-            ];
-        }
-
-        // 2. Alerta de Combustible en Efectivo
-        $fuelCash = \DB::table('cfdis')
-            ->where('rfc_receptor', $rfc)
-            ->whereIn('forma_pago', ['01', '1', '01 '])
-            ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
-            ->where(function($q) {
-                $q->where('concepto', 'like', '%GASOLINA%')
-                  ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
-                  ->orWhere('concepto', 'like', '%DIESEL%')
-                  ->orWhere('concepto', 'like', '%MAGNA%')
-                  ->orWhere('concepto', 'like', '%PREMIUM%');
-            })
-            ->count();
-
-        if ($fuelCash > 0) {
-            $alerts[] = [
-                'type' => 'danger',
-                'title' => 'Combustible en Efectivo',
-                'message' => "Se detectaron $fuelCash facturas de combustible pagadas en efectivo. La ley del ISR exige que el combustible se pague siempre con medios electrónicos para ser deducible."
-            ];
-        }
-
-    {
-        Log::info("Iniciando auditoria para RFC: $rfc | Periodo: $startDate - $endDate");
-
-        // 1. Marcar efectivo > 2000 como no deducible
-        $res1 = Cfdi::where('rfc_receptor', trim($rfc))
-            ->whereIn('metodo_pago', ['PUE', 'PUE '])
-            ->whereIn('forma_pago', ['01', '1', '01 '])
-            ->where('total', '>', 2000)
-            ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
-            ->where(function($q) {
-                $q->whereNull('deduction_type')
-                  ->orWhere('deduction_type', '!=', 'manual');
-            })
-            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_cash_gt_2000']);
-
-        // 2. Marcar combustible en efectivo
-        $res2 = Cfdi::where('rfc_receptor', trim($rfc))
-            ->whereIn('forma_pago', ['01', '1', '01 '])
-            ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
-            ->where(function($q) {
-                $q->whereNull('deduction_type')
-                  ->orWhere('deduction_type', '!=', 'manual');
-            })
-            ->where(function($q) {
-                $q->where('concepto', 'like', '%GASOLINA%')
-                  ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
-                  ->orWhere('concepto', 'like', '%DIESEL%')
-                  ->orWhere('concepto', 'like', '%MAGNA%')
-                  ->orWhere('concepto', 'like', '%PREMIUM%');
-            })
-            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_fuel_cash']);
-
-        // 3. Marcar deducciones personales
-        $res3 = Cfdi::where('rfc_receptor', trim($rfc))
-            ->where('es_cancelado', false)
-            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
-            ->where('uso_cfdi', 'like', 'D%')
-            ->where(function($q) {
-                $q->whereNull('deduction_type')
-                  ->orWhere('deduction_type', '!=', 'manual');
-            })
-            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_personal_deduction']);
-
-        Log::info("Auditoria finalizada. Efectivo>2000: $res1, Combustible: $res2, Personales: $res3");
-    }
-
-    private function getWarningForCfdi($c)
-    {
-        $metodo = $c->metodo_pago ?? 'PUE';
-        $forma = $c->forma_pago ?? '01';
-        $total = (float)($c->total ?? 0);
-        $concepto = strtoupper($c->concepto ?? '');
-
-        $isFuel = (str_contains($concepto, 'GASOLINA') || 
-                   str_contains($concepto, 'COMBUSTIBLE') || 
-                   str_contains($concepto, 'DIESEL') || 
-                   str_contains($concepto, 'MAGNA') || 
-                   str_contains($concepto, 'PREMIUM'));
-        
-        $uso = strtoupper($c->uso_cfdi ?? '');
-
-        if ($forma === '01' && $isFuel) {
-            return "Combustible en efectivo";
-        }
-
-        if ($metodo === 'PUE' && $forma === '01' && $total > 2000) {
-            return "Efectivo > $2,000";
-        }
-
-        if (str_starts_with($uso, 'D')) {
-            return "Deduccion Personal";
-        }
-
-        return null;
-    }
-
-    private function getReasonFriendly($type)
-    {
-        if (!$type) return null;
-        $map = [
-            'auto_cash_gt_2000' => 'Gasto en efectivo > $2,000',
-            'auto_fuel_cash' => 'Combustible pago en efectivo',
-            'auto_personal_deduction' => 'Deducción Personal',
-            'manual' => 'Criterio manual del usuario'
-        ];
-        return $map[$type] ?? $type;
     }
 }
