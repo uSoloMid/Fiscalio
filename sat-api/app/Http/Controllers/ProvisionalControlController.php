@@ -540,33 +540,47 @@ class ProvisionalControlController extends Controller
             $summaryResponse = $this->getSummary($request);
             $data = json_decode($summaryResponse->getContent(), true);
 
-            // Fetch details to include in the PDF
+            // Fetch details to include in the PDF with correct keys for the blade view
             $details = [
-                'ingresos' => collect(),
-                'egresos' => collect(),
+                'ingresos_considerados' => collect(),
+                'egresos_considerados' => collect(),
+                'ingresos_pendientes' => collect(),
+                'egresos_pendientes' => collect(),
                 'no_deducibles' => collect(),
             ];
 
+            // 1. Ingresos Considerados (PUE + REP)
             foreach(['ingresos_total_pue', 'ingresos_total_rep'] as $b) {
                 $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
-                $details['ingresos'] = $details['ingresos']->concat($items);
+                $details['ingresos_considerados'] = $details['ingresos_considerados']->concat($items);
             }
 
+            // 2. Egresos Considerados (PUE + REP + PPD Pagados)
             foreach(['egresos_total_pue', 'egresos_total_ppd', 'egresos_total_rep'] as $b) {
                 $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
-                $details['egresos'] = $details['egresos']->concat($items);
+                $details['egresos_considerados'] = $details['egresos_considerados']->concat($items);
             }
 
+            // 3. No Deducibles
             foreach(['egresos_nodeducibles_pue', 'egresos_nodeducibles_ppd', 'egresos_nodeducibles_rep'] as $b) {
                 $req = new Request(); $req->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => $b]);
                 $items = collect($this->getBucketDetails($req)->original);
                 $details['no_deducibles'] = $details['no_deducibles']->concat($items);
             }
 
+            // 4. Pendientes (CXC / CXP)
+            $reqI = new Request(); $reqI->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'ingresos_total_pendiente']);
+            $itemsI = $this->getBucketDetails($reqI)->original;
+            $details['ingresos_pendientes'] = collect($itemsI);
+
+            $reqE = new Request(); $reqE->query->add(['rfc' => $rfc, 'year' => $year, 'month' => $month, 'bucket' => 'egresos_total_pendiente']);
+            $itemsE = $this->getBucketDetails($reqE)->original;
+            $details['egresos_pendientes'] = collect($itemsE);
+
             $client = DB::table('businesses')->where('rfc', $rfc)->first();
-            $clientName = $client ? $client->name : $rfc;
+            $clientName = $client ? ($client->name ?? $client->common_name) : $rfc;
 
             $months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
             $periodName = $months[$month - 1];
@@ -581,12 +595,11 @@ class ProvisionalControlController extends Controller
                 'periodName' => $periodName
             ]);
 
-            return $pdf->download("ResumenProvisional_{$rfc}_{$month}_{$year}.pdf");
-        } catch (Throwable $e) {
-                        return response()->json(['error' => $e->getMessage()], 500);
+            return $pdf->download("Reporte_Provisional_{$rfc}_{$month}_{$year}.pdf");
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()], 500);
         }
     }
-
     public function exportDetailedBucketPdf(Request $request)
     {
         try {
