@@ -59,52 +59,60 @@ class XmlProcessorService
         $files = Storage::allFiles($tmpDir);
         Log::info("Archivos encontrados en $tmpDir: " . count($files));
 
-        DB::beginTransaction();
-        try {
-            foreach ($files as $file) {
-                if (!str_ends_with(strtolower($file), '.xml')) {
+        $batchSize = 50; // Procesar en bloques para no bloquear SQLite por mucho tiempo
+        $currentBatch = [];
+
+        foreach ($files as $file) {
+            if (!str_ends_with(strtolower($file), '.xml')) {
+                continue;
+            }
+
+            try {
+                $content = (string)Storage::get($file);
+                $data = $this->parseCfdi($content);
+
+                if (!$data) {
                     continue;
                 }
 
-                try {
-                    $content = (string)Storage::get($file);
-                    $data = $this->parseCfdi($content);
-
-                    if (!$data) {
-                        continue;
-                    }
-
-                    // Clasificar
-                    $tipo = 'otros';
-                    if (strtoupper($data['rfc_emisor']) === $rfcCliente) {
-                        $tipo = 'emitidas';
-                    }
-                    elseif (strtoupper($data['rfc_receptor']) === $rfcCliente) {
-                        $tipo = 'recibidas';
-                    }
-
-                    // Mover archivo final
-                    $year = $data['fecha']->format('Y');
-                    $month = $data['fecha']->format('m');
-                    $finalPath = "sat/xml/$rfcCliente/$year/$tipo/$month/" . $data['uuid'] . ".xml";
-
-                    Storage::put($finalPath, $content);
-
-                    // Indexar DB (Idempotencia)
-                    $this->indexCfdi($data, $finalPath, $requestId);
-
-                    $xmlsProcesados++;
-
+                // Clasificar
+                $tipo = 'otros';
+                if (strtoupper($data['rfc_emisor']) === $rfcCliente) {
+                    $tipo = 'emitidas';
                 }
-                catch (Exception $e) {
-                    Log::error("Error procesando XML $file: " . $e->getMessage());
+                elseif (strtoupper($data['rfc_receptor']) === $rfcCliente) {
+                    $tipo = 'recibidas';
                 }
+
+                // Mover archivo final
+                $year = $data['fecha']->format('Y');
+                $month = $data['fecha']->format('m');
+                $finalPath = "sat/xml/$rfcCliente/$year/$tipo/$month/" . $data['uuid'] . ".xml";
+
+                Storage::put($finalPath, $content);
+
+                // Guardar para procesar en bloque
+                $currentBatch[] = [
+                    'data' => $data,
+                    'path' => $finalPath
+                ];
+
+                if (count($currentBatch) >= $batchSize) {
+                    $this->saveBatch($currentBatch, $requestId);
+                    $xmlsProcesados += count($currentBatch);
+                    $currentBatch = [];
+                }
+
             }
-            DB::commit();
+            catch (Exception $e) {
+                Log::error("Error procesando XML $file: " . $e->getMessage());
+            }
         }
-        catch (Exception $e) {
-            DB::rollBack();
-            Log::error("Error fatal en transacción de procesamiento: " . $e->getMessage());
+
+        // Procesar remanentes
+        if (count($currentBatch) > 0) {
+            $this->saveBatch($currentBatch, $requestId);
+            $xmlsProcesados += count($currentBatch);
         }
 
         // Limpieza
@@ -114,6 +122,21 @@ class XmlProcessorService
         $this->updateRequestStats($requestId, $xmlsProcesados);
 
         Log::info("Procesamiento completado para Request $requestId. XMLs: $xmlsProcesados");
+    }
+
+    protected function saveBatch(array $batch, string $requestId)
+    {
+        DB::beginTransaction();
+        try {
+            foreach ($batch as $item) {
+                $this->indexCfdi($item['data'], $item['path'], $requestId);
+            }
+            DB::commit();
+        }
+        catch (Exception $e) {
+            DB::rollBack();
+            Log::error("Error en saveBatch: " . $e->getMessage());
+        }
     }
 
     public function processManualFile(string $content, string $rfcCliente): array

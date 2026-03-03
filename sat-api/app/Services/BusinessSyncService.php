@@ -7,6 +7,7 @@ use App\Models\Cfdi;
 use App\Models\SatRequest;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BusinessSyncService
 {
@@ -50,13 +51,18 @@ class BusinessSyncService
 
                 $latestDate = $lastRequest ? $lastRequest->end_date : null;
 
-                // If it's the first time syncing THIS business record, 
-                // we MUST ensure we have the 5-year history even if some invoices exist 
-                if (!$business->last_sync_at) {
-                    $startDate = now()->subYears(5)->startOfYear();
+                // Si no hay historial de solicitudes (posible limpieza manual), buscamos el último CFDI en la BD
+                if (!$latestDate) {
+                    $column = $type === 'issued' ? 'rfc_emisor' : 'rfc_receptor';
+                    $latestCfdiDate = Cfdi::where($column, 'like', $business->rfc . '%')->max('fecha_fiscal');
+                    if ($latestCfdiDate) {
+                        $latestDate = $latestCfdiDate;
+                        Log::info("Restableciendo punto de sincronización desde CFDI para {$business->rfc} ($type): $latestDate");
+                    }
                 }
-                elseif (!$latestDate) {
-                    // Fallback for missing data (never synced successfully before)
+
+                if (!$latestDate) {
+                    // Si es la primera vez (historia de 5 años), lo pedimos en bloques o manejamos el inicio
                     $startDate = now()->subYears(5)->startOfYear();
                 }
                 else {
@@ -65,6 +71,13 @@ class BusinessSyncService
                 }
 
                 $endDate = now()->subMinutes(5);
+
+                // SEGURIDAD: Si el rango es mayor a 6 meses, lo limitamos para evitar que el SAT devuelva "Error no controlado"
+                // El runner irá avanzando en cada ciclo de 6 horas hasta completar la historia.
+                if ($startDate->diffInDays($endDate) > 180) {
+                    $endDate = (clone $startDate)->addMonths(6)->endOfDay();
+                    Log::info("Rango de sincronización limitado a 6 meses para evitar saturación SAT ({$business->rfc})");
+                }
 
                 // Check for duplicate pending requests for this range (roughly)
                 // If it's a forced sync, we might want to allow it anyway if the date range is different

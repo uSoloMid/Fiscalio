@@ -157,9 +157,10 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         setUpdatingUuid(item.uuid);
         try {
             await updateDeductibility(item.uuid, {
-                is_deductible: !item.is_deductible
+                is_deductible: !item.is_deductible,
+                deduction_type: 'manual'
             });
-            setDetailData(prev => prev.map(i => i.uuid === item.uuid ? { ...i, is_deductible: !i.is_deductible } : i));
+            setDetailData(prev => prev.map(i => i.uuid === item.uuid ? { ...i, is_deductible: !i.is_deductible, deduction_type: i.is_deductible ? i.deduction_type : 'manual' } : i));
             fetchSummary();
         } catch (error) {
             console.error("Error updating deductibility", error);
@@ -466,7 +467,7 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                         Gastos No Deducibles
                                     </h3>
                                     <div className="flex gap-20">
-                                        <button onClick={() => loadBucketDetail('egresos_nodeducibles')} className="text-left group/item">
+                                        <button onClick={() => loadBucketDetail('egresos_nodeducibles_pagados')} className="text-left group/item">
                                             <div className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-3">Pagados (PUE/REP)</div>
                                             <div className="text-5xl font-black group-hover:text-blue-300 transition-colors tracking-tighter">
                                                 {formatCurrency(summary?.no_deducibles?.total_efectivo || 0)}
