@@ -14,7 +14,8 @@ class ProvisionalControlController extends Controller
     public function getSummary(Request $request)
     {
         try {
-            $rfc = strtoupper((string)$request->query('rfc'));
+            $rfc = trim(strtoupper((string)$request->query('rfc')));
+
             $year = (int)$request->query('year');
             $month = (int)$request->query('month');
 
@@ -44,7 +45,7 @@ class ProvisionalControlController extends Controller
                 if ($direction === 'egresos') {
                     if ($onlyDeductible) {
                         $query->where(function($q) {
-                            $q->where('is_deductible', '!=', 0)
+                            $q->where('is_deductible', 1)
                               ->orWhereNull('is_deductible');
                         });
                     } else {
@@ -74,7 +75,7 @@ class ProvisionalControlController extends Controller
                 if ($direction === 'egresos') {
                     if ($onlyDeductible) {
                         $query->where(function($q) {
-                            $q->where('ppds.is_deductible', '!=', 0)
+                            $q->where('ppds.is_deductible', 1)
                               ->orWhereNull('ppds.is_deductible');
                         });
                     } else {
@@ -100,7 +101,14 @@ class ProvisionalControlController extends Controller
                     ->whereBetween('fecha_fiscal', [$startDate, $endDate]);
 
                 if ($direction === 'egresos') {
-                    $query->where('is_deductible', $onlyDeductible);
+                    if ($onlyDeductible) {
+                        $query->where(function($q) {
+                            $q->where('is_deductible', 1)
+                              ->orWhereNull('is_deductible');
+                        });
+                    } else {
+                        $query->where('is_deductible', 0);
+                    }
                 }
 
                 $invoices = $query->get();
@@ -200,8 +208,8 @@ class ProvisionalControlController extends Controller
             
             $fieldRfc = ($dir === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
             $onlyNonDeductible = ($dir === 'egresos' && $cat === 'nodeducibles');
-            // Nota: En egresos, las cubetas normales (subtotal, iva, total) ahora muestran TODO (deducible y no deducible) 
-            // para que el usuario pueda ver las marcas de advertencia, pero los totales del resumen sí están filtrados.
+            // En egresos, mostramos todo en las cubetas normales para gestión, 
+            // pero filtramos estrictamente en la de nodeducibles.
             $onlyDeductible = false; 
 
             $results = collect();
@@ -211,8 +219,9 @@ class ProvisionalControlController extends Controller
                 if ($metodo) $query->where('metodo_pago', $metodo);
                 else $query->whereIn('metodo_pago', ['PUE', 'PPD']);
 
-                if ($onlyDeductible) $query->where('is_deductible', true);
-                if ($onlyNonDeductible) $query->where('is_deductible', false);
+                if ($onlyNonDeductible) {
+                    $query->where('is_deductible', 0);
+                }
 
                 $resInvoices = $query->get()->map(function($c) use ($dir) {
                     $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
@@ -236,8 +245,9 @@ class ProvisionalControlController extends Controller
                     ->join('cfdis as ppds', 'cfdi_payments.uuid_relacionado', '=', 'ppds.uuid')
                     ->where('reps.' . $fieldRfc, $rfc)->where('reps.es_cancelado', false)->whereBetween('cfdi_payments.fecha_pago', [$startDate, $endDate]);
 
-                if ($onlyDeductible) $query->where('ppds.is_deductible', true);
-                if ($onlyNonDeductible) $query->where('ppds.is_deductible', false);
+                if ($onlyNonDeductible) {
+                    $query->where('ppds.is_deductible', 0);
+                }
 
                 $resReps = $query->select('cfdi_payments.*', 'reps.forma_pago as rep_forma_pago', 'ppds.name_receptor', 'ppds.name_emisor', 'ppds.subtotal as ppd_sub', 'ppds.iva as ppd_iva', 'ppds.total as ppd_tot', 'ppds.moneda as ppd_mon', 'ppds.tipo_cambio as ppd_tc', 'ppds.is_deductible', 'ppds.uso_cfdi', 'ppds.concepto', 'ppds.deduction_type')
                     ->get()->map(function($p) use ($dir) {
@@ -268,8 +278,9 @@ class ProvisionalControlController extends Controller
 
             if (!$metodo || $metodo === 'PENDIENTE') {
                 $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('metodo_pago', 'PPD')->where('es_cancelado', false)->whereBetween('fecha_fiscal', [$startDate, $endDate]);
-                if ($onlyDeductible) $query->where('is_deductible', true);
-                if ($onlyNonDeductible) $query->where('is_deductible', false);
+                if ($onlyNonDeductible) {
+                    $query->where('is_deductible', 0);
+                }
 
                 $resPend = $query->get()->map(function($c) use ($endDate, $dir) {
                     $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
@@ -642,24 +653,32 @@ class ProvisionalControlController extends Controller
         }
 
     {
-        // 1. Marcar efectivo > 2000 como no deducible si no tiene deduction_type manual
-        DB::table('cfdis')
+        Log::info("Iniciando auditoria para RFC: $rfc | Periodo: $startDate - $endDate");
+
+        // 1. Marcar efectivo > 2000 como no deducible
+        $res1 = DB::table('cfdis')
             ->where('rfc_receptor', $rfc)
             ->where('metodo_pago', 'PUE')
             ->where('forma_pago', '01')
             ->where('total', '>', 2000)
             ->where('es_cancelado', false)
             ->whereBetween('fecha_fiscal', [$startDate, $endDate])
-            ->whereNull('deduction_type')
-            ->update(['is_deductible' => false, 'deduction_type' => 'auto_cash_gt_2000']);
+            ->where(function($q) {
+                $q->whereNull('deduction_type')
+                  ->orWhere('deduction_type', '!=', 'manual');
+            })
+            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_cash_gt_2000']);
 
         // 2. Marcar combustible en efectivo
-        DB::table('cfdis')
+        $res2 = DB::table('cfdis')
             ->where('rfc_receptor', $rfc)
             ->where('forma_pago', '01')
             ->where('es_cancelado', false)
             ->whereBetween('fecha_fiscal', [$startDate, $endDate])
-            ->whereNull('deduction_type')
+            ->where(function($q) {
+                $q->whereNull('deduction_type')
+                  ->orWhere('deduction_type', '!=', 'manual');
+            })
             ->where(function($q) {
                 $q->where('concepto', 'like', '%GASOLINA%')
                   ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
@@ -667,7 +686,21 @@ class ProvisionalControlController extends Controller
                   ->orWhere('concepto', 'like', '%MAGNA%')
                   ->orWhere('concepto', 'like', '%PREMIUM%');
             })
-            ->update(['is_deductible' => false, 'deduction_type' => 'auto_fuel_cash']);
+            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_fuel_cash']);
+
+        // 3. Marcar deducciones personales
+        $res3 = DB::table('cfdis')
+            ->where('rfc_receptor', $rfc)
+            ->where('es_cancelado', false)
+            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->where('uso_cfdi', 'like', 'D%')
+            ->where(function($q) {
+                $q->whereNull('deduction_type')
+                  ->orWhere('deduction_type', '!=', 'manual');
+            })
+            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_personal_deduction']);
+
+        Log::info("Auditoria finalizada. Efectivo>2000: $res1, Combustible: $res2, Personales: $res3");
     }
 
     private function getWarningForCfdi($c)
@@ -683,12 +716,18 @@ class ProvisionalControlController extends Controller
                    str_contains($concepto, 'MAGNA') || 
                    str_contains($concepto, 'PREMIUM'));
         
+        $uso = strtoupper($c->uso_cfdi ?? '');
+
         if ($forma === '01' && $isFuel) {
             return "Combustible en efectivo";
         }
 
         if ($metodo === 'PUE' && $forma === '01' && $total > 2000) {
             return "Efectivo > $2,000";
+        }
+
+        if (str_starts_with($uso, 'D')) {
+            return "Deduccion Personal";
         }
 
         return null;
@@ -700,6 +739,7 @@ class ProvisionalControlController extends Controller
         $map = [
             'auto_cash_gt_2000' => 'Gasto en efectivo > $2,000',
             'auto_fuel_cash' => 'Combustible pago en efectivo',
+            'auto_personal_deduction' => 'Deducción Personal',
             'manual' => 'Criterio manual del usuario'
         ];
         return $map[$type] ?? $type;
