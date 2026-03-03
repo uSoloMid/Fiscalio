@@ -250,7 +250,8 @@ class ProvisionalControlController extends Controller
                             'metodo_pago' => 'REP',
                             'forma_pago' => $p->rep_forma_pago,
                             'total' => $p->monto_pagado,
-                            'concepto' => $p->concepto
+                            'concepto' => $p->concepto,
+                            'uso_cfdi' => $p->uso_cfdi
                         ];
 
                         return [
