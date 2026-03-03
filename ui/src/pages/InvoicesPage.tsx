@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel, createManualRequest } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import { BankStatementPage } from './BankStatementPage';
@@ -48,6 +48,36 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [showExportModal, setShowExportModal] = useState(false);
 
     const [isScrapingFiel, setIsScrapingFiel] = useState(false);
+
+    const [showManualRequestModal, setShowManualRequestModal] = useState(false);
+    const [manualRequest, setManualRequest] = useState({
+        start_date: '',
+        end_date: '',
+        type: 'all'
+    });
+    const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+
+    const handleManualRequestSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!manualRequest.start_date || !manualRequest.end_date) {
+            alert('Por favor selecciona las fechas');
+            return;
+        }
+
+        try {
+            setIsSubmittingManual(true);
+            await createManualRequest(activeRfc, manualRequest.start_date, manualRequest.end_date, manualRequest.type);
+            alert('Solicitud creada correctamente. El sistema la procesará en unos momentos.');
+            setShowManualRequestModal(false);
+            // Refresh active requests
+            const reqs = await getActiveRequests(activeRfc);
+            setActiveRequests(reqs);
+        } catch (error: any) {
+            alert(error.message || 'Error al crear solicitud');
+        } finally {
+            setIsSubmittingManual(false);
+        }
+    };
 
     const fielStatus = React.useMemo(() => {
         if (!activeValidUntil) return null;
@@ -768,6 +798,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                     className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-[10.5px] font-bold uppercase tracking-wider transition-all shadow-sm ${syncing ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'}`}>
                                     <span className={`material-symbols-outlined text-base ${syncing ? 'animate-spin' : ''}`}>sync</span>
                                     {syncing ? 'Sincronizando...' : getNextSyncText()}
+                                </button>
+
+                                <button
+                                    onClick={() => setShowManualRequestModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-[10.5px] font-bold uppercase tracking-wider rounded-xl transition-all shadow-md shadow-emerald-100"
+                                >
+                                    <span className="material-symbols-outlined text-base">add_circle</span>
+                                    Solicitud Manual
                                 </button>
 
                                 <button
@@ -1614,6 +1652,82 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                 Entendido
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Manual Request Modal */}
+            {showManualRequestModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-[32px] shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900">Solicitud Manual SAT</h3>
+                                <p className="text-xs text-gray-500 font-medium">Define el rango de fechas para {activeRfc}</p>
+                            </div>
+                            <button
+                                onClick={() => setShowManualRequestModal(false)}
+                                className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-gray-600 transition-all border border-transparent hover:border-gray-100"
+                            >
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleManualRequestSubmit} className="p-8 space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Fecha Inicio</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-50 border-0 rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 transition-all"
+                                        value={manualRequest.start_date}
+                                        onChange={e => setManualRequest({ ...manualRequest, start_date: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Fecha Fin</label>
+                                    <input
+                                        type="date"
+                                        className="w-full bg-gray-50 border-0 rounded-2xl p-4 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500 transition-all"
+                                        value={manualRequest.end_date}
+                                        onChange={e => setManualRequest({ ...manualRequest, end_date: e.target.value })}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 px-1">Tipo de Facturas</label>
+                                <div className="flex gap-2 p-1 bg-gray-50 rounded-2xl">
+                                    {['all', 'issued', 'received'].map(t => (
+                                        <button
+                                            key={t}
+                                            type="button"
+                                            onClick={() => setManualRequest({ ...manualRequest, type: t })}
+                                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${manualRequest.type === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                        >
+                                            {t === 'all' ? 'Ambas' : t === 'issued' ? 'Emitidas' : 'Recibidas'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={isSubmittingManual}
+                                className="w-full py-5 bg-gray-900 hover:bg-gray-800 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 group shadow-lg shadow-gray-200"
+                            >
+                                {isSubmittingManual ? (
+                                    <span className="material-symbols-outlined animate-spin">refresh</span>
+                                ) : (
+                                    <>
+                                        <span>Crear Solicitud</span>
+                                        <span className="material-symbols-outlined group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                                    </>
+                                )}
+                            </button>
+                        </form>
                     </div>
                 </div>
             )}
