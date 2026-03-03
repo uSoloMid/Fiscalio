@@ -726,6 +726,20 @@ class InvoiceController extends Controller
         return response()->json(['message' => 'Solicitud eliminada correctamente']);
     }
 
+    public function bulkDeleteSatRequests(Request $request)
+    {
+        $rfc = $request->input('rfc');
+        $query = \App\Models\SatRequest::whereIn('state', ['completed', 'failed', 'error', 'canceled']);
+
+        if ($rfc) {
+            $query->where('rfc', strtoupper($rfc));
+        }
+
+        $count = $query->delete();
+
+        return response()->json(['message' => "Se eliminaron $count solicitudes correctamente"]);
+    }
+
     public function verifySatRequest($id)
     {
         $req = \App\Models\SatRequest::findOrFail($id);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listSatRequests, verifySatRequest, getRunnerStatus } from '../services';
+import { listSatRequests, verifySatRequest, getRunnerStatus, bulkDeleteSatRequests } from '../services';
 
 interface SatRequest {
     id: string;
@@ -21,12 +21,13 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [totalPages, setTotalPages] = useState(1);
     const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const fetchRequests = async () => {
         try {
             setLoading(true);
             const data = await listSatRequests({ page });
-            setRequests(data.data);
+            setRequests(data.data || []);
             setTotalPages(data.last_page);
 
             const rStatus = await getRunnerStatus();
@@ -49,6 +50,21 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
             alert(error.message || 'Error al verificar solicitud');
         } finally {
             setProcessingId(null);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm('¿Estás seguro de que deseas eliminar todas las solicitudes completadas y fallidas?')) return;
+
+        try {
+            setIsDeleting(true);
+            const res = await bulkDeleteSatRequests();
+            alert(res.message || 'Historial limpiado');
+            await fetchRequests();
+        } catch (error: any) {
+            alert(error.message || 'Error al limpiar historial');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -122,6 +138,19 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                             </p>
                         </div>
                     </div>
+
+                    <button
+                        onClick={handleBulkDelete}
+                        disabled={isDeleting || requests.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-black rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed uppercase tracking-wider"
+                    >
+                        {isDeleting ? (
+                            <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                        ) : (
+                            <span className="material-symbols-outlined text-sm">delete_sweep</span>
+                        )}
+                        Limpiar Historial
+                    </button>
                 </div>
             </header>
 

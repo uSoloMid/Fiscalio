@@ -234,6 +234,15 @@ export async function deleteSatRequest(id: string): Promise<void> {
     if (!response.ok) throw new Error('Error deleting request');
 }
 
+export async function bulkDeleteSatRequests(rfc?: string): Promise<any> {
+    const query = rfc ? `?rfc=${rfc}` : '';
+    const response = await authFetch(`${API_BASE_URL}/api/sat/requests-bulk${query}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Error deleting requests');
+    return response.json();
+}
+
 export async function verifySatRequest(id: string): Promise<any> {
     const response = await authFetch(`${API_BASE_URL}/api/sat/requests/${id}/verify`, {
         method: 'POST'
