@@ -214,10 +214,15 @@ class ProvisionalControlController extends Controller
 
             $results = collect();
 
-            if (!$metodo || $metodo === 'PUE' || $metodo === 'PPD') {
+            if (!$metodo || $metodo === 'PUE' || $metodo === 'PPD' || $metodo === 'PAGADOS') {
                 $query = DB::table('cfdis')->where($fieldRfc, $rfc)->where('tipo', 'I')->where('es_cancelado', false)->whereBetween('fecha_fiscal', [$startDate, $endDate]);
-                if ($metodo) $query->where('metodo_pago', $metodo);
-                else $query->whereIn('metodo_pago', ['PUE', 'PPD']);
+                if ($metodo === 'PUE' || $metodo === 'PPD') {
+                    $query->where('metodo_pago', $metodo);
+                } elseif ($metodo === 'PAGADOS') {
+                    $query->where('metodo_pago', 'PUE'); // Solo PUE, omitir PPD
+                } else {
+                    $query->whereIn('metodo_pago', ['PUE', 'PPD']);
+                }
 
                 if ($onlyNonDeductible) {
                     $query->where('is_deductible', 0);
@@ -239,7 +244,7 @@ class ProvisionalControlController extends Controller
                 $results = $results->concat($resInvoices);
             }
 
-            if (!$metodo || $metodo === 'REP') {
+            if (!$metodo || $metodo === 'REP' || $metodo === 'PAGADOS') {
                 $query = DB::table('cfdi_payments')
                     ->join('cfdis as reps', 'cfdi_payments.uuid_pago', '=', 'reps.uuid')
                     ->join('cfdis as ppds', 'cfdi_payments.uuid_relacionado', '=', 'ppds.uuid')
@@ -648,6 +653,28 @@ class ProvisionalControlController extends Controller
             ->count();
 
         if ($fuelCash > 0) {
+            $alerts[] = [
+                'type' => 'danger',
+                'title' => 'Combustible en Efectivo',
+                'message' => "Se detectaron $fuelCash facturas de combustible pagadas en efectivo. La ley del ISR exige que el combustible se pague siempre con medios electrónicos para ser deducible."
+            ];
+        }
+
+        // 3. Alerta de Deducciones Personales
+        $personalesCount = \DB::table('cfdis')
+            ->where('rfc_receptor', $rfc)
+            ->where('es_cancelado', false)
+            ->whereBetween('fecha_fiscal', [$startDate, $endDate])
+            ->where('uso_cfdi', 'like', 'D%')
+            ->count();
+
+        if ($personalesCount > 0) {
+            $alerts[] = [
+                'type' => 'warning',
+                'title' => 'Deducciones Personales Detectadas',
+                'message' => "Se detectaron $personalesCount facturas con Uso de CFDI tipo 'D' (Honorarios médicos, dentales, etc.). Estas se han marcado automáticamente como gastos no deducibles para el cálculo provisional, pero serán útiles en la Declaración Anual."
+            ];
+        }
             $alerts[] = [
                 'type' => 'danger',
                 'title' => 'Combustible en Efectivo',
