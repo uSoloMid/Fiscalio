@@ -64,4 +64,9 @@ class Business extends Model
     {
         return $this->belongsTo(Workspace::class);
     }
+
+    public function notes()
+    {
+        return $this->hasMany(BusinessNote::class, 'rfc', 'rfc');
+    }
 }

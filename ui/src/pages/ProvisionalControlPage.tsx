@@ -6,7 +6,9 @@ import {
     exportDetailedBucketPdf,
     exportCfdiPdf,
     exportProvisionalExcel,
-    exportProvisionalPdfSummary
+    exportProvisionalPdfSummary,
+    getBusinessNotes,
+    resolveBusinessNote
 } from '../services';
 import { PpdExplorer, RepExplorer } from './ProvisionalExplorers';
 
@@ -112,6 +114,25 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
 
     const [period, setPeriod] = useState({ year: initialYear, month: initialMonth });
     const [updatingUuid, setUpdatingUuid] = useState<string | null>(null);
+    const [notes, setNotes] = useState<any[]>([]);
+    const [resolvingNoteId, setResolvingNoteId] = useState<number | null>(null);
+
+    const fetchNotes = async () => {
+        try {
+            const data = await getBusinessNotes(activeRfc);
+            setNotes(data);
+        } catch { /* non-critical */ }
+    };
+
+    const handleResolveNote = async (noteId: number) => {
+        setResolvingNoteId(noteId);
+        try {
+            await resolveBusinessNote(noteId);
+            setNotes(prev => prev.filter(n => n.id !== noteId));
+        } catch { /* ignore */ } finally {
+            setResolvingNoteId(null);
+        }
+    };
 
     const fetchSummary = async () => {
         setLoading(true);
@@ -133,6 +154,10 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
     useEffect(() => {
         fetchSummary();
     }, [activeRfc, period]);
+
+    useEffect(() => {
+        fetchNotes();
+    }, [activeRfc]);
 
     const loadBucketDetail = async (bucket: string) => {
         setDetailBucket(bucket);
@@ -328,6 +353,79 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            )}
+
+                            {/* Diagnóstico de Cobertura SAT */}
+                            {notes.length > 0 && (
+                                <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+                                    <div className="px-8 py-5 border-b border-gray-50 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
+                                            <span className="material-symbols-outlined text-violet-500 text-base">radar</span>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black text-violet-500 uppercase tracking-widest">Diagnóstico Automático</div>
+                                            <div className="text-sm font-bold text-gray-800">Cobertura SAT — últimos 5 años</div>
+                                        </div>
+                                        <div className="ml-auto text-[10px] font-black text-gray-400 uppercase tracking-widest">{notes.length} hallazgo{notes.length !== 1 ? 's' : ''}</div>
+                                    </div>
+                                    <div className="divide-y divide-gray-50">
+                                        {notes.map((note) => {
+                                            const colors: Record<string, string> = {
+                                                coverage_gap:     'bg-amber-50  border-amber-100  text-amber-800',
+                                                credential_error: 'bg-red-50    border-red-100    text-red-800',
+                                                expired_fiel:     'bg-rose-50   border-rose-100   text-rose-800',
+                                                sat_error:        'bg-orange-50 border-orange-100 text-orange-800',
+                                                info:             'bg-blue-50   border-blue-100   text-blue-800',
+                                            };
+                                            const icons: Record<string, string> = {
+                                                coverage_gap:     'calendar_today',
+                                                credential_error: 'key_off',
+                                                expired_fiel:     'badge',
+                                                sat_error:        'cloud_off',
+                                                info:             'info',
+                                            };
+                                            const colorClass = colors[note.type] || colors.info;
+                                            const icon = icons[note.type] || 'info';
+                                            const typeLabel: Record<string, string> = {
+                                                coverage_gap:     'Brecha de cobertura',
+                                                credential_error: 'Error de credenciales',
+                                                expired_fiel:     'FIEL vencida',
+                                                sat_error:        'Error SAT',
+                                                info:             'Información',
+                                            };
+                                            return (
+                                                <div key={note.id} className={`px-8 py-5 flex items-start gap-4 ${colorClass.split(' ')[0]}`}>
+                                                    <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center bg-white/70 border ${colorClass.split(' ')[1]}`}>
+                                                        <span className="material-symbols-outlined text-base">{icon}</span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <span className="text-[9px] font-black uppercase tracking-widest opacity-50">{typeLabel[note.type] || note.type}</span>
+                                                            {note.invoice_type && (
+                                                                <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full ${note.invoice_type === 'issued' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                                                                    {note.invoice_type === 'issued' ? 'Emitidas' : 'Recibidas'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-sm font-bold mb-1">{note.title}</div>
+                                                        <div className="text-xs opacity-70 whitespace-pre-line leading-relaxed">{note.body}</div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleResolveNote(note.id)}
+                                                        disabled={resolvingNoteId === note.id}
+                                                        className="flex-shrink-0 p-1.5 hover:bg-white/60 rounded-lg transition-colors opacity-40 hover:opacity-100"
+                                                        title="Marcar como revisado"
+                                                    >
+                                                        {resolvingNoteId === note.id
+                                                            ? <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                                                            : <span className="material-symbols-outlined text-sm">check_circle</span>
+                                                        }
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
 

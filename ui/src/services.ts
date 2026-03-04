@@ -447,3 +447,14 @@ export async function deleteBankStatement(id: number, rfc: string): Promise<void
     });
     if (!response.ok) throw new Error('Error al eliminar estado de cuenta');
 }
+
+export async function getBusinessNotes(rfc: string): Promise<any[]> {
+    const response = await authFetch(`${API_BASE_URL}/api/clients/${rfc}/notes`);
+    if (!response.ok) return [];
+    return response.json();
+}
+
+export async function resolveBusinessNote(noteId: number): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/api/clients/notes/${noteId}/resolve`, { method: 'POST' });
+    if (!response.ok) throw new Error('Error al resolver nota');
+}

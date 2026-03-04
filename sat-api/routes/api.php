@@ -100,6 +100,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/clients/{id}/group', [ClientController::class , 'updateGroup']);
         Route::put('/clients/{id}/tags', [ClientController::class , 'updateTags']);
         Route::post('/clients/{id}/fiel', [ClientController::class , 'updateFiel']);
+        Route::get('/clients/{rfc}/notes', [ClientController::class , 'notes']);
+        Route::post('/clients/notes/{noteId}/resolve', [ClientController::class , 'resolveNote']);
 
         Route::get('/groups', [GroupController::class , 'index']);
         Route::post('/groups', [GroupController::class , 'store']);

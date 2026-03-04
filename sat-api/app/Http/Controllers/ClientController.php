@@ -6,6 +6,7 @@ declare(strict_types = 1)
 namespace App\Http\Controllers;
 
 use App\Models\Business;
+use App\Models\BusinessNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -217,6 +218,29 @@ class ClientController extends Controller
     {
         $business = Business::findOrFail($id);
         $business->delete();
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * List diagnostic notes for a business by RFC.
+     */
+    public function notes(Request $request, string $rfc)
+    {
+        $notes = BusinessNote::where('rfc', strtoupper($rfc))
+            ->whereNull('resolved_at')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($notes);
+    }
+
+    /**
+     * Mark a note as resolved.
+     */
+    public function resolveNote(int $noteId)
+    {
+        $note = BusinessNote::findOrFail($noteId);
+        $note->update(['resolved_at' => now()]);
         return response()->json(['success' => true]);
     }
 }
