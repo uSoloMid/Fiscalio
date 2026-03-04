@@ -4,6 +4,7 @@ import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifySta
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import { BankStatementPage } from './BankStatementPage';
+import { ReconciliationPage } from './ReconciliationPage';
 import type { Cfdi } from '../models';
 
 export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, activeValidUntil }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string, activeValidUntil?: string }) => {
@@ -31,7 +32,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [activeRequests, setActiveRequests] = useState<any[]>([]);
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
-    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks'>('invoices');
+    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation'>('invoices');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [contabilidadOpen, setContabilidadOpen] = useState(true);
 
@@ -535,10 +536,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                     Bancos
                                 </button>
                                 <button
-                                    className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 cursor-not-allowed"
-                                    title="Próximamente"
+                                    onClick={() => { setCurrentView('reconciliation'); setIsSidebarOpen(false); }}
+                                    className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'reconciliation' ? 'active bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
                                 >
-                                    <span className="material-symbols-outlined text-lg">sync_alt</span>
+                                    <span className="material-symbols-outlined text-lg">balance</span>
                                     Conciliaciones
                                 </button>
                                 <button
@@ -606,6 +607,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
             ) : currentView === 'banks' ? (
                 <div className="flex-1 h-screen overflow-hidden">
                     <BankStatementPage
+                        activeRfc={activeRfc}
+                        clientName={clientName || activeClientName || activeRfc}
+                        onBack={() => setCurrentView('invoices')}
+                    />
+                </div>
+            ) : currentView === 'reconciliation' ? (
+                <div className="flex-1 h-screen overflow-hidden">
+                    <ReconciliationPage
                         activeRfc={activeRfc}
                         clientName={clientName || activeClientName || activeRfc}
                         onBack={() => setCurrentView('invoices')}

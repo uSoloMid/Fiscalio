@@ -207,7 +207,7 @@ class BankStatementController extends Controller
 
     public function show($id)
     {
-        return BankStatement::with('movements')->findOrFail($id);
+        return BankStatement::with(['movements', 'movements.cfdi'])->findOrFail($id);
     }
 
     public function destroy($id)

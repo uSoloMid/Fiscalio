@@ -49,6 +49,67 @@ export interface CfdiPagination {
     total: number;
 }
 
+export type ReconciliationConfidence = 'green' | 'yellow' | 'red' | 'black';
+
+export interface ReconciliationSuggestion {
+    cfdi_id: number;
+    uuid: string;
+    rfc_emisor: string;
+    rfc_receptor: string;
+    name_emisor?: string;
+    name_receptor?: string;
+    fecha: string;
+    total: number;
+    tipo: 'I' | 'E' | 'P';
+    confidence: ReconciliationConfidence;
+    days_diff: number;
+    match_via: 'total' | 'payment';
+    payment_uuid?: string;
+    monto_pagado?: number;
+}
+
+export interface ReconciliationStats {
+    total: number;
+    green: number;
+    yellow: number;
+    red: number;
+    unmatched: number;
+}
+
+export interface BankMovement {
+    id: number;
+    bank_statement_id: number;
+    date: string;
+    description: string;
+    reference?: string;
+    cargo: number;
+    abono: number;
+    saldo: number;
+    cfdi_id?: number | null;
+    confidence?: ReconciliationConfidence | null;
+    reconciled_at?: string | null;
+    is_reviewed: boolean;
+    cfdi?: Cfdi | null;
+    suggestions?: ReconciliationSuggestion[];
+    _confidence_preview?: ReconciliationConfidence;
+}
+
+export interface BankStatement {
+    id: number;
+    business_id: number;
+    bank_name: string;
+    account_number: string;
+    period: string;
+    total_cargos: number;
+    total_abonos: number;
+    initial_balance: number;
+    final_balance: number;
+    file_name?: string;
+    movements?: BankMovement[];
+    movements_count?: number;
+    created_at: string;
+}
+
 export interface Account {
     id: number;
     internal_code: string;
