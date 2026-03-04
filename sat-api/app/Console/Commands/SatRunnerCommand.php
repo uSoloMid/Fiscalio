@@ -25,7 +25,7 @@ class SatRunnerCommand extends Command
         // DEBUG INFO
         $this->info("--- DEBUG START ---");
         $this->info("CWD: " . getcwd());
-        $this->info("DB: " . config('database.connections.sqlite.database'));
+        $this->info("DB: " . config('database.default') . ' / ' . config('database.connections.' . config('database.default') . '.database'));
 
         $logPath = storage_path('logs/laravel.log');
         if (file_exists($logPath)) {
@@ -102,8 +102,9 @@ class SatRunnerCommand extends Command
                     break;
             }
 
-            // Reset error if successful step
+            // Reset error and retry timer if successful step
             $req->last_error = null;
+            $req->next_retry_at = null;
             $req->save();
 
         }
@@ -240,9 +241,15 @@ class SatRunnerCommand extends Command
 
         }
 
-        // Ahora dejamos que el procesador original intente leer (o falle, pero ya sabremos que descomprimió)
-        // Llamamos al método original de extracción
-        $this->stepExtract($req, $packageIds);
+        // Llamamos al método de extracción e indexación
+        try {
+            $this->stepExtract($req, $packageIds);
+        } catch (Exception $e) {
+            $req->last_error = "Error en extracción: " . $e->getMessage();
+            $req->state = 'failed';
+            $req->save();
+            $this->error("[stepExtract] " . $e->getMessage());
+        }
     }
 
     protected function stepExtract(SatRequest $req, array $packages)

@@ -472,12 +472,9 @@ class XmlProcessorService
 
     protected function updateRequestStats(string $requestId, int $count)
     {
-        $req = SatRequest::where('request_id', $requestId)->first();
-        if ($req) {
-            $req->xml_count += $count;
-            $req->state = 'completed'; // Asumimos completado tras procesar
-            $req->save();
-        }
+        // Increment atómico para evitar race conditions en MySQL
+        SatRequest::where('request_id', $requestId)
+            ->increment('xml_count', $count);
     }
 
     protected function xmlToArray(\DOMDocument $dom)

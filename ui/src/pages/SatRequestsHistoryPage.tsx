@@ -12,6 +12,9 @@ interface SatRequest {
     created_at: string;
     updated_at: string;
     package_count: number;
+    xml_count: number;
+    attempts: number;
+    last_error: string | null;
 }
 
 interface Client {
@@ -19,6 +22,8 @@ interface Client {
     legal_name?: string;
     common_name?: string;
 }
+
+const EMPTY_MANUAL = { rfc: '', start_date: '', end_date: '', type: 'all' };
 
 export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [requests, setRequests] = useState<SatRequest[]>([]);
@@ -28,22 +33,19 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [rfcFilter, setRfcFilter] = useState('');
+    const [expandedError, setExpandedError] = useState<string | null>(null);
 
     // Manual Request Modal State
     const [showModal, setShowModal] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
-    const [manualRequest, setManualRequest] = useState({
-        rfc: '',
-        start_date: '',
-        end_date: '',
-        type: 'all'
-    });
+    const [manualRequest, setManualRequest] = useState(EMPTY_MANUAL);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const fetchRequests = async () => {
         try {
             setLoading(true);
-            const data = await listSatRequests({ page });
+            const data = await listSatRequests({ page, rfc: rfcFilter || undefined });
             setRequests(data.data || []);
             setTotalPages(data.last_page);
 
@@ -57,6 +59,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     };
 
     const handleOpenModal = async () => {
+        setManualRequest(EMPTY_MANUAL);
         setShowModal(true);
         try {
             const data = await listClients();
@@ -72,12 +75,11 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
             alert('Por favor completa todos los campos');
             return;
         }
-
         try {
             setIsSubmitting(true);
             await createManualRequest(manualRequest.rfc, manualRequest.start_date, manualRequest.end_date, manualRequest.type);
-            alert('Solicitud creada correctamente. Aparecerá en el historial en unos momentos.');
             setShowModal(false);
+            setManualRequest(EMPTY_MANUAL);
             await fetchRequests();
         } catch (error: any) {
             alert(error.message || 'Error al crear solicitud manual');
@@ -90,9 +92,8 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
         if (e) e.stopPropagation();
         try {
             setProcessingId(id);
-            const res = await verifySatRequest(id);
+            await verifySatRequest(id);
             await fetchRequests();
-            alert(res.message || 'Consulta completada');
         } catch (error: any) {
             alert(error.message || 'Error al verificar solicitud');
         } finally {
@@ -102,7 +103,6 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
 
     const handleBulkDelete = async () => {
         if (!confirm('¿Estás seguro de que deseas eliminar todas las solicitudes completadas y fallidas?')) return;
-
         try {
             setIsDeleting(true);
             const res = await bulkDeleteSatRequests();
@@ -117,43 +117,52 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
 
     useEffect(() => {
         fetchRequests();
-        const interval = setInterval(fetchRequests, 10000); // Poll every 10s
+        const interval = setInterval(fetchRequests, 10000);
         return () => clearInterval(interval);
-    }, [page]);
+    }, [page, rfcFilter]);
+
+    const isTerminal = (state: string) =>
+        ['completed', 'failed', 'error', 'canceled'].includes(state);
 
     const getStatusColor = (state: string) => {
         switch (state) {
-            case 'completed': return 'text-green-600 bg-green-50';
+            case 'completed':   return 'text-green-600 bg-green-50';
             case 'downloading': return 'text-orange-600 bg-orange-50';
-            case 'error': return 'text-red-600 bg-red-50';
-            default: return 'text-yellow-600 bg-yellow-50';
+            case 'failed':      return 'text-red-600 bg-red-50';
+            case 'error':       return 'text-red-600 bg-red-50';
+            case 'canceled':    return 'text-gray-500 bg-gray-100';
+            default:            return 'text-yellow-600 bg-yellow-50';
         }
     };
 
     const getStatusLabel = (state: string) => {
         switch (state) {
-            case 'completed': return 'Completada';
+            case 'completed':   return 'Completada';
             case 'downloading': return 'Descargando';
-            case 'error': return 'Error';
-            case 'created': return 'En cola';
-            case 'polling': return 'En proceso';
-            default: return state;
+            case 'failed':      return 'Fallida';
+            case 'error':       return 'Error';
+            case 'created':     return 'En cola';
+            case 'polling':     return 'Verificando';
+            case 'canceled':    return 'Cancelada';
+            default:            return state;
         }
     };
 
-    const getTypeLabel = (type: string) => {
-        return type === 'issued' ? 'EMITIDAS' : 'RECIBIDAS';
-    };
+    const getTypeLabel = (type: string) => type === 'issued' ? 'EMITIDAS' : 'RECIBIDAS';
 
-    const getTypeColor = (type: string) => {
-        return type === 'issued'
+    const getTypeColor = (type: string) =>
+        type === 'issued'
             ? 'text-blue-600 bg-blue-50 border-blue-200'
             : 'text-purple-600 bg-purple-50 border-purple-200';
-    };
 
     const formatDate = (dateStr: string) => {
         if (!dateStr) return '';
-        return new Date(dateStr).toLocaleDateString();
+        return new Date(dateStr).toLocaleDateString('es-MX');
+    };
+
+    const formatDateTime = (dateStr: string) => {
+        if (!dateStr) return '';
+        return new Date(dateStr).toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' });
     };
 
     return (
@@ -180,13 +189,20 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                             <p className="text-[10px] md:text-xs text-gray-500 font-medium truncate">
                                 Registro completo de descargas
                                 {runnerStatus?.last_activity && (
-                                    <span className="ml-2 text-gray-400">— Última actividad: {new Date(runnerStatus.last_activity).toLocaleTimeString()}</span>
+                                    <span className="ml-2 text-gray-400">— Última actividad: {new Date(runnerStatus.last_activity).toLocaleTimeString('es-MX')}</span>
                                 )}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-3">
+                        <input
+                            type="text"
+                            placeholder="Filtrar RFC..."
+                            value={rfcFilter}
+                            onChange={e => { setRfcFilter(e.target.value.toUpperCase()); setPage(1); }}
+                            className="hidden md:block px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300 w-44"
+                        />
                         <button
                             onClick={handleOpenModal}
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 text-xs font-black rounded-xl transition-all uppercase tracking-wider"
@@ -194,7 +210,6 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                             <span className="material-symbols-outlined text-sm">add_circle</span>
                             Solicitud Manual
                         </button>
-
                         <button
                             onClick={handleBulkDelete}
                             disabled={isDeleting || requests.length === 0}
@@ -205,77 +220,105 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                             ) : (
                                 <span className="material-symbols-outlined text-sm">delete_sweep</span>
                             )}
-                            Limpiar Historial
+                            Limpiar
                         </button>
                     </div>
                 </div>
             </header>
 
-            <main className="flex-1 p-10 overflow-y-auto">
+            <main className="flex-1 p-4 md:p-10 overflow-y-auto">
                 <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-gray-50/50 text-gray-400 font-black uppercase text-[10px] tracking-widest border-b border-gray-100">
                                 <tr>
-                                    <th className="px-8 py-5">Cliente</th>
-                                    <th className="px-8 py-5">Tipo</th>
-                                    <th className="px-8 py-5">Periodo Solicitado</th>
-                                    <th className="px-8 py-5">Estado</th>
-                                    <th className="px-8 py-5">Paquetes</th>
-                                    <th className="px-8 py-5">Fecha Solicitud</th>
-                                    <th className="px-8 py-5 text-right">Acciones</th>
+                                    <th className="px-6 py-5">Cliente</th>
+                                    <th className="px-6 py-5">Tipo</th>
+                                    <th className="px-6 py-5">Periodo</th>
+                                    <th className="px-6 py-5">Estado</th>
+                                    <th className="px-6 py-5">XMLs / Paq.</th>
+                                    <th className="px-6 py-5">Intentos</th>
+                                    <th className="px-6 py-5">Creada</th>
+                                    <th className="px-6 py-5 text-right">Acción</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {requests.map((req) => (
-                                    <tr key={req.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-8 py-5">
-                                            <div className="font-bold text-gray-900">{req.business_name}</div>
-                                            <div className="text-[10px] text-gray-400 font-mono tracking-tighter">{req.rfc}</div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border uppercase tracking-wider ${getTypeColor(req.type)}`}>
-                                                {getTypeLabel(req.type)}
-                                            </span>
-                                        </td>
-                                        <td className="px-8 py-5 text-gray-600 font-medium whitespace-nowrap">
-                                            {formatDate(req.start_date)} — {formatDate(req.end_date)}
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className={`flex items-center gap-2 px-3 py-1 rounded-full w-fit ${getStatusColor(req.state)}`}>
-                                                <div className={`w-1.5 h-1.5 rounded-full bg-current ${req.state !== 'completed' && req.state !== 'error' && req.state !== 'failed' && req.state !== 'canceled' ? 'animate-pulse' : ''}`} />
-                                                <span className="font-bold text-[10px] uppercase tracking-wider">{getStatusLabel(req.state)}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-5">
-                                            <div className="font-bold text-gray-700">{req.package_count}</div>
-                                            <div className="text-[10px] text-gray-400 uppercase">SAT Packages</div>
-                                        </td>
-                                        <td className="px-8 py-5 text-gray-500 text-xs">
-                                            {new Date(req.created_at).toLocaleString()}
-                                        </td>
-                                        <td className="px-8 py-5 text-right">
-                                            {req.state !== 'completed' && req.state !== 'error' && req.state !== 'failed' && req.state !== 'canceled' && (
-                                                <button
-                                                    onClick={(e) => handleVerify(req.id, e)}
-                                                    disabled={processingId === req.id}
-                                                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    title="Verificar y procesar manualmente"
-                                                >
-                                                    {processingId === req.id ? (
-                                                        <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
-                                                    ) : (
-                                                        <span className="material-symbols-outlined text-sm">play_arrow</span>
-                                                    )}
-                                                    Procesar
-                                                </button>
-                                            )}
-                                        </td>
-                                    </tr>
+                                    <>
+                                        <tr
+                                            key={req.id}
+                                            className={`hover:bg-gray-50/50 transition-colors ${req.last_error && isTerminal(req.state) ? 'cursor-pointer' : ''}`}
+                                            onClick={() => req.last_error && isTerminal(req.state) && setExpandedError(expandedError === req.id ? null : req.id)}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-gray-900 text-sm">{req.business_name}</div>
+                                                <div className="text-[10px] text-gray-400 font-mono">{req.rfc}</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black border uppercase tracking-wider ${getTypeColor(req.type)}`}>
+                                                    {getTypeLabel(req.type)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-600 font-medium whitespace-nowrap text-xs">
+                                                {formatDate(req.start_date)} — {formatDate(req.end_date)}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className={`flex items-center gap-2 px-3 py-1 rounded-full w-fit ${getStatusColor(req.state)}`}>
+                                                    <div className={`w-1.5 h-1.5 rounded-full bg-current ${!isTerminal(req.state) ? 'animate-pulse' : ''}`} />
+                                                    <span className="font-bold text-[10px] uppercase tracking-wider">{getStatusLabel(req.state)}</span>
+                                                </div>
+                                                {req.last_error && isTerminal(req.state) && (
+                                                    <div className="text-[9px] text-red-400 mt-1 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[10px]">{expandedError === req.id ? 'expand_less' : 'expand_more'}</span>
+                                                        {expandedError === req.id ? 'Ocultar error' : 'Ver error'}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-gray-700">{req.xml_count ?? 0}</div>
+                                                <div className="text-[10px] text-gray-400">{req.package_count ?? 0} paquetes</div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className={`font-bold text-sm ${(req.attempts ?? 0) >= 4 ? 'text-red-500' : 'text-gray-700'}`}>
+                                                    {req.attempts ?? 0} / 5
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-gray-500 text-xs whitespace-nowrap">
+                                                {formatDateTime(req.created_at)}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                {!isTerminal(req.state) && (
+                                                    <button
+                                                        onClick={(e) => handleVerify(req.id, e)}
+                                                        disabled={processingId === req.id}
+                                                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        title="Verificar y procesar manualmente"
+                                                    >
+                                                        {processingId === req.id ? (
+                                                            <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-sm">play_arrow</span>
+                                                        )}
+                                                        Procesar
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                        {expandedError === req.id && req.last_error && (
+                                            <tr key={`${req.id}-error`} className="bg-red-50/60">
+                                                <td colSpan={8} className="px-8 py-3">
+                                                    <div className="flex items-start gap-2 text-red-600">
+                                                        <span className="material-symbols-outlined text-sm mt-0.5 flex-shrink-0">error</span>
+                                                        <p className="text-xs font-mono break-all">{req.last_error}</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
                                 ))}
                                 {requests.length === 0 && !loading && (
                                     <tr>
-                                        <td colSpan={7} className="px-8 py-20 text-center">
+                                        <td colSpan={8} className="px-8 py-20 text-center">
                                             <span className="material-symbols-outlined text-gray-200 text-6xl mb-4">history</span>
                                             <p className="text-gray-400 font-medium">No se han encontrado solicitudes en el historial.</p>
                                         </td>
@@ -285,7 +328,6 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                         </table>
                     </div>
 
-                    {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
                             <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
@@ -312,7 +354,6 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                 </div>
             </main>
 
-            {/* Manual Request Modal */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-[32px] shadow-2xl border border-gray-100 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -322,7 +363,7 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                                 <p className="text-xs text-gray-500 font-medium">Define el RFC y el rango de fechas</p>
                             </div>
                             <button
-                                onClick={() => setShowModal(false)}
+                                onClick={() => { setShowModal(false); setManualRequest(EMPTY_MANUAL); }}
                                 className="p-2 hover:bg-white rounded-xl text-gray-400 hover:text-gray-600 transition-all border border-transparent hover:border-gray-100"
                             >
                                 <span className="material-symbols-outlined">close</span>
