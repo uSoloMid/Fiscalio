@@ -70,6 +70,8 @@ export const DashboardPage = ({
     // Runner status state
     const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean; last_activity: string | null }>({ is_alive: false, last_activity: null });
     const [nowTick, setNowTick] = useState(Date.now());
+    const [mobileTab, setMobileTab] = useState<'home' | 'clients' | 'settings'>('home');
+    const [expandRisks, setExpandRisks] = useState(false);
 
     useEffect(() => {
         loadInitialData();
@@ -367,7 +369,7 @@ export const DashboardPage = ({
     return (
         <div className="flex h-screen bg-[#F9FAFB] font-['Inter'] overflow-hidden">
             {/* Sidebar Navigation */}
-            <aside className="w-20 lg:w-24 flex-shrink-0 flex flex-col items-center py-8 bg-white border-r border-gray-100 z-20">
+            <aside className="hidden md:flex w-20 lg:w-24 flex-shrink-0 flex-col items-center py-8 bg-white border-r border-gray-100 z-20">
                 <div className="mb-10 cursor-pointer flex justify-center w-full">
                     <img src="/img/fiscalio-logo.png" alt="Fiscalio Logo" className="w-12 h-12 object-contain" />
                 </div>
@@ -391,6 +393,24 @@ export const DashboardPage = ({
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col overflow-hidden">
+                {/* Mobile Header */}
+                <header className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between flex-shrink-0">
+                    <div className="flex items-center gap-2">
+                        <img src="/img/fiscalio-logo.png" className="w-8 h-8 object-contain" alt="Fiscalio" />
+                        <span className="text-sm font-bold text-gray-900">Fiscalio</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${runnerStatus.is_alive ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full bg-current ${runnerStatus.is_alive ? 'animate-pulse' : ''}`} />
+                            SAT {runnerStatus.is_alive ? 'ACTIVO' : 'INACTIVO'}
+                        </div>
+                        <button onClick={() => setMobileTab('clients')} className="p-2 text-gray-400">
+                            <span className="material-symbols-outlined text-xl">search</span>
+                        </button>
+                    </div>
+                </header>
+                {/* Desktop Header */}
+                <div className="hidden md:block flex-shrink-0">
                 <header className="bg-white border-b border-gray-100 z-10 sticky top-0">
                     <div className="flex flex-col md:flex-row md:items-center justify-between px-6 lg:px-10 py-4 md:h-20 gap-4">
                         <div className="flex items-center justify-between md:justify-start gap-4 lg:gap-6">
@@ -508,7 +528,9 @@ export const DashboardPage = ({
                         </div>
                     </div>
                 </header>
-
+                </div>
+                {/* Desktop Content */}
+                <div className="hidden md:flex flex-col flex-1 overflow-hidden">
                 <div className="flex-1 overflow-y-auto px-10 py-8 space-y-12">
                     {/* Groups Overview Row */}
                     <section>
@@ -651,6 +673,219 @@ export const DashboardPage = ({
                         )}
                     </section>
                 </div>
+                </div>
+
+                {/* Mobile Content */}
+                <div className="md:hidden flex-1 overflow-y-auto pb-20 bg-[#F9FAFB]">
+                    {/* HOME TAB */}
+                    {mobileTab === 'home' && (
+                        <div className="p-4 space-y-4">
+                            {/* Riesgos Críticos */}
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                                <button
+                                    onClick={() => setExpandRisks(!expandRisks)}
+                                    className="w-full flex items-center justify-between p-4"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-rose-500 text-xl">shield</span>
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Riesgos Críticos</div>
+                                            <div className="text-xl font-black text-gray-900">
+                                                {String(fielRisks.expiredClients.length + fielRisks.expiringSoonClients.length).padStart(2, '0')}
+                                            </div>
+                                            <div className="text-xs text-gray-500">FIEL vencida / por vencer</div>
+                                        </div>
+                                    </div>
+                                    <span className="material-symbols-outlined text-gray-400">
+                                        {expandRisks ? 'expand_less' : 'expand_more'}
+                                    </span>
+                                </button>
+                                {expandRisks && (fielRisks.expiredClients.length + fielRisks.expiringSoonClients.length) > 0 && (
+                                    <div className="border-t border-gray-50 divide-y divide-gray-50">
+                                        {[
+                                            ...fielRisks.expiredClients.map((c: any) => ({ ...c, _riskType: 'expired' as const })),
+                                            ...fielRisks.expiringSoonClients.map((c: any) => ({ ...c, _riskType: 'soon' as const })),
+                                        ].map((client: any) => (
+                                            <div key={client.rfc} className="px-4 py-3 flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-sm font-bold text-gray-900">{client.common_name || client.legal_name}</div>
+                                                    <div className="text-[10px] text-gray-400 font-mono">{client.rfc}</div>
+                                                </div>
+                                                <span className={`text-[10px] font-black px-2 py-1 rounded-full ${client._riskType === 'expired' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                    {client._riskType === 'expired' ? 'VENCIDA' : 'POR VENCER'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Últimas Solicitudes */}
+                            <div>
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Últimas Solicitudes</span>
+                                    <button onClick={onViewHistory} className="text-[10px] font-black text-emerald-600 uppercase">Ver todo</button>
+                                </div>
+                                <RecentRequests onViewHistory={onViewHistory} compact={true} />
+                            </div>
+
+                            {/* Problemas Operativos */}
+                            {clients.filter((c: any) => c.sync_status === 'error').length > 0 && (
+                                <div className="bg-white rounded-2xl border border-orange-100 shadow-sm overflow-hidden">
+                                    <div className="p-4 flex items-center gap-3 border-b border-orange-50">
+                                        <div className="w-8 h-8 bg-orange-50 rounded-xl flex items-center justify-center">
+                                            <span className="material-symbols-outlined text-orange-500 text-lg">warning</span>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Problemas Operativos</div>
+                                            <div className="text-xs text-gray-600">{clients.filter((c: any) => c.sync_status === 'error').length} cliente(s) con error</div>
+                                        </div>
+                                    </div>
+                                    <div className="divide-y divide-gray-50">
+                                        {clients.filter((c: any) => c.sync_status === 'error').map((client: any) => (
+                                            <div
+                                                key={client.rfc}
+                                                onClick={() => onSelectClient(client.rfc, client.legal_name, client.last_sync_at || '', client.valid_until || '')}
+                                                className="px-4 py-3 flex items-center justify-between cursor-pointer active:bg-gray-50"
+                                            >
+                                                <div>
+                                                    <div className="text-sm font-bold text-gray-900">{client.common_name || client.legal_name}</div>
+                                                    <div className="text-[10px] text-gray-400 font-mono">{client.rfc}</div>
+                                                </div>
+                                                <span className="material-symbols-outlined text-gray-300 text-lg">chevron_right</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* CLIENTS TAB */}
+                    {mobileTab === 'clients' && (
+                        <div className="p-4 space-y-4">
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg">search</span>
+                                <input
+                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-2xl bg-white text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-[#10B981]"
+                                    placeholder="Buscar alias, RFC..."
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-4">
+                                {groupedClients.map(group => (
+                                    <div key={group.title}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.title}</span>
+                                            <div className="h-px bg-gray-100 flex-1"></div>
+                                            <span className="text-[10px] font-bold text-gray-300">{group.items.length}</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {group.items.map((client: any) => (
+                                                <div
+                                                    key={client.rfc}
+                                                    onClick={() => onSelectClient(client.rfc, client.legal_name, client.last_sync_at || '', client.valid_until || '')}
+                                                    className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center justify-between cursor-pointer active:bg-gray-50"
+                                                >
+                                                    <div>
+                                                        <div className="text-sm font-bold text-gray-900">{client.common_name || client.legal_name}</div>
+                                                        <div className="text-[10px] text-gray-400 font-mono">{client.rfc}</div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {client.sync_status === 'error' && (
+                                                            <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                                                        )}
+                                                        {client.is_syncing && (
+                                                            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+                                                        )}
+                                                        <span className="material-symbols-outlined text-gray-300 text-lg">chevron_right</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SETTINGS TAB */}
+                    {mobileTab === 'settings' && (
+                        <div className="p-4 space-y-3">
+                            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Configuración</div>
+                            <button
+                                onClick={() => setIsManageGroupsOpen(true)}
+                                className="w-full bg-white rounded-2xl border border-gray-100 px-4 py-4 flex items-center justify-between"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-emerald-50 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-emerald-500 text-lg">folder</span>
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-sm font-bold text-gray-900">Grupos</div>
+                                        <div className="text-xs text-gray-400">{groups.length} grupos configurados</div>
+                                    </div>
+                                </div>
+                                <span className="material-symbols-outlined text-gray-300">chevron_right</span>
+                            </button>
+                            <button
+                                onClick={() => setIsManageTagsOpen(true)}
+                                className="w-full bg-white rounded-2xl border border-gray-100 px-4 py-4 flex items-center justify-between"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center">
+                                        <span className="material-symbols-outlined text-blue-500 text-lg">label</span>
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="text-sm font-bold text-gray-900">Etiquetas</div>
+                                        <div className="text-xs text-gray-400">{tags.length} etiquetas configuradas</div>
+                                    </div>
+                                </div>
+                                <span className="material-symbols-outlined text-gray-300">chevron_right</span>
+                            </button>
+                            <div className="pt-2">
+                                <button
+                                    onClick={logout}
+                                    className="w-full bg-red-50 text-red-500 rounded-2xl px-4 py-4 flex items-center justify-center gap-2 font-bold text-sm"
+                                >
+                                    <span className="material-symbols-outlined text-lg">logout</span>
+                                    Cerrar sesión
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Mobile FAB */}
+                <button
+                    onClick={() => setIsDrawerOpen(true)}
+                    className="md:hidden fixed bottom-20 right-5 z-40 w-14 h-14 bg-[#10B981] rounded-full shadow-lg flex items-center justify-center"
+                >
+                    <span className="material-symbols-outlined text-white text-3xl">add</span>
+                </button>
+
+                {/* Mobile Bottom Navigation */}
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-100 grid grid-cols-4 h-16">
+                    {([
+                        { tab: 'home' as const, icon: 'home', label: 'Inicio' },
+                        { tab: 'clients' as const, icon: 'people', label: 'Clientes' },
+                        { tab: 'history' as const, icon: 'history', label: 'Historial' },
+                        { tab: 'settings' as const, icon: 'settings', label: 'Ajustes' },
+                    ]).map(({ tab, icon, label }) => (
+                        <button
+                            key={tab}
+                            onClick={() => tab === 'history' ? onViewHistory() : setMobileTab(tab)}
+                            className={`flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold uppercase tracking-widest transition-colors ${tab !== 'history' && mobileTab === tab ? 'text-[#10B981]' : 'text-gray-400'}`}
+                        >
+                            <span className="material-symbols-outlined text-xl">{icon}</span>
+                            {label}
+                        </button>
+                    ))}
+                </nav>
             </main>
 
             {/* MODAL: Change Group */}

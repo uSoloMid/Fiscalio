@@ -3,7 +3,7 @@ import { getRecentRequests, deleteSatRequest, getRunnerStatus, verifySatRequest 
 import type { SatRequest } from '../models';
 import { RequestDetailsModal } from './RequestDetailsModal';
 
-export function RecentRequests({ onViewHistory }: { onViewHistory: () => void }) {
+export function RecentRequests({ onViewHistory, compact }: { onViewHistory: () => void; compact?: boolean }) {
     const [requests, setRequests] = useState<SatRequest[]>([]);
     const [loading, setLoading] = useState(true);
     const [runnerStatus, setRunnerStatus] = useState<{ is_alive: boolean, last_activity: string | null } | null>(null);
@@ -106,6 +106,32 @@ export function RecentRequests({ onViewHistory }: { onViewHistory: () => void })
 
     if (loading && requests.length === 0) {
         return <div className="p-4 text-center text-gray-500 font-medium">Cargando solicitudes...</div>;
+    }
+
+    if (compact) {
+        if (requests.length === 0) {
+            return <div className="text-xs text-gray-400 text-center py-4">No hay solicitudes recientes.</div>;
+        }
+        return (
+            <div className="space-y-2">
+                {requests.map((req) => (
+                    <div key={req.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-bold text-gray-900 truncate">{req.business_name}</div>
+                            <div className="text-[10px] text-gray-400 font-mono">{req.rfc} · {new Date(req.start_date).toLocaleDateString('es-MX', { month: 'short', year: '2-digit' })}</div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${getTypeColor(req.type)}`}>
+                                {getTypeLabel(req.type)}
+                            </span>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${getStatusColor(req.state)}`}>
+                                {getStatusLabel(req.state)}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
     }
 
     return (
