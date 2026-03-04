@@ -1,4 +1,0 @@
-{
-  "home_dir": "Fiscalio/\nFiscalio-Test/\nget-docker.sh\nrunner.log\nsetup_fiscalio_test.sh*",
-  "compose_projects": "NAME                STATUS              CONFIG FILES\nfiscalio            running(1)          /home/fiscalio/Fiscalio/docker-compose.yml\nsat-api             running(1)          /home/fiscalio/Fiscalio/sat-api/docker-compose.yml"
-}

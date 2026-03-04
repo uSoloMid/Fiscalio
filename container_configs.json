@@ -1,3 +1,0 @@
-{
-  "containers_and_configs": "sat-api-app | /home/fiscalio/Fiscalio/sat-api/docker-compose.yml\nfiscalio-agent | \nfiscalio-runner | \nfiscalio-tunnel | /home/fiscalio/Fiscalio/docker-compose.yml"
-}

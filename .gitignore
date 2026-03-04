@@ -21,17 +21,16 @@ Fiscalio_DB_Only.zip
 Base_datos/
 
 # Scripts de debug temporales (NO subir al repo)
+/scripts/
+/scripts_mantenimiento/
 /*.py
 /*.sh
 /*.bak
+/*.b64
+/*.txt
 /diagnostics.json
 /sat_requests*.json
 /*.json
 /sat-api/*.php
 /sat-api/**/*.bak
-/test_db_config*.php
-/test_db_conn*.php
-/test_laravel*.php
-/reset_audit*.php
-/remote_controller.php
 /cfdis_schema.txt

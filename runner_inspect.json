@@ -1,3 +1,0 @@
-{
-  "runner_cmd": "php artisan sat:runner --loop"
-}
