@@ -62,7 +62,7 @@ class BusinessSyncService
                 }
 
                 if (!$latestDate) {
-                    // Si es la primera vez (historia de 5 años), lo pedimos en bloques o manejamos el inicio
+                    // Si es la primera vez (historia de 5 años), lo pedimos en bloques
                     $startDate = now()->subYears(5)->startOfYear();
                 }
                 else {
@@ -70,34 +70,45 @@ class BusinessSyncService
                     $startDate = Carbon::parse($latestDate)->subDays(2)->startOfDay();
                 }
 
-                $endDate = now()->subMinutes(5);
+                $totalEnd = now()->subMinutes(5);
 
-                // SEGURIDAD: Si el rango es mayor a 6 meses, lo limitamos para evitar que el SAT devuelva "Error no controlado"
-                // El runner irá avanzando en cada ciclo de 6 horas hasta completar la historia.
-                if ($startDate->diffInDays($endDate) > 180) {
-                    $endDate = (clone $startDate)->addMonths(6)->endOfDay();
-                    Log::info("Rango de sincronización limitado a 6 meses para evitar saturación SAT ({$business->rfc})");
-                }
+                // Crear TODOS los chunks de 6 meses desde startDate hasta hoy de una vez
+                $chunkStart = $startDate->copy();
+                while ($chunkStart < $totalEnd) {
+                    $chunkEnd = $chunkStart->copy()->addMonths(6)->endOfDay();
+                    if ($chunkEnd > $totalEnd) {
+                        $chunkEnd = $totalEnd->copy();
+                    }
 
-                // Check for duplicate pending requests for this range (roughly)
-                // If it's a forced sync, we might want to allow it anyway if the date range is different
-                $exists = SatRequest::where('rfc', $business->rfc)
-                    ->where('type', $type)
-                    ->where('start_date', $startDate->toDateTimeString())
-                    ->where('end_date', $endDate->toDateTimeString())
-                    ->whereIn('state', ['created', 'polling', 'downloading'])
-                    ->exists();
+                    $exists = SatRequest::where('rfc', $business->rfc)
+                        ->where('type', $type)
+                        ->where('start_date', $chunkStart->toDateTimeString())
+                        ->where('end_date', $chunkEnd->toDateTimeString())
+                        ->whereIn('state', ['created', 'polling', 'downloading'])
+                        ->exists();
 
-                if (!$exists || $force) {
-                    SatRequest::create([
-                        'id' => (string)\Illuminate\Support\Str::uuid(),
-                        'rfc' => $business->rfc,
-                        'type' => $type,
-                        'start_date' => $startDate,
-                        'end_date' => $endDate,
-                        'state' => 'created'
-                    ]);
-                    $requestCount++;
+                    // Si ya existe un completado para este rango exacto, también lo saltamos
+                    $completed = SatRequest::where('rfc', $business->rfc)
+                        ->where('type', $type)
+                        ->where('start_date', $chunkStart->toDateTimeString())
+                        ->where('end_date', $chunkEnd->toDateTimeString())
+                        ->where('state', 'completed')
+                        ->exists();
+
+                    if (!$exists && (!$completed || $force)) {
+                        SatRequest::create([
+                            'id' => (string)\Illuminate\Support\Str::uuid(),
+                            'rfc' => $business->rfc,
+                            'type' => $type,
+                            'start_date' => $chunkStart,
+                            'end_date' => $chunkEnd,
+                            'state' => 'created'
+                        ]);
+                        $requestCount++;
+                        Log::info("Chunk creado para {$business->rfc} ($type): {$chunkStart->toDateString()} → {$chunkEnd->toDateString()}");
+                    }
+
+                    $chunkStart = $chunkEnd->copy()->addSecond()->startOfDay();
                 }
             }
 
@@ -219,15 +230,36 @@ class BusinessSyncService
         $requestCount = 0;
 
         foreach ($types as $t) {
-            SatRequest::create([
-                'id' => (string)\Illuminate\Support\Str::uuid(),
-                'rfc' => $business->rfc,
-                'type' => $t,
-                'start_date' => $start,
-                'end_date' => $end,
-                'state' => 'created'
-            ]);
-            $requestCount++;
+            $chunkStart = $start->copy();
+
+            while ($chunkStart < $end) {
+                $chunkEnd = $chunkStart->copy()->addMonths(6)->endOfDay();
+                if ($chunkEnd > $end) {
+                    $chunkEnd = $end->copy();
+                }
+
+                // Evitar duplicados con solicitudes activas en el mismo rango
+                $exists = SatRequest::where('rfc', $business->rfc)
+                    ->where('type', $t)
+                    ->where('start_date', $chunkStart->toDateTimeString())
+                    ->where('end_date', $chunkEnd->toDateTimeString())
+                    ->whereIn('state', ['created', 'polling', 'downloading'])
+                    ->exists();
+
+                if (!$exists) {
+                    SatRequest::create([
+                        'id' => (string)\Illuminate\Support\Str::uuid(),
+                        'rfc' => $business->rfc,
+                        'type' => $t,
+                        'start_date' => $chunkStart,
+                        'end_date' => $chunkEnd,
+                        'state' => 'created'
+                    ]);
+                    $requestCount++;
+                }
+
+                $chunkStart = $chunkEnd->copy()->addSecond()->startOfDay();
+            }
         }
 
         return [
