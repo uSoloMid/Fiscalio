@@ -7,27 +7,46 @@ use App\Models\BusinessNote;
 use App\Models\SatRequest;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AnalyzeCoverageCommand extends Command
 {
     protected $signature   = 'sat:analyze-coverage {--rfc= : Analizar solo este RFC} {--clear : Limpiar notas anteriores antes de analizar}';
-    protected $description = 'Analiza la cobertura de 5 años de cada cliente y genera notas de diagnóstico en Riesgos Fiscales';
+    protected $description = 'Detecta clientes con problemas reales de descarga SAT y genera notas en Riesgos Fiscales';
 
-    // Target: January 1st of 5 years ago
-    private function expectedStart(): Carbon
-    {
-        return now()->subYears(5)->startOfYear();
-    }
+    /**
+     * Error patterns that require HUMAN intervention (grouped by action needed).
+     * Key = note type, value = [label, action hint, keyword patterns]
+     */
+    private const CRITICAL_PATTERNS = [
+        'wrong_passphrase' => [
+            'title'    => 'Contraseña de llave privada incorrecta',
+            'body_tpl' => 'La llave privada no puede abrirse con la contraseña registrada. Error: %s — Solución: actualizar la FIEL con la contraseña correcta desde el perfil del cliente.',
+            'keywords' => ['bad decrypt', 'pkcs12 cipherfinal', 'bad password', 'cannot open private key'],
+        ],
+        'certificate_invalid' => [
+            'title'    => 'Certificado SAT revocado, vencido o inválido',
+            'body_tpl' => 'El SAT rechazó el certificado FIEL. Error: %s — Solución: renovar la e.firma ante el SAT y actualizar la FIEL del cliente.',
+            'keywords' => ['certificado revocado', 'caduco', 'certificado inv', 'certificate revoked', 'revocado o caduco', 'certificado inválido', 'certificado invalido'],
+        ],
+        'exhausted_lifetime' => [
+            'title'    => 'Solicitudes SAT agotadas de por vida',
+            'body_tpl' => 'El SAT indica que este RFC ha agotado el límite de solicitudes masivas de por vida. Error: %s — Este es un límite impuesto por el SAT y no tiene solución técnica desde nuestra plataforma.',
+            'keywords' => ['solicitudes de por vida', 'agotado'],
+        ],
+        'server_error' => [
+            'title'    => 'Error de servidor al procesar descarga',
+            'body_tpl' => 'Fallo en el servidor al guardar o extraer el ZIP descargado del SAT. Error: %s — El administrador debe revisar los permisos de almacenamiento.',
+            'keywords' => ['permission denied', 'failed to open stream', 'ziparchive', 'extractto'],
+        ],
+    ];
 
     public function handle(): int
     {
         $query = Business::query();
-
         if ($rfc = $this->option('rfc')) {
             $query->where('rfc', strtoupper($rfc));
         }
-
         $businesses = $query->get();
 
         if ($businesses->isEmpty()) {
@@ -38,153 +57,130 @@ class AnalyzeCoverageCommand extends Command
         if ($this->option('clear')) {
             $rfcs = $businesses->pluck('rfc');
             BusinessNote::whereIn('rfc', $rfcs)->delete();
-            $this->info("Notas previas eliminadas.");
+            $this->info("Notas previas eliminadas para {$rfcs->count()} cliente(s).");
         }
 
-        $this->info("Analizando cobertura SAT de {$businesses->count()} cliente(s)...");
+        $this->info("Analizando {$businesses->count()} cliente(s)...");
         $this->newLine();
+
+        $stats = ['ok' => 0, 'issues' => 0, 'expired_fiel' => 0];
 
         foreach ($businesses as $business) {
-            $this->analyzeBusiness($business);
+            $issues = $this->analyzeBusiness($business);
+            if ($issues > 0) {
+                $stats['issues']++;
+            } else {
+                $stats['ok']++;
+            }
         }
 
         $this->newLine();
-        $this->info('Análisis completado.');
+        $this->info("Análisis completado: {$stats['ok']} sin problemas, {$stats['issues']} con problemas detectados.");
+        $this->info("Las notas están disponibles en Riesgos Fiscales de cada cliente.");
         return 0;
     }
 
-    private function analyzeBusiness(Business $business): void
+    private function analyzeBusiness(Business $business): int
     {
-        $rfc     = $business->rfc;
-        $name    = $business->common_name ?: $business->legal_name;
-        $expected = $this->expectedStart();
+        $rfc    = $business->rfc;
+        $name   = $business->common_name ?: $business->legal_name;
+        $issues = 0;
 
-        $this->line("── {$rfc}  ({$name})");
-
-        // ── 1. FIEL expirada ──────────────────────────────────────────────
+        // ── 1. FIEL expirada ────────────────────────────────────────────
         if ($business->valid_until && $business->valid_until->isPast()) {
             $expiredSince = $business->valid_until->format('d/M/Y');
             $this->createNote($rfc, 'expired_fiel', null,
                 'FIEL / e.firma vencida',
-                "El certificado FIEL venció el {$expiredSince}. No se pueden realizar nuevas descargas del SAT hasta renovarlo."
+                "El certificado FIEL venció el {$expiredSince}. No se pueden realizar nuevas descargas del SAT hasta renovarlo con el SAT y actualizar la FIEL del cliente."
             );
-            $this->warn("   ⚠  FIEL vencida desde {$expiredSince}");
+            $this->warn("   ⚠  {$rfc} ({$name}): FIEL vencida desde {$expiredSince}");
+            $issues++;
         }
 
-        // ── 2. Errores de credenciales recientes ──────────────────────────
-        $credentialKeywords = ['contraseña', 'passphrase', 'autenticaci', '401', 'credencial',
-                               'certificate', 'certificado', 'private key', 'llave'];
-
-        $credErrors = SatRequest::where('rfc', $rfc)
+        // ── 2. Analizar errores de solicitudes fallidas ──────────────────
+        $failedRequests = SatRequest::where('rfc', $rfc)
             ->where('state', 'failed')
             ->whereNotNull('last_error')
-            ->get()
-            ->filter(function ($req) use ($credentialKeywords) {
-                $err = strtolower($req->last_error);
-                foreach ($credentialKeywords as $kw) {
-                    if (str_contains($err, strtolower($kw))) return true;
-                }
-                return false;
-            });
+            ->orderBy('updated_at', 'desc')
+            ->get();
 
-        if ($credErrors->isNotEmpty()) {
-            $sample = $credErrors->first()->last_error;
-            $this->createNote($rfc, 'credential_error', null,
-                'Posible error de credenciales (FIEL/CIEC)',
-                "Se detectaron {$credErrors->count()} solicitud(es) fallida(s) con errores de autenticación. " .
-                "Verificar que la contraseña de la llave privada y el certificado sean correctos.\n\nEjemplo: \"{$sample}\""
-            );
-            $this->warn("   ⚠  {$credErrors->count()} error(es) de credenciales detectados");
-        }
+        if ($failedRequests->isEmpty()) {
+            // No failures — check that at least one completed request exists
+            $hasCompleted = SatRequest::where('rfc', $rfc)->where('state', 'completed')->exists();
+            $hasAny       = SatRequest::where('rfc', $rfc)->exists();
 
-        // ── 3. Cobertura por tipo ─────────────────────────────────────────
-        foreach (['issued', 'received'] as $type) {
-            $typeLabel = $type === 'issued' ? 'Emitidas' : 'Recibidas';
-
-            // Find oldest COMPLETED request for this RFC + type
-            $oldest = SatRequest::where('rfc', $rfc)
-                ->where('type', $type)
-                ->where('state', 'completed')
-                ->orderBy('start_date', 'asc')
-                ->first();
-
-            if (!$oldest) {
-                // Check if there are ANY requests (even failed)
-                $anyRequest = SatRequest::where('rfc', $rfc)->where('type', $type)->exists();
-                if (!$anyRequest) {
-                    $this->createNote($rfc, 'coverage_gap', $type,
-                        "Sin historial SAT: {$typeLabel}",
-                        "No se ha encontrado ninguna solicitud SAT para facturas {$typeLabel}. " .
-                        "El cliente no ha sido sincronizado aún o las solicitudes fueron eliminadas."
-                    );
-                    $this->error("   ✗  [{$typeLabel}] Sin solicitudes SAT registradas");
-                } else {
-                    $failedCount = SatRequest::where('rfc', $rfc)->where('type', $type)->where('state', 'failed')->count();
-                    $this->createNote($rfc, 'sat_error', $type,
-                        "Sin descargas completadas: {$typeLabel}",
-                        "Existen {$failedCount} solicitud(es) fallida(s) para {$typeLabel} pero ninguna completada. " .
-                        "La cobertura histórica no pudo establecerse."
-                    );
-                    $this->error("   ✗  [{$typeLabel}] {$failedCount} solicitud(es) fallidas, 0 completadas");
-                }
-                continue;
-            }
-
-            // Check coverage gap from expected start
-            $oldestStart = Carbon::parse($oldest->start_date);
-            $gapDays = $expected->diffInDays($oldestStart, false); // positive = oldest is AFTER expected
-
-            if ($gapDays > 60) {
-                $gapMonths = (int) ceil($gapDays / 30);
-                $coveredFrom = $oldestStart->format('M Y');
-                $expectedFrom = $expected->format('M Y');
-
-                $reason = '';
-                // Check if FIEL was expired during that gap period
-                if ($business->valid_until && $business->valid_until < $oldestStart) {
-                    $reason = " La FIEL venció el {$business->valid_until->format('d/M/Y')}, lo que pudo impedir descargas anteriores.";
-                }
-
-                $this->createNote($rfc, 'coverage_gap', $type,
-                    "Brecha de cobertura SAT: {$typeLabel}",
-                    "La cobertura de {$typeLabel} inicia en {$coveredFrom}, pero el objetivo son 5 años ({$expectedFrom}). " .
-                    "Hay aproximadamente {$gapMonths} mes(es) sin datos SAT.{$reason}"
+            if (!$hasAny) {
+                $this->createNote($rfc, 'info', null,
+                    'Cliente pendiente de primera sincronización',
+                    "No se ha iniciado ninguna solicitud SAT para este cliente. Se sincronizará automáticamente en el próximo ciclo del runner."
                 );
-                $this->warn("   △  [{$typeLabel}] Cubre desde {$coveredFrom} (falta ~{$gapMonths} mes(es) hasta {$expectedFrom})");
+                $this->line("   ℹ  {$rfc} ({$name}): pendiente primera sync");
+                $issues++;
             } else {
-                $coveredFrom = $oldestStart->format('M Y');
-                $this->info("   ✓  [{$typeLabel}] Cobertura OK desde {$coveredFrom}");
+                $this->info("   ✓  {$rfc} ({$name}): sin errores");
             }
+            return $issues;
+        }
 
-            // ── 4. Check for failed requests within the covered period ────
-            $failedInRange = SatRequest::where('rfc', $rfc)
-                ->where('type', $type)
-                ->where('state', 'failed')
-                ->where('start_date', '>=', $expected)
-                ->count();
+        // Classify each failed request by its error message
+        $detectedTypes = [];
 
-            if ($failedInRange > 0) {
-                // Only create note if not already covered by credential error note
-                if ($credErrors->isEmpty()) {
-                    $this->createNote($rfc, 'sat_error', $type,
-                        "Solicitudes fallidas en periodo cubierto: {$typeLabel}",
-                        "Se encontraron {$failedInRange} solicitud(es) fallida(s) para {$typeLabel} dentro del periodo de 5 años. " .
-                        "Puede haber brechas puntuales en los datos."
-                    );
+        foreach ($failedRequests as $req) {
+            $err = strtolower($req->last_error ?? '');
+            foreach (self::CRITICAL_PATTERNS as $type => $config) {
+                if (in_array($type, $detectedTypes)) continue; // already noted
+
+                foreach ($config['keywords'] as $kw) {
+                    if (str_contains($err, strtolower($kw))) {
+                        $sample  = rtrim(substr($req->last_error, 0, 300));
+                        $body    = sprintf($config['body_tpl'], $sample);
+                        $typeStr = $req->type === 'issued' ? 'Emitidas' : 'Recibidas';
+
+                        $this->createNote($rfc, $type, null,
+                            $config['title'],
+                            $body
+                        );
+
+                        $detectedTypes[] = $type;
+                        $this->error("   ✗  {$rfc} ({$name}): {$config['title']}");
+                        $issues++;
+                        break;
+                    }
                 }
-                $this->warn("   △  [{$typeLabel}] {$failedInRange} solicitud(es) fallida(s) en el periodo");
             }
         }
 
-        $this->newLine();
+        // If failed requests exist but no critical pattern matched → transient SAT error (runner retries)
+        if (empty($detectedTypes)) {
+            $recentError    = $failedRequests->first()->last_error;
+            $maxAttempts    = $failedRequests->max('attempts');
+            $this->line("   ~  {$rfc} ({$name}): error transitorio SAT (runner reintenta) — " . substr($recentError, 0, 80));
+
+            // Only create a note if attempts are exhausted (>= 5) with no recent completed requests
+            $hasRecentCompleted = SatRequest::where('rfc', $rfc)
+                ->where('state', 'completed')
+                ->where('updated_at', '>=', now()->subDays(7))
+                ->exists();
+
+            if ($maxAttempts >= 5 && !$hasRecentCompleted) {
+                $this->createNote($rfc, 'sat_error', null,
+                    'Solicitudes SAT agotaron reintentos',
+                    "Una o más solicitudes fallaron {$maxAttempts} veces con error del SAT: \"{$recentError}\". " .
+                    "El SAT puede estar rechazando rangos de fechas muy grandes. El sistema creará nuevas solicitudes en el próximo ciclo."
+                );
+                $this->warn("   △  {$rfc} ({$name}): intentos agotados, se reencolarán");
+                $issues++;
+            }
+        }
+
+        return $issues;
     }
 
     private function createNote(string $rfc, string $type, ?string $invoiceType, string $title, string $body): void
     {
-        // Avoid duplicates: skip if identical note already exists
+        // Avoid duplicates: skip if identical unresolved note exists
         $exists = BusinessNote::where('rfc', $rfc)
             ->where('type', $type)
-            ->where('invoice_type', $invoiceType)
             ->where('title', $title)
             ->whereNull('resolved_at')
             ->exists();
