@@ -18,3 +18,4 @@ yarn-error.log
 /storage/logs/*.log
 /public/debug_simulation.php
 /reset_sync.php
+/mysql_data
