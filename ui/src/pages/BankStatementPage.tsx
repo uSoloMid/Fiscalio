@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { processBankStatement, confirmBankStatement, listBankStatements, getBankStatement, deleteBankStatement } from '../services';
+import { processBankStatement, confirmBankStatement, listBankStatements, getBankStatement, deleteBankStatement, getReconciliationSuggestions } from '../services';
+import { MovementReconcileRow } from '../components/MovementReconcileRow';
+import type { BankMovement, ReconciliationStats } from '../models';
 
 export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc: string, clientName: string, onBack: () => void }) => {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -12,6 +14,9 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const [yearFilter, setYearFilter] = useState('all');
     const [monthFilter, setMonthFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [reconciliationMode, setReconciliationMode] = useState(false);
+    const [reconciliationData, setReconciliationData] = useState<{ movements: BankMovement[]; stats: ReconciliationStats } | null>(null);
+    const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
     useEffect(() => {
         loadStatements();
@@ -28,6 +33,8 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
 
     const handleSelectStatement = async (id: number) => {
         setIsProcessing(true);
+        setReconciliationMode(false);
+        setReconciliationData(null);
         try {
             const data = await getBankStatement(id, activeRfc);
             setResult({
@@ -37,6 +44,8 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                 period: data.period,
                 account_number: data.account_number,
                 movements: data.movements.map((m: any) => ({
+                    // Preserve DB fields for reconciliation
+                    _dbId: m.id,
                     fecha: m.date,
                     concepto: m.description,
                     referencia: m.reference,
@@ -57,6 +66,60 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
         } finally {
             setIsProcessing(false);
         }
+    };
+
+    const handleToggleReconciliation = async () => {
+        if (!reconciliationMode && !reconciliationData && result?.id) {
+            setIsLoadingSuggestions(true);
+            try {
+                const data = await getReconciliationSuggestions(result.id, activeRfc);
+                setReconciliationData(data);
+            } catch (e) {
+                alert('Error al cargar sugerencias de conciliación');
+            } finally {
+                setIsLoadingSuggestions(false);
+            }
+        }
+        setReconciliationMode(prev => !prev);
+    };
+
+    const handleMovementReconciled = (updated: BankMovement) => {
+        setReconciliationData(prev => {
+            if (!prev) return prev;
+            const movements = prev.movements.map(m => m.id === updated.id ? { ...updated, suggestions: [] } : m);
+            const stats = computeStats(movements);
+            return { ...prev, movements, stats };
+        });
+    };
+
+    const handleMovementUnreconciled = (movementId: number) => {
+        setReconciliationData(prev => {
+            if (!prev) return prev;
+            const movements = prev.movements.map(m =>
+                m.id === movementId
+                    ? { ...m, cfdi_id: null, confidence: null, reconciled_at: null, is_reviewed: false }
+                    : m
+            );
+            const stats = computeStats(movements);
+            return { ...prev, movements, stats };
+        });
+    };
+
+    const computeStats = (movements: BankMovement[]): ReconciliationStats => {
+        const stats: ReconciliationStats = { total: movements.length, green: 0, yellow: 0, red: 0, unmatched: 0 };
+        movements.forEach(m => {
+            if (m.cfdi_id) {
+                const c = m.confidence ?? 'green';
+                if (c in stats) (stats as any)[c]++;
+            } else if ((m.suggestions?.length ?? 0) === 0) {
+                stats.unmatched++;
+            } else {
+                const top = m._confidence_preview ?? m.suggestions![0]?.confidence;
+                if (top && top in stats) (stats as any)[top]++;
+                else stats.unmatched++;
+            }
+        });
+        return stats;
     };
 
     const handleDeleteStatement = async (e: React.MouseEvent, id: number) => {
@@ -374,13 +437,26 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                     <div className="p-10 space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">
                         {/* Detail View Components (Existing Logic Improved) */}
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3">
                                 <button
                                     onClick={handleExportExcel}
                                     className="flex items-center gap-3 px-8 py-3.5 bg-white border border-gray-200 text-gray-400 rounded-[20px] font-bold text-sm hover:border-emerald-200 hover:text-emerald-500 hover:shadow-lg hover:shadow-gray-100 transition-all active:scale-[0.98]">
                                     <span className="material-symbols-outlined">export_notes</span>
                                     Exportar a Excel
                                 </button>
+                                {result?.id && (
+                                    <button
+                                        onClick={handleToggleReconciliation}
+                                        disabled={isLoadingSuggestions}
+                                        className={`flex items-center gap-2 px-6 py-3.5 rounded-[20px] font-black text-[11px] uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-60 ${reconciliationMode ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400'}`}
+                                    >
+                                        {isLoadingSuggestions
+                                            ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                            : <span className="material-symbols-outlined text-lg">balance</span>
+                                        }
+                                        {reconciliationMode ? 'Ver Normal' : 'Conciliar'}
+                                    </button>
+                                )}
                             </div>
                             <div className="flex items-center gap-10">
                                 <div className="flex flex-col items-end">
@@ -410,54 +486,93 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                         <div className="bg-white rounded-[48px] border border-gray-100 shadow-2xl shadow-gray-200/50 overflow-hidden flex flex-col">
                             <div className="px-10 py-8 border-b border-gray-50 flex items-center justify-between bg-gradient-to-r from-white to-gray-50/30">
                                 <div className="flex items-center gap-3">
-                                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">REGISTRO DE TRANSACCIONES</h3>
+                                    <h3 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">
+                                        {reconciliationMode ? 'CONCILIACIÓN DE MOVIMIENTOS' : 'REGISTRO DE TRANSACCIONES'}
+                                    </h3>
                                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-500"></div>
                                 </div>
-                                <div className="px-4 py-1.5 bg-emerald-50 rounded-full">
-                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{result?.movements?.length || 0} OPERACIONES DETECTADAS</span>
-                                </div>
+                                {reconciliationMode && reconciliationData ? (
+                                    <div className="flex items-center gap-3">
+                                        {[
+                                            { key: 'green', label: 'AUTO', color: 'bg-emerald-500' },
+                                            { key: 'yellow', label: 'REVISAR', color: 'bg-yellow-400' },
+                                            { key: 'red', label: 'MANUAL', color: 'bg-red-400' },
+                                            { key: 'unmatched', label: 'PENDIENTE', color: 'bg-gray-300' },
+                                        ].map(({ key, label, color }) => (
+                                            <div key={key} className="flex items-center gap-1.5">
+                                                <div className={`w-2 h-2 rounded-full ${color}`} />
+                                                <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                                    {(reconciliationData.stats as any)[key]} {label}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="px-4 py-1.5 bg-emerald-50 rounded-full">
+                                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{result?.movements?.length || 0} OPERACIONES DETECTADAS</span>
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-white">
-                                            <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">FECHA</th>
-                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">REFERENCIA</th>
-                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">DESCRIPCIÓN</th>
-                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">CARGOS (-)</th>
-                                            <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">ABONOS (+)</th>
-                                            <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">BALANCE</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50/50">
-                                        {(result?.movements || []).map((m: any, i: number) => (
-                                            <tr key={i} className="hover:bg-emerald-50/30 transition-all duration-200 group">
-                                                <td className="px-10 py-6 text-xs font-black text-gray-400 group-hover:text-emerald-700 transition-colors uppercase">{m.fecha}</td>
-                                                <td className="px-6 py-6">
-                                                    <span className="px-2.5 py-1 bg-gray-50 text-[9px] font-black text-gray-400 rounded-lg group-hover:bg-white group-hover:text-emerald-500 transition-all border border-transparent group-hover:border-emerald-100">{m.referencia || 'N/A'}</span>
-                                                </td>
-                                                <td className="px-6 py-6">
-                                                    <p className="text-xs font-bold text-gray-900 leading-normal uppercase group-hover:translate-x-1 transition-transform">{m.concepto}</p>
-                                                </td>
-                                                <td className="px-6 py-6 text-right">
-                                                    <span className={`text-sm font-black ${m.cargo > 0 ? 'text-[#FF4D4D]' : 'text-gray-200'}`}>
-                                                        {m.cargo > 0 ? `-${(m.cargo || 0).toFixed(2)}` : '0.00'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-6 text-right">
-                                                    <span className={`text-sm font-black ${m.abono > 0 ? 'text-[#10B981]' : 'text-gray-200'}`}>
-                                                        {m.abono > 0 ? `+${(m.abono || 0).toFixed(2)}` : '0.00'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-10 py-6 text-right">
-                                                    <span className="text-sm font-black text-gray-900">{(m.saldo || 0).toFixed(2)}</span>
-                                                </td>
-                                            </tr>
+                            {reconciliationMode && reconciliationData ? (
+                                <div className="divide-y divide-gray-50">
+                                    {/* Header */}
+                                    <div className="grid grid-cols-[130px_1fr_140px_140px_140px_200px] gap-2 px-8 py-3 bg-gray-50/50">
+                                        {['FECHA', 'DESCRIPCIÓN', 'CARGOS (-)', 'ABONOS (+)', 'ESTADO', 'CFDI'].map(h => (
+                                            <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest last:text-right">{h}</span>
                                         ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                    </div>
+                                    {reconciliationData.movements.map((m: BankMovement) => (
+                                        <MovementReconcileRow
+                                            key={m.id}
+                                            movement={m}
+                                            onReconciled={handleMovementReconciled}
+                                            onUnreconciled={handleMovementUnreconciled}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-white">
+                                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">FECHA</th>
+                                                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">REFERENCIA</th>
+                                                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">DESCRIPCIÓN</th>
+                                                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">CARGOS (-)</th>
+                                                <th className="px-6 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">ABONOS (+)</th>
+                                                <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50 text-right">BALANCE</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50/50">
+                                            {(result?.movements || []).map((m: any, i: number) => (
+                                                <tr key={i} className="hover:bg-emerald-50/30 transition-all duration-200 group">
+                                                    <td className="px-10 py-6 text-xs font-black text-gray-400 group-hover:text-emerald-700 transition-colors uppercase">{m.fecha}</td>
+                                                    <td className="px-6 py-6">
+                                                        <span className="px-2.5 py-1 bg-gray-50 text-[9px] font-black text-gray-400 rounded-lg group-hover:bg-white group-hover:text-emerald-500 transition-all border border-transparent group-hover:border-emerald-100">{m.referencia || 'N/A'}</span>
+                                                    </td>
+                                                    <td className="px-6 py-6">
+                                                        <p className="text-xs font-bold text-gray-900 leading-normal uppercase group-hover:translate-x-1 transition-transform">{m.concepto}</p>
+                                                    </td>
+                                                    <td className="px-6 py-6 text-right">
+                                                        <span className={`text-sm font-black ${m.cargo > 0 ? 'text-[#FF4D4D]' : 'text-gray-200'}`}>
+                                                            {m.cargo > 0 ? `-${(m.cargo || 0).toFixed(2)}` : '0.00'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-6 text-right">
+                                                        <span className={`text-sm font-black ${m.abono > 0 ? 'text-[#10B981]' : 'text-gray-200'}`}>
+                                                            {m.abono > 0 ? `+${(m.abono || 0).toFixed(2)}` : '0.00'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-10 py-6 text-right">
+                                                        <span className="text-sm font-black text-gray-900">{(m.saldo || 0).toFixed(2)}</span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

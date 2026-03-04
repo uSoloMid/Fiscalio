@@ -441,6 +441,30 @@ export async function updateBankMovement(id: number, data: any, rfc: string): Pr
     if (!response.ok) throw new Error('Error al actualizar movimiento');
     return response.json();
 }
+export async function getReconciliationSuggestions(statementId: number, rfc: string): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/reconciliation/suggest/${statementId}?rfc=${rfc}`);
+    if (!response.ok) throw new Error('Error al obtener sugerencias de conciliación');
+    return response.json();
+}
+
+export async function reconcileMovement(movementId: number, cfdiId: number, confidence: string): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/bank-movements/${movementId}/reconcile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cfdi_id: cfdiId, confidence }),
+    });
+    if (!response.ok) throw new Error('Error al conciliar movimiento');
+    return response.json();
+}
+
+export async function unreconcileMovement(movementId: number): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/bank-movements/${movementId}/reconcile`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) throw new Error('Error al desconciliar movimiento');
+    return response.json();
+}
+
 export async function deleteBankStatement(id: number, rfc: string): Promise<void> {
     const response = await authFetch(`${API_BASE_URL}/api/bank-statements/${id}?rfc=${rfc}`, {
         method: 'DELETE'

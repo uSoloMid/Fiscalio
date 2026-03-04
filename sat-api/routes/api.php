@@ -120,6 +120,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/bank-statements/{id}', [\App\Http\Controllers\BankStatementController::class , 'show']);
         Route::delete('/bank-statements/{id}', [\App\Http\Controllers\BankStatementController::class , 'destroy']);
         Route::put('/bank-movements/{id}', [\App\Http\Controllers\BankStatementController::class , 'updateMovement']);
+
+        // Reconciliation
+        Route::get('/reconciliation/suggest/{statementId}', [\App\Http\Controllers\ReconciliationController::class, 'suggest']);
+        Route::post('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class, 'reconcile']);
+        Route::delete('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class, 'unreconcile']);
     });
 
 require __DIR__ . '/debug_routes.php';

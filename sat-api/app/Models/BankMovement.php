@@ -19,7 +19,9 @@ class BankMovement extends Model
         'saldo',
         'cfdi_id',
         'account_id',
-        'is_reviewed'
+        'is_reviewed',
+        'confidence',
+        'reconciled_at',
     ];
 
     protected $casts = [
@@ -27,6 +29,7 @@ class BankMovement extends Model
         'cargo' => 'float',
         'abono' => 'float',
         'saldo' => 'float',
+        'reconciled_at' => 'datetime',
     ];
 
     public function statement()
