@@ -95,3 +95,26 @@ cd ui && npm run dev
 # Build frontend
 cd ui && npm run build
 ```
+
+---
+
+## Historial de trabajo reciente
+> Actualizar esta sección al terminar cada sesión. Quitar entradas antiguas conforme se agregan nuevas.
+
+### Mar 2026 — Dashboard móvil responsive
+- `DashboardPage.tsx`: sidebar `hidden md:flex`, header móvil con badge SAT activo/inactivo
+- Contenido desktop envuelto en `hidden md:flex`; contenido móvil `md:hidden` con 3 pestañas:
+  - **Inicio**: tarjeta Riesgos Críticos colapsable, solicitudes compactas, clientes con error
+  - **Clientes**: búsqueda + lista agrupada con indicadores de sync
+  - **Ajustes**: botones para Grupos, Etiquetas, Cerrar sesión
+- FAB verde fijo (abre drawer nuevo cliente) + barra navegación inferior 4 tabs
+- `RecentRequests.tsx`: prop `compact` → tarjetas simples en móvil
+
+### Mar 2026 — Diagnóstico de cobertura SAT + correcciones runner
+- Nueva tabla `business_notes` + modelo `BusinessNote` + comando `sat:analyze-coverage`
+- Solo reporta problemas reales: `wrong_passphrase`, `certificate_invalid`, `duplicate_request`, `server_error`
+- Panel "Diagnóstico de Cobertura SAT" en `ProvisionalControlPage.tsx` (solo si hay notas)
+- `SatRunnerCommand.php`: optimistic lock (`WHERE attempts = X`) para evitar duplicados concurrentes
+- "Solicitudes de por vida" → reclasificado como colisión de duplicados, runner hace retry en 5 min
+- Endpoints: `GET /clients/{rfc}/notes`, `POST /clients/notes/{noteId}/resolve`
+- Estado final: 40/42 clientes limpios; MABY y MURT pendientes (wrong passphrase), GASS (cert inválido)
