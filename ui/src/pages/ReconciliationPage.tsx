@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { listBankStatements, getReconciliationSuggestions, reconcileMovement } from '../services';
 import { MovementReconcileRow } from '../components/MovementReconcileRow';
 import type { BankStatement, BankMovement, ReconciliationStats } from '../models';
