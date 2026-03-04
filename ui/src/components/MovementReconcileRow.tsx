@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ConfidenceBadge } from './ConfidenceBadge';
 import { reconcileMovement, unreconcileMovement } from '../services';
 import type { BankMovement, ReconciliationSuggestion } from '../models';
