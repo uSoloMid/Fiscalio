@@ -29,9 +29,9 @@ class AnalyzeCoverageCommand extends Command
             'body_tpl' => 'El SAT rechazó el certificado FIEL. Error: %s — Solución: renovar la e.firma ante el SAT y actualizar la FIEL del cliente.',
             'keywords' => ['certificado revocado', 'caduco', 'certificado inv', 'certificate revoked', 'revocado o caduco', 'certificado inválido', 'certificado invalido'],
         ],
-        'exhausted_lifetime' => [
-            'title'    => 'Solicitudes SAT agotadas de por vida',
-            'body_tpl' => 'El SAT indica que este RFC ha agotado el límite de solicitudes masivas de por vida. Error: %s — Este es un límite impuesto por el SAT y no tiene solución técnica desde nuestra plataforma.',
+        'duplicate_request' => [
+            'title'    => 'Solicitud duplicada enviada al SAT (colisión de runners)',
+            'body_tpl' => 'El SAT rechazó la solicitud porque llegaron dos peticiones idénticas casi simultáneamente (error de sincronización entre runners). Error: %s — El runner ya tiene un lock optimista para prevenir esto. Las solicitudes afectadas serán reencoladas.',
             'keywords' => ['solicitudes de por vida', 'agotado'],
         ],
         'server_error' => [

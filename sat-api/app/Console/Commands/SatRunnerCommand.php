@@ -67,10 +67,22 @@ class SatRunnerCommand extends Command
 
     protected function processRequest(SatRequest $req)
     {
+        // Optimistic lock: atomically claim the record by incrementing attempts.
+        // If another runner instance already incremented (concurrent execution), skip.
+        $claimed = SatRequest::where('id', $req->id)
+            ->where('attempts', $req->attempts ?? 0)
+            ->whereIn('state', ['created', 'polling', 'downloading'])
+            ->update(['attempts' => ($req->attempts ?? 0) + 1]);
+
+        if (!$claimed) {
+            $this->warn("[Skip] Request {$req->id} ya fue tomada por otro runner — se omite.");
+            return;
+        }
+
+        $req->attempts = ($req->attempts ?? 0) + 1;
+
         $this->info("[Runner] Procesando Request {$req->id} (RFC: {$req->rfc}) - Estado: {$req->state}");
         try {
-            // Incrementar intentos
-            $req->attempts = ($req->attempts ?? 0) + 1;
 
             // Si el password o certificado es inválido, fallamos de inmediato para no buclear
             try {
@@ -117,6 +129,14 @@ class SatRunnerCommand extends Command
             if (str_contains($msg, 'Solicitud rechazada') || str_contains($msg, 'No se encontró la información') || str_contains($msg, 'vencida')) {
                 $req->state = 'completed';
                 $this->info("Marcando Request {$req->id} como completado (Sin información/Rechazada/Vencida por SAT).");
+            }
+            // "Solicitudes de por vida" es colisión de solicitudes duplicadas, no un límite real.
+            // Resetear request_id y reintentar después de 5 minutos para que el SAT lo procese limpio.
+            elseif (str_contains($msg, 'solicitudes de por vida') || str_contains($msg, 'agotado')) {
+                $req->state = 'created';
+                $req->request_id = null;
+                $req->next_retry_at = now()->addMinutes(5);
+                $this->warn("Colisión de solicitudes duplicadas para {$req->id} — se reencola en 5 min.");
             }
             else {
                 // Si ya van muchos intentos, marcar como fallida para que no estorbe en la cola
@@ -176,7 +196,8 @@ class SatRunnerCommand extends Command
             $req->save();
         }
         else {
-            // Manejo simplificado de error/ rechazo
+            $satStatus = $status->getValue();
+            $req->last_error = "Fallo al verificar: {$satStatus}";
             $req->state = 'failed';
             $req->save();
         }
