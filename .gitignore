@@ -6,15 +6,32 @@
 .DS_Store
 Thumbs.db
 
-# Ignorar archivos locales de VS Code
+# VS Code
 .vscode/
 
-# Ignorar dependencias pesadas si no se usara el gitignore interno
+# Dependencias pesadas
 **/node_modules
 **/vendor
 **/.env
 **/storage/app/sat
 **/database/*.sqlite
 
+# Datos locales
 Fiscalio_DB_Only.zip
 Base_datos/
+
+# Scripts de debug temporales (NO subir al repo)
+/*.py
+/*.sh
+/*.bak
+/diagnostics.json
+/sat_requests*.json
+/*.json
+/sat-api/*.php
+/sat-api/**/*.bak
+/test_db_config*.php
+/test_db_conn*.php
+/test_laravel*.php
+/reset_audit*.php
+/remote_controller.php
+/cfdis_schema.txt

@@ -23,6 +23,7 @@ export const DashboardPage = ({
     const [groups, setGroups] = useState<any[]>([]);
     const [tags, setTags] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [totalSystemClients, setTotalSystemClients] = useState(0);
 
     // UI states
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -109,9 +110,10 @@ export const DashboardPage = ({
 
     const loadInitialData = async () => {
         try {
-            const [gRes, tRes] = await Promise.all([listGroups(), listTags()]);
+            const [gRes, tRes, totalRes] = await Promise.all([listGroups(), listTags(), listClients({ pageSize: 1 })]);
             setGroups(gRes);
             setTags(tRes);
+            setTotalSystemClients(totalRes.total || 0);
         } catch (err) {
             console.error("Error loading metadata", err);
         }
@@ -516,6 +518,7 @@ export const DashboardPage = ({
                             groups={groups}
                             selectedGroupId={selectedGroupId}
                             onSelectGroup={setSelectedGroupId}
+                            totalClients={totalSystemClients}
                         />
                     </section>
 

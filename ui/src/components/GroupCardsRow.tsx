@@ -33,12 +33,16 @@ export const GroupCard = ({ name, count, pending, icon, color, isActive, onClick
     );
 };
 
-export const GroupCardsRow = ({ groups, selectedGroupId, onSelectGroup }: { groups: any[], selectedGroupId: string | number | null, onSelectGroup: (id: any) => void }) => {
+export const GroupCardsRow = ({ groups, selectedGroupId, onSelectGroup, totalClients }: { groups: any[], selectedGroupId: string | number | null, onSelectGroup: (id: any) => void, totalClients?: number }) => {
+    const groupedCount = groups.reduce((acc, g) => acc + g.businesses_count, 0);
+    const countTodos = totalClients !== undefined ? totalClients : groupedCount;
+    const countSinGrupo = totalClients !== undefined ? totalClients - groupedCount : 0;
+
     return (
         <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
             <GroupCard
                 name="Todos"
-                count={groups.reduce((acc, g) => acc + g.businesses_count, 0)}
+                count={countTodos}
                 icon="grid_view"
                 color="#10B981"
                 isActive={selectedGroupId === 'all'}
@@ -57,7 +61,7 @@ export const GroupCardsRow = ({ groups, selectedGroupId, onSelectGroup }: { grou
             ))}
             <GroupCard
                 name="Sin Grupo"
-                count={0} // This should ideally come from backend too
+                count={countSinGrupo}
                 icon="group_off"
                 color="#9ca3af"
                 isActive={selectedGroupId === 'null'}
