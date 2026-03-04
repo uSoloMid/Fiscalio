@@ -23,8 +23,8 @@ class BusinessSyncService
      */
     public function syncIfNeeded(Business $business, bool $force = false)
     {
-        // Threshold: 12 hours since last sync check
-        $syncThreshold = now()->subHours(12); // Umbral ajustado a 12 horas para mayor seguridad con el SAT
+        // Threshold: 24 horas entre syncs para no saturar el SAT
+        $syncThreshold = now()->subHours(24);
 
         if ($business->is_syncing && !$force) {
             return ['status' => 'already_syncing'];
@@ -42,7 +42,6 @@ class BusinessSyncService
 
             foreach ($types as $type) {
                 // Find the end_date of the last successful SAT request for this RFC and type
-                // This prevents skipping gaps if a user manually uploads a newer XML
                 $lastRequest = SatRequest::where('rfc', $business->rfc)
                     ->where('type', $type)
                     ->where('state', 'completed')
@@ -61,54 +60,24 @@ class BusinessSyncService
                     }
                 }
 
-                if (!$latestDate) {
-                    // Si es la primera vez (historia de 5 años), lo pedimos en bloques
-                    $startDate = now()->subYears(5)->startOfYear();
-                }
-                else {
-                    // Incremental: start from the end of the last successful request (minus 2 days for overlap safety)
-                    $startDate = Carbon::parse($latestDate)->subDays(2)->startOfDay();
-                }
-
                 $totalEnd = now()->subMinutes(5);
 
-                // Crear TODOS los chunks de 6 meses desde startDate hasta hoy de una vez
-                $chunkStart = $startDate->copy();
-                while ($chunkStart < $totalEnd) {
-                    $chunkEnd = $chunkStart->copy()->addMonths(6)->endOfDay();
-                    if ($chunkEnd > $totalEnd) {
-                        $chunkEnd = $totalEnd->copy();
+                if (!$latestDate) {
+                    // Primera vez: 1 sola solicitud para los últimos 5 años completos
+                    $startDate = now()->subYears(5)->startOfYear();
+                    $this->createRequestIfNotExists($business->rfc, $type, $startDate, $totalEnd, $force);
+                    $requestCount++;
+                    Log::info("Solicitud inicial creada para {$business->rfc} ($type): {$startDate->toDateString()} → {$totalEnd->toDateString()}");
+                } else {
+                    // Incremental: 1 solicitud desde el último completado hasta hoy
+                    $startDate = Carbon::parse($latestDate)->subDays(2)->startOfDay();
+                    if ($startDate < $totalEnd->copy()->subMinutes(30)) {
+                        $created = $this->createRequestIfNotExists($business->rfc, $type, $startDate, $totalEnd, $force);
+                        if ($created) {
+                            $requestCount++;
+                            Log::info("Solicitud incremental creada para {$business->rfc} ($type): {$startDate->toDateString()} → {$totalEnd->toDateString()}");
+                        }
                     }
-
-                    $exists = SatRequest::where('rfc', $business->rfc)
-                        ->where('type', $type)
-                        ->where('start_date', $chunkStart->toDateTimeString())
-                        ->where('end_date', $chunkEnd->toDateTimeString())
-                        ->whereIn('state', ['created', 'polling', 'downloading'])
-                        ->exists();
-
-                    // Si ya existe un completado para este rango exacto, también lo saltamos
-                    $completed = SatRequest::where('rfc', $business->rfc)
-                        ->where('type', $type)
-                        ->where('start_date', $chunkStart->toDateTimeString())
-                        ->where('end_date', $chunkEnd->toDateTimeString())
-                        ->where('state', 'completed')
-                        ->exists();
-
-                    if (!$exists && (!$completed || $force)) {
-                        SatRequest::create([
-                            'id' => (string)\Illuminate\Support\Str::uuid(),
-                            'rfc' => $business->rfc,
-                            'type' => $type,
-                            'start_date' => $chunkStart,
-                            'end_date' => $chunkEnd,
-                            'state' => 'created'
-                        ]);
-                        $requestCount++;
-                        Log::info("Chunk creado para {$business->rfc} ($type): {$chunkStart->toDateString()} → {$chunkEnd->toDateString()}");
-                    }
-
-                    $chunkStart = $chunkEnd->copy()->addSecond()->startOfDay();
                 }
             }
 
@@ -224,47 +193,170 @@ class BusinessSyncService
     public function createManualRequest(Business $business, $startDate, $endDate, $type = 'all')
     {
         $start = Carbon::parse($startDate)->startOfDay();
-        $end = Carbon::parse($endDate)->endOfDay();
+        $end   = Carbon::parse($endDate)->endOfDay();
 
         $types = ($type === 'all') ? ['issued', 'received'] : [$type];
         $requestCount = 0;
 
         foreach ($types as $t) {
-            $chunkStart = $start->copy();
-
-            while ($chunkStart < $end) {
-                $chunkEnd = $chunkStart->copy()->addMonths(6)->endOfDay();
-                if ($chunkEnd > $end) {
-                    $chunkEnd = $end->copy();
-                }
-
-                // Evitar duplicados con solicitudes activas en el mismo rango
-                $exists = SatRequest::where('rfc', $business->rfc)
-                    ->where('type', $t)
-                    ->where('start_date', $chunkStart->toDateTimeString())
-                    ->where('end_date', $chunkEnd->toDateTimeString())
-                    ->whereIn('state', ['created', 'polling', 'downloading'])
-                    ->exists();
-
-                if (!$exists) {
-                    SatRequest::create([
-                        'id' => (string)\Illuminate\Support\Str::uuid(),
-                        'rfc' => $business->rfc,
-                        'type' => $t,
-                        'start_date' => $chunkStart,
-                        'end_date' => $chunkEnd,
-                        'state' => 'created'
-                    ]);
-                    $requestCount++;
-                }
-
-                $chunkStart = $chunkEnd->copy()->addSecond()->startOfDay();
-            }
+            $created = $this->createRequestIfNotExists($business->rfc, $t, $start, $end, false);
+            if ($created) $requestCount++;
         }
 
         return [
             'status' => 'success',
             'requests_created' => $requestCount
         ];
+    }
+
+    /**
+     * Detecta periodos sin cobertura (sin solicitud completed) para un RFC+tipo
+     * en los últimos 5 años y crea solicitudes para cubrirlos.
+     * Útil para clientes ya existentes que pueden tener huecos por solicitudes fallidas.
+     */
+    public function fillGaps(Business $business): array
+    {
+        $types = ['issued', 'received'];
+        $requestCount = 0;
+        $gapsFound = [];
+
+        foreach ($types as $type) {
+            $gaps = $this->getCoverageGaps($business->rfc, $type);
+            foreach ($gaps as $gap) {
+                $created = $this->createRequestIfNotExists($business->rfc, $type, $gap['start'], $gap['end'], false);
+                if ($created) {
+                    $requestCount++;
+                    $gapsFound[] = [
+                        'type'  => $type,
+                        'start' => $gap['start']->toDateString(),
+                        'end'   => $gap['end']->toDateString(),
+                    ];
+                    Log::info("Hueco rellenado para {$business->rfc} ($type): {$gap['start']->toDateString()} → {$gap['end']->toDateString()}");
+                }
+            }
+        }
+
+        return [
+            'status'           => 'success',
+            'requests_created' => $requestCount,
+            'gaps_found'       => $gapsFound,
+        ];
+    }
+
+    /**
+     * Retorna el estado de cobertura de un cliente para mostrar en la UI.
+     */
+    public function getCoverageStatus(Business $business): array
+    {
+        $result = [];
+        $expectedStart = now()->subYears(5)->startOfYear();
+        $expectedEnd   = now()->subMinutes(5);
+        $totalDays = $expectedStart->diffInDays($expectedEnd) ?: 1;
+
+        foreach (['issued', 'received'] as $type) {
+            $gaps = $this->getCoverageGaps($business->rfc, $type);
+
+            $gapDays = 0;
+            foreach ($gaps as $gap) {
+                $gapDays += Carbon::parse($gap['start'])->diffInDays(Carbon::parse($gap['end']));
+            }
+
+            $coveredDays = max(0, $totalDays - $gapDays);
+            $pct = round(($coveredDays / $totalDays) * 100, 1);
+
+            $lastCompleted = SatRequest::where('rfc', $business->rfc)
+                ->where('type', $type)
+                ->where('state', 'completed')
+                ->orderBy('end_date', 'desc')
+                ->value('end_date');
+
+            $result[$type] = [
+                'covered_pct'  => $pct,
+                'gaps_count'   => count($gaps),
+                'last_covered' => $lastCompleted ? Carbon::parse($lastCompleted)->toDateString() : null,
+            ];
+        }
+
+        return $result;
+    }
+
+    // ─── Helpers privados ────────────────────────────────────────────────────
+
+    /**
+     * Detecta huecos de cobertura para un RFC+tipo en los últimos 5 años.
+     * Un "hueco" es un periodo sin ninguna solicitud en estado completed.
+     * Tolerancia de 2 días entre solicitudes para evitar falsos positivos.
+     */
+    private function getCoverageGaps(string $rfc, string $type): array
+    {
+        $expectedStart = now()->subYears(5)->startOfYear();
+        $expectedEnd   = now()->subMinutes(5);
+
+        $completed = SatRequest::where('rfc', $rfc)
+            ->where('type', $type)
+            ->where('state', 'completed')
+            ->where('end_date', '>=', $expectedStart)
+            ->orderBy('start_date')
+            ->get(['start_date', 'end_date']);
+
+        $gaps   = [];
+        $cursor = $expectedStart->copy();
+
+        foreach ($completed as $req) {
+            $reqStart = Carbon::parse($req->start_date);
+            $reqEnd   = Carbon::parse($req->end_date);
+
+            // Hay hueco si el inicio de esta solicitud es más de 2 días después del cursor
+            if ($reqStart->gt($cursor->copy()->addDays(2))) {
+                $gaps[] = ['start' => $cursor->copy(), 'end' => $reqStart->copy()];
+            }
+
+            if ($reqEnd->gt($cursor)) {
+                $cursor = $reqEnd->copy();
+            }
+        }
+
+        // Hueco desde el último completado hasta hoy (más de 2 días sin cubrir)
+        if ($cursor->lt($expectedEnd->copy()->subDays(2))) {
+            $gaps[] = ['start' => $cursor->copy(), 'end' => $expectedEnd->copy()];
+        }
+
+        return $gaps;
+    }
+
+    /**
+     * Crea una solicitud SAT si no existe ya una activa o completada para ese rango exacto.
+     * Retorna true si se creó, false si ya existía.
+     */
+    private function createRequestIfNotExists(string $rfc, string $type, Carbon $start, Carbon $end, bool $force): bool
+    {
+        $active = SatRequest::where('rfc', $rfc)
+            ->where('type', $type)
+            ->where('start_date', $start->toDateTimeString())
+            ->where('end_date', $end->toDateTimeString())
+            ->whereIn('state', ['created', 'polling', 'downloading'])
+            ->exists();
+
+        if ($active) return false;
+
+        $completedExists = SatRequest::where('rfc', $rfc)
+            ->where('type', $type)
+            ->where('start_date', $start->toDateTimeString())
+            ->where('end_date', $end->toDateTimeString())
+            ->where('state', 'completed')
+            ->exists();
+
+        if ($completedExists && !$force) return false;
+
+        SatRequest::create([
+            'id'         => (string)\Illuminate\Support\Str::uuid(),
+            'rfc'        => $rfc,
+            'type'       => $type,
+            'start_date' => $start,
+            'end_date'   => $end,
+            'state'      => 'created',
+        ]);
+
+        return true;
     }
 }

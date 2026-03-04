@@ -53,6 +53,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::delete('/sat/requests-bulk', [InvoiceController::class , 'bulkDeleteSatRequests']);
     Route::delete('/sat/requests/{id}', [InvoiceController::class , 'deleteSatRequest']);
     Route::get('/sat/runner-status', [InvoiceController::class , 'getRunnerStatus']);
+    Route::post('/sat/fill-gaps', [InvoiceController::class , 'fillGaps']);
+    Route::get('/sat/coverage', [InvoiceController::class , 'getSatCoverage']);
     Route::get('/sat/bulk-pdf', [InvoiceController::class , 'downloadBulkPdf']);
     Route::get('/cfdis/{uuid}/pdf', [InvoiceController::class , 'downloadPdf']);
     Route::get('/cfdis/{uuid}/zip', [InvoiceController::class , 'downloadSingleZip']);
