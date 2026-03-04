@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { parseCertificate, createClient, logout, getRunnerStatus } from '../services';
 import { listGroups, createGroup, updateGroup, deleteGroup } from '../api/groups';
 import { listTags, createTag, updateTag, deleteTag } from '../api/tags';
-import { listClients, updateClientGroup, updateClientTags, updateClientInfo, deleteClient } from '../api/clients';
+import { listClients, updateClientGroup, updateClientTags, updateClientInfo, deleteClient, updateClientFiel } from '../api/clients';
 import { GroupCardsRow } from '../components/GroupCardsRow';
 import { TagsFilter } from '../components/TagsFilter';
 import { GroupByToggle } from '../components/GroupByToggle';
@@ -51,6 +51,14 @@ export const DashboardPage = ({
     const [errorMessage, setErrorMessage] = useState('');
     const [showKeyPass, setShowKeyPass] = useState(false);
     const [showCiec, setShowCiec] = useState(false);
+
+    // FIEL update states (edit mode only)
+    const [fielCerFile, setFielCerFile] = useState<File | null>(null);
+    const [fielKeyFile, setFielKeyFile] = useState<File | null>(null);
+    const [fielPass, setFielPass] = useState('');
+    const [showFielPass, setShowFielPass] = useState(false);
+    const [fielSubmitting, setFielSubmitting] = useState(false);
+    const [fielMessage, setFielMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     // Group/Tag form state
     const [newGroupName, setNewGroupName] = useState('');
@@ -140,6 +148,32 @@ export const DashboardPage = ({
         }
     };
 
+    const handleFielUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!fielCerFile || !fielKeyFile || !fielPass) {
+            setFielMessage({ type: 'error', text: 'Completa los tres campos: .cer, .key y contraseña.' });
+            return;
+        }
+        setFielSubmitting(true);
+        setFielMessage(null);
+        try {
+            const fd = new FormData();
+            fd.append('certificate', fielCerFile);
+            fd.append('private_key', fielKeyFile);
+            fd.append('passphrase', fielPass);
+            const res = await updateClientFiel(selectedClient.id, fd);
+            setFielMessage({ type: 'success', text: res.message || 'FIEL actualizada.' });
+            setFielCerFile(null);
+            setFielKeyFile(null);
+            setFielPass('');
+            loadClientsData();
+        } catch (err: any) {
+            setFielMessage({ type: 'error', text: err.message || 'Error al actualizar FIEL.' });
+        } finally {
+            setFielSubmitting(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -205,6 +239,10 @@ export const DashboardPage = ({
         setErrorMessage('');
         setIsEditMode(false);
         setSelectedClient(null);
+        setFielCerFile(null);
+        setFielKeyFile(null);
+        setFielPass('');
+        setFielMessage(null);
     };
 
     const handleSaveGroup = async () => {
@@ -968,7 +1006,78 @@ export const DashboardPage = ({
                                 </div>
                             </section>
 
-                            {/* Section 3: CIEC */}
+                            {/* Section 3: Actualizar FIEL (solo edit mode) */}
+                            {isEditMode && (
+                                <section className="space-y-6 border-t border-gray-100 pt-8">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-1.5 rounded-lg ${selectedClient?.valid_until && new Date(selectedClient.valid_until) < new Date() ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'}`}>
+                                                <span className="material-symbols-outlined text-xl">refresh</span>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Renovar FIEL</h3>
+                                                {selectedClient?.valid_until && (
+                                                    <p className={`text-[10px] font-bold mt-0.5 ${new Date(selectedClient.valid_until) < new Date() ? 'text-red-500' : 'text-amber-500'}`}>
+                                                        {new Date(selectedClient.valid_until) < new Date()
+                                                            ? `⚠ Vencida el ${new Date(selectedClient.valid_until).toLocaleDateString('es-MX')}`
+                                                            : `Válida hasta ${new Date(selectedClient.valid_until).toLocaleDateString('es-MX')}`
+                                                        }
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Feedback message */}
+                                    {fielMessage && (
+                                        <div className={`p-3 rounded-2xl text-[11px] font-bold flex items-center gap-2 ${fielMessage.type === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                                            <span className="material-symbols-outlined text-base">{fielMessage.type === 'success' ? 'check_circle' : 'error'}</span>
+                                            {fielMessage.text}
+                                        </div>
+                                    )}
+
+                                    <form onSubmit={handleFielUpdate} className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-5 transition-all cursor-pointer ${fielCerFile ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/30'}`}>
+                                                <span className={`material-symbols-outlined mb-2 text-3xl ${fielCerFile ? 'text-emerald-500' : 'text-gray-300 group-hover:text-emerald-500'}`}>upload_file</span>
+                                                <p className="text-[10px] font-bold text-gray-500 text-center truncate max-w-full px-1">
+                                                    {fielCerFile ? fielCerFile.name : 'Nuevo .cer'}
+                                                </p>
+                                                <input className="absolute inset-0 opacity-0 cursor-pointer" type="file" accept=".cer" onChange={e => setFielCerFile(e.target.files?.[0] || null)} />
+                                            </div>
+                                            <div className={`group relative flex flex-col items-center justify-center border-2 border-dashed rounded-3xl p-5 transition-all cursor-pointer ${fielKeyFile ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-emerald-500 hover:bg-emerald-50/30'}`}>
+                                                <span className={`material-symbols-outlined mb-2 text-3xl ${fielKeyFile ? 'text-emerald-500' : 'text-gray-300 group-hover:text-emerald-500'}`}>key</span>
+                                                <p className="text-[10px] font-bold text-gray-500 text-center truncate max-w-full px-1">
+                                                    {fielKeyFile ? fielKeyFile.name : 'Nuevo .key'}
+                                                </p>
+                                                <input className="absolute inset-0 opacity-0 cursor-pointer" type="file" accept=".key" onChange={e => setFielKeyFile(e.target.files?.[0] || null)} />
+                                            </div>
+                                        </div>
+                                        <div className="relative">
+                                            <input
+                                                className="w-full px-5 py-3 rounded-2xl border border-gray-200 text-sm font-semibold focus:ring-4 focus:ring-emerald-500/5 focus:border-[#10B981] transition-all pr-12"
+                                                placeholder="Contraseña de la nueva FIEL"
+                                                type={showFielPass ? 'text' : 'password'}
+                                                value={fielPass}
+                                                onChange={e => setFielPass(e.target.value)}
+                                            />
+                                            <button type="button" onClick={() => setShowFielPass(!showFielPass)} className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
+                                                <span className="material-symbols-outlined text-xl">{showFielPass ? 'visibility_off' : 'visibility'}</span>
+                                            </button>
+                                        </div>
+                                        <button
+                                            type="submit"
+                                            disabled={fielSubmitting || !fielCerFile || !fielKeyFile || !fielPass}
+                                            className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black uppercase tracking-widest text-[10px] rounded-2xl transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <span className={`material-symbols-outlined text-base ${fielSubmitting ? 'animate-spin' : ''}`}>{fielSubmitting ? 'sync' : 'verified_user'}</span>
+                                            {fielSubmitting ? 'Actualizando...' : 'Actualizar FIEL'}
+                                        </button>
+                                    </form>
+                                </section>
+                            )}
+
+                            {/* Section 4: CIEC */}
                             <section className="space-y-6">
                                 <div className="flex items-center gap-3">
                                     <div className="p-1.5 bg-orange-50 rounded-lg text-orange-600">

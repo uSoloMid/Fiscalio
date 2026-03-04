@@ -5,9 +5,9 @@ Este documento es la fuente de verdad definitiva y unificada para cualquier desa
 ## 🏗️ 1. Arquitectura e Infraestructura
 Fiscalio se divide de forma híbrida para máxima disponibilidad y procesamiento seguro:
 - **Backend (API + Runner + Agent + DB)**: Alojado localmente en una **Mini PC Linux (Ubuntu)**.
-    - **Tecnología**: Laravel 10+, PHP 8.2+, SQLite.
-    - **Servicios Docker**: `api`, `runner` (extrae XMLs del SAT en bucle), `agent` (comunicación de credenciales CIEC/FIEL con extensión), `tunnel` (Cloudflared).
-    - **Base de Datos**: SQLite, archivo físico mapeado desde el host a los contenedores.
+    - **Tecnología**: Laravel 10+, PHP 8.3+, MariaDB 10.6.
+    - **Servicios Docker**: `sat-api-app` (API prod), `fiscalio-runner` (runner prod), `sat-api-app-dev` (API dev), `fiscalio-runner-dev` (runner dev), `fiscalio-db` (MariaDB), `fiscalio-agent` (credenciales CIEC/FIEL), `fiscalio-tunnel` (Cloudflared).
+    - **Base de Datos**: MariaDB 10.6 (`fiscalio-db`), datos persistidos en `sat-api/mysql_data/`. Levantada con `docker-compose.db.yml`.
 - **Frontend (UI)**: Alojado y desplegado en la nube a través de **Vercel**.
     - **Tecnología**: React, Vite, TS, Tailwind CSS.
 
@@ -86,11 +86,11 @@ Ubicado en `/agent/scraper_sat.js`, es un motor basado en **Puppeteer** diseñad
 - Se agregó el botón de **Procesamiento Manual** directo en el Front-End (Historial de solicitudes SAT) para destrabar paquetes en estado "polling" o "downloading" a voluntad, sin depender exclusivamente del cron background.
 
 ## 💾 7. Backups y Resiliencia de Datos
-La base de datos SQLite es el corazón del sistema. Se gestiona de la siguiente manera:
-- **Automatización**: Existe un comando `db:backup` en Laravel que se ejecuta periódicamente (vía cron/scheduler).
-- **Retención**: El script mantiene los 3 backups más recientes y elimina los que tengan más de 48 horas de antigüedad.
-- **Backup Permanente**: Existe un archivo `~/Fiscalio/Base_datos/backups/database_PERMANENT.sqlite` que **NUNCA** es borrado por el script automático. 
-- **⚠️ IMPORTANTE**: Siempre que realices cambios masivos o antes de una intervención crítica en la Mini PC, verifica que el `database_PERMANENT.sqlite` esté actualizado o crea uno nuevo. Este archivo es tu seguro de vida si la base de datos principal se corrompe.
+La base de datos es MariaDB 10.6, corriendo en el contenedor `fiscalio-db`. Los datos se persisten en `sat-api/mysql_data/` en el host.
+- **Levantar la DB**: `docker compose -f sat-api/docker-compose.db.yml up -d`
+- **Backup manual**: `docker exec fiscalio-db mariadb-dump -uroot -pSolomid8 fiscalio_prod > backup_$(date +%Y%m%d).sql`
+- **Restaurar**: `docker exec -i fiscalio-db mariadb -uroot -pSolomid8 fiscalio_prod < backup.sql`
+- **⚠️ IMPORTANTE**: El directorio `mysql_data/` está en `.gitignore`. Nunca subas los datos de MariaDB al repositorio. Siempre ten un backup SQL antes de intervenciones críticas.
 
 ---
 **NOTA PARA ASISTENTES IA:** Si haces un cambio arquitectónico u operativo, actualiza este README para mantener la fuente de la verdad sincronizada.

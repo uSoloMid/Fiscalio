@@ -144,6 +144,19 @@ export async function triggerScraperFiel(rfc: string): Promise<any> {
     return response.json();
 }
 
+export async function createManualRequest(rfc: string, start_date: string, end_date: string, type: string = 'all'): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/sat/manual-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc, start_date, end_date, type })
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Error creando solicitud manual');
+    }
+    return response.json();
+}
+
 export async function verifyStatus(params: any): Promise<any> {
     const response = await authFetch(`${API_BASE_URL}/api/sat/verify-status`, {
         method: 'POST',
@@ -232,6 +245,15 @@ export async function deleteSatRequest(id: string): Promise<void> {
         method: 'DELETE'
     });
     if (!response.ok) throw new Error('Error deleting request');
+}
+
+export async function bulkDeleteSatRequests(rfc?: string): Promise<any> {
+    const query = rfc ? `?rfc=${rfc}` : '';
+    const response = await authFetch(`${API_BASE_URL}/api/sat/requests-bulk${query}`, {
+        method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Error deleting requests');
+    return response.json();
 }
 
 export async function verifySatRequest(id: string): Promise<any> {

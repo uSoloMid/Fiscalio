@@ -20,8 +20,8 @@ RUN pip3 install pdfplumber pandas openpyxl pymupdf --break-system-packages
 ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 RUN chmod +x /usr/local/bin/install-php-extensions
 
-# ✅ Extensiones necesarias para Laravel (SQLite + PostgreSQL)
-RUN install-php-extensions pdo pdo_sqlite pdo_pgsql pgsql sqlite3 mbstring bcmath gd soap zip intl pcntl
+# ✅ Extensiones necesarias para Laravel (MySQL + SQLite + PostgreSQL)
+RUN install-php-extensions bcmath gd intl mbstring pcntl pdo pdo_mysql pdo_pgsql pdo_sqlite pgsql soap sqlite3 zip
 
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
