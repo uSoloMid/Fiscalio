@@ -99,6 +99,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/clients/{id}', [ClientController::class , 'destroy']);
         Route::put('/clients/{id}/group', [ClientController::class , 'updateGroup']);
         Route::put('/clients/{id}/tags', [ClientController::class , 'updateTags']);
+        Route::post('/clients/{id}/fiel', [ClientController::class , 'updateFiel']);
 
         Route::get('/groups', [GroupController::class , 'index']);
         Route::post('/groups', [GroupController::class , 'store']);

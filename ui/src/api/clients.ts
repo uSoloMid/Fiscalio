@@ -55,6 +55,16 @@ export async function updateClientInfo(clientId: number, data: any): Promise<any
     return response.json();
 }
 
+export async function updateClientFiel(clientId: number, formData: FormData): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/clients/${clientId}/fiel`, {
+        method: 'POST',
+        body: formData
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(json.message || 'Error actualizando FIEL');
+    return json;
+}
+
 export async function deleteClient(clientId: number): Promise<any> {
     const response = await authFetch(`${API_BASE_URL}/api/clients/${clientId}`, {
         method: 'DELETE'

@@ -180,11 +180,42 @@ class ClientController extends Controller
         return response()->json($business);
     }
 
+    public function updateFiel(Request $request, $id)
+    {
+        $request->validate([
+            'certificate' => 'required|file',
+            'private_key' => 'required|file',
+            'passphrase'  => 'required|string',
+        ]);
+
+        $certContent = file_get_contents($request->file('certificate')->getRealPath());
+        $keyContent  = file_get_contents($request->file('private_key')->getRealPath());
+
+        $data = openssl_x509_parse($certContent);
+        if (!$data && strpos($certContent, '-----BEGIN CERTIFICATE-----') === false) {
+            $pem  = "-----BEGIN CERTIFICATE-----\n" . chunk_split(base64_encode($certContent), 64, "\n") . "-----END CERTIFICATE-----\n";
+            $data = openssl_x509_parse($pem);
+        }
+        $validUntil = $data ? date('Y-m-d H:i:s', $data['validTo_time_t']) : now()->addYears(4);
+
+        $business = Business::findOrFail($id);
+        $business->update([
+            'certificate' => base64_encode($certContent),
+            'private_key' => base64_encode($keyContent),
+            'passphrase'  => $request->passphrase,
+            'valid_until' => $validUntil,
+        ]);
+
+        return response()->json([
+            'success'     => true,
+            'valid_until' => $validUntil,
+            'message'     => 'FIEL actualizada correctamente. Válida hasta: ' . date('d/m/Y', strtotime($validUntil)),
+        ]);
+    }
+
     public function destroy($id)
     {
         $business = Business::findOrFail($id);
-        // Podríamos querer borrar sus CFDIs y Requests asociados, o dejarlos como huérfanos.
-        // Por ahora, borrado simple.
         $business->delete();
         return response()->json(['success' => true]);
     }
