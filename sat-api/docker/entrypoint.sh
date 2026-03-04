@@ -56,9 +56,10 @@ php artisan route:clear || true
 php artisan cache:clear || true
 php artisan view:clear || true
 
-echo "==> Re-generando caché de producción..."
-php artisan config:cache || true
-php artisan route:cache || true
+# NOTA: config:cache y route:cache están desactivados intencionalmente.
+# Prod y dev comparten el mismo volumen /var/www — cachear aquí sobreescribiría
+# la config del otro container con settings incorrectos (ej. DB equivocada).
+# Cada container lee sus env vars directamente sin cache.
 
 # 4.1. Migraciones (Auto-Schema)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
