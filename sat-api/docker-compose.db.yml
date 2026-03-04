@@ -5,6 +5,7 @@ services:
     image: mariadb:10.6
     container_name: fiscalio-db
     restart: unless-stopped
+    command: ['--max_allowed_packet=256M']
     environment:
       MARIADB_ROOT_PASSWORD: Solomid8
       MARIADB_DATABASE: fiscalio_prod
