@@ -23,6 +23,9 @@ RUN chmod +x /usr/local/bin/install-php-extensions
 # ✅ Extensiones necesarias para Laravel (MySQL + SQLite + PostgreSQL)
 RUN install-php-extensions bcmath gd intl mbstring pcntl pdo pdo_mysql pdo_pgsql pdo_sqlite pgsql soap sqlite3 zip
 
+# PHP upload limits (PDFs de estados de cuenta pueden ser grandes)
+RUN echo "upload_max_filesize=20M\npost_max_size=20M" > /usr/local/etc/php/conf.d/uploads.ini
+
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
