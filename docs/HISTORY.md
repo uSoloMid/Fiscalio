@@ -5,6 +5,14 @@
 
 ---
 
+## 2026-03-05 — Optimización módulo de facturas (velocidad y filtros)
+**Commit:** `54dba27`
+- Migración con índices en `tipo`, `es_cancelado`, compuestos `(rfc_emisor, fecha_fiscal)` y `(rfc_receptor, fecha_fiscal)`
+- `InvoiceController`: extraído `buildCfdiQuery()`, reemplazado `whereYear`/`whereMonth` con rangos `BETWEEN` para usar índices
+- `InvoicesPage`: debounce 400ms en búsqueda (evita API call por cada tecla)
+
+---
+
 ## 2026-03-05 — Backfill cfdi_payments para REPs existentes
 **Commit:** `ae541a1`
 

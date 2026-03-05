@@ -520,11 +520,40 @@ class InvoiceController extends Controller
     public function refreshCfdiStatus($uuid, \App\Services\SatStatusService $service)
     {
         $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
-        $result = $service->checkStatus($cfdi->uuid, $cfdi->rfc_emisor, $cfdi->rfc_receptor, number_format($cfdi->total, 2, '.', ''));
-        if ($result['estado'] !== 'Error') {
-            $cfdi->update(['estado_sat' => $result['estado'], 'estado_sat_updated_at' => now(), 'es_cancelado' => ($result['estado'] === 'Cancelado' ? 1 : 0)]);
+
+        // Try to build the expression directly from the XML so the SAT total matches exactly.
+        // Falling back to manual expression if the XML is unavailable.
+        $result = null;
+        if ($cfdi->path_xml) {
+            try {
+                $xmlContent = \Illuminate\Support\Facades\Storage::get($cfdi->path_xml);
+                if ($xmlContent) {
+                    $dom = new \DOMDocument();
+                    @$dom->loadXML((string) $xmlContent);
+                    $extractor = new \PhpCfdi\CfdiExpresiones\DiscoverExtractor();
+                    $expression = $extractor->extract($dom);
+                    $result = $service->checkStatusByExpression($expression);
+                }
+            } catch (\Exception $e) {
+                Log::warning("refreshCfdiStatus: could not extract expression from XML for {$uuid}: " . $e->getMessage());
+            }
         }
-        return response()->json(['metadata' => $cfdi, 'sat_response' => $result]);
+
+        if ($result === null) {
+            $result = $service->checkStatus($cfdi->uuid, $cfdi->rfc_emisor, $cfdi->rfc_receptor, number_format($cfdi->total, 2, '.', ''));
+        }
+
+        // Only persist when the SAT gave a definitive answer — avoid overwriting a known-cancelled
+        // CFDI with 0 when the query fails or returns "No Encontrado".
+        if ($result['estado'] === 'Vigente' || $result['estado'] === 'Cancelado') {
+            $cfdi->update([
+                'estado_sat' => $result['estado'],
+                'estado_sat_updated_at' => now(),
+                'es_cancelado' => ($result['estado'] === 'Cancelado' ? 1 : 0),
+            ]);
+        }
+
+        return response()->json(['metadata' => $cfdi->fresh(), 'sat_response' => $result]);
     }
 
     public function showRequest($id)
