@@ -7,25 +7,23 @@
 
 ---
 
-## Conciliación inteligente: algoritmo mejorado + aprendizaje
+## Tarea: Backfill cfdi_payments para REPs existentes
 
-**Objetivo:** Motor de matching más inteligente basado en REPs (suma total, facturas relacionadas), extracción de nombre/RFC de descripción bancaria, y aprendizaje de patrones manuales.
-
-### Archivos a modificar/crear
-- `sat-api/database/migrations/*_create_reconciliation_patterns.php` — nueva tabla
-- `sat-api/app/Models/ReconciliationPattern.php` — nuevo modelo
-- `sat-api/app/Models/Cfdi.php` — agregar `pagosPropios()` (relación correcta para REPs)
-- `sat-api/app/Http/Controllers/ReconciliationController.php` — reescritura del algoritmo
-- `ui/src/components/MovementReconcileRow.tsx` — mostrar facturas relacionadas en REPs
+**Archivos modificados:**
+- `sat-api/app/Console/Commands/BackfillCfdiPaymentsCommand.php` ← nuevo
 
 ### Pasos
-- [ ] PLANNING.md actualizado
-- [ ] Migration: `reconciliation_patterns` (business_id, description_keyword, counterpart_rfc, confirmed_count)
-- [ ] Model + Cfdi::pagosPropios()
-- [ ] Backend: REP matching por suma total (no por pago individual)
-- [ ] Backend: Extracción de nombre/RFC de descripción (patrones SPEI mexicanos)
-- [ ] Backend: Confidence score con nombre/RFC match
-- [ ] Backend: Aprendizaje — guardar patrón al confirmar manualmente
-- [ ] Backend: Boost de confidence si descripción coincide con patrón aprendido
-- [ ] Frontend: Mostrar facturas relacionadas en sugerencia de REP
-- [ ] Deploy
+- [x] Analizar causa raíz: REPs importadas antes de que existiera `cfdi_payments`, por eso `pagosPropios` siempre vacío
+- [x] El XML processor SÍ extrae pagos, pero `indexCfdi()` hace early-return si UUID ya existe
+- [x] Crear comando `cfdi:backfill-payments` que:
+  - Busca REPs tipo=P sin `cfdi_payments`
+  - Lee el XML desde `path_xml` (o fallback a `xml_data` JSON)
+  - Inserta registros en `cfdi_payments` con `firstOrCreate`
+  - Soporta `--rfc=` para probar con César García primero
+  - Soporta `--dry-run` para inspección previa
+- [ ] Deploy a main y ejecutar en servidor
+
+### Notas técnicas
+- REP (tipo=P) en CFDI 4.0: `total=0` es correcto — el monto está en `pago20:Pago/DoctoRelacionado/@ImpPagado`
+- `pagosPropios()` usa `uuid_pago = cfdi.uuid` — correcto
+- Fallback a `xml_data` parsea la estructura `cfdi:Comprobante > cfdi:Complemento > pago20:Pagos > pago20:Pago`

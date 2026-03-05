@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-03-05 — Conciliación inteligente: REPs, SPEI, aprendizaje
+**Commits:** `5806b45`, `31e7f14`
+
+- **Bug fix crítico:** REPs ahora matchean por `pagosPropios` (uuid_pago = rep.uuid). 1 REP que cubre N facturas suma total correctamente.
+- **Extracción SPEI:** "POR ORDEN DE" / "AL BENEF" → nombre contraparte; RFC formato mexicano detectado en descripción
+- **Confidence mejorado:** patrón aprendido → verde; RFC/nombre en desc + ≤10d → verde; monto exacto → mínimo amarillo
+- **Aprendizaje:** al confirmar manualmente → guarda keyword+RFC en `reconciliation_patterns`; siguiente match → verde automático
+- **UI:** REPs muestran UUIDs de facturas relacionadas en chips morados
+- **Migration idempotente:** `Schema::hasTable` evita error si tabla ya existe
+
+---
+
 ## 2026-03-05 — Mejoras UX conciliación + fix autodeploy definitivo
 **Commits:** `e824f30`, `e9260be`
 
