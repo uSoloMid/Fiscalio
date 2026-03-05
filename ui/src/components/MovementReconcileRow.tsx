@@ -163,11 +163,16 @@ export function MovementReconcileRow({ movement, onReconciled, onUnreconciled }:
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-bold text-gray-900 uppercase truncate">{counterpart(s)}</p>
                                     <div className="flex items-center gap-3 mt-0.5">
-                                        <span className="text-[9px] font-black text-gray-400">{s.fecha?.slice(0, 10)}</span>
+                                        <span className="text-[9px] font-black text-gray-400">
+                                            {s.match_via === 'payment' && s.fecha_pago ? s.fecha_pago : s.fecha?.slice(0, 10)}
+                                        </span>
                                         {s.days_diff > 0 && (
                                             <span className="text-[9px] font-black text-gray-300">+{s.days_diff}d</span>
                                         )}
                                         <span className="text-[9px] font-black text-gray-400 uppercase">{s.match_via === 'payment' ? 'REP' : s.tipo}</span>
+                                        {s.match_via === 'payment' && s.forma_pago && (
+                                            <span className="text-[9px] font-black text-purple-400 bg-purple-50 px-1.5 py-0.5 rounded uppercase">{s.forma_pago}</span>
+                                        )}
                                         <span className="text-[9px] font-black text-gray-300 truncate">{s.uuid?.slice(0, 12)}…</span>
                                     </div>
                                     {/* Related invoices for REP */}

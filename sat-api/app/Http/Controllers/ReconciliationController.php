@@ -199,6 +199,8 @@ class ReconciliationController extends Controller
                     'name_emisor'      => $cfdi->name_emisor,
                     'name_receptor'    => $cfdi->name_receptor,
                     'fecha'            => $cfdi->fecha,
+                    'fecha_pago'       => $payDate->toDateString(),
+                    'forma_pago'       => $cfdi->forma_pago,
                     'total'            => round($repTotal, 2),
                     'tipo'             => 'P',
                     'confidence'       => $confidence,

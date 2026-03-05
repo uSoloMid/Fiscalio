@@ -59,6 +59,8 @@ export interface ReconciliationSuggestion {
     name_emisor?: string;
     name_receptor?: string;
     fecha: string;
+    fecha_pago?: string;
+    forma_pago?: string;
     total: number;
     tipo: 'I' | 'E' | 'P';
     confidence: ReconciliationConfidence;
