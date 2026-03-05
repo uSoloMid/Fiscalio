@@ -160,6 +160,22 @@ export function MovementReconcileRow({ movement, onReconciled, onUnreconciled }:
                                         <span className="text-[9px] font-black text-gray-400 uppercase">{s.match_via === 'payment' ? 'REP' : s.tipo}</span>
                                         <span className="text-[9px] font-black text-gray-300 truncate">{s.uuid?.slice(0, 12)}…</span>
                                     </div>
+                                    {/* Related invoices for REP */}
+                                    {s.match_via === 'payment' && s.related_invoices && s.related_invoices.length > 0 && (
+                                        <div className="mt-1.5 flex flex-wrap gap-1">
+                                            <span className="text-[8px] font-black text-purple-500 uppercase tracking-widest">
+                                                {s.payments_count ?? s.related_invoices.length} factura{(s.payments_count ?? s.related_invoices.length) > 1 ? 's' : ''}:
+                                            </span>
+                                            {s.related_invoices.slice(0, 4).map((uuid, j) => (
+                                                <span key={j} className="text-[8px] font-black text-purple-400 bg-purple-50 px-1.5 py-0.5 rounded">
+                                                    {uuid.slice(0, 8)}…
+                                                </span>
+                                            ))}
+                                            {s.related_invoices.length > 4 && (
+                                                <span className="text-[8px] font-black text-purple-300">+{s.related_invoices.length - 4}</span>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                                 <span className="text-sm font-black text-gray-900 whitespace-nowrap">{fmt(s.total)}</span>
                                 <button

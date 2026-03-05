@@ -66,6 +66,8 @@ export interface ReconciliationSuggestion {
     match_via: 'total' | 'payment';
     payment_uuid?: string;
     monto_pagado?: number;
+    related_invoices?: string[];   // UUIDs of invoices covered by this REP
+    payments_count?: number;       // how many invoices this REP covers
 }
 
 export interface ReconciliationStats {

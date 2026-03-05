@@ -7,16 +7,25 @@
 
 ---
 
-## Mejoras UX módulo de conciliación
+## Conciliación inteligente: algoritmo mejorado + aprendizaje
 
-**Objetivo:** Hacer la interfaz legible y funcional — descripción truncada, filas con identidad visual por estado, barra de progreso real.
+**Objetivo:** Motor de matching más inteligente basado en REPs (suma total, facturas relacionadas), extracción de nombre/RFC de descripción bancaria, y aprendizaje de patrones manuales.
 
-### Archivos a modificar
-- `sat-api/app/Http/Controllers/BankStatementController.php` — agregar `reconciled_count`
-- `ui/src/components/MovementReconcileRow.tsx` — truncar descripción + highlight por estado
-- `ui/src/pages/ReconciliationPage.tsx` — usar `reconciled_count` real
+### Archivos a modificar/crear
+- `sat-api/database/migrations/*_create_reconciliation_patterns.php` — nueva tabla
+- `sat-api/app/Models/ReconciliationPattern.php` — nuevo modelo
+- `sat-api/app/Models/Cfdi.php` — agregar `pagosPropios()` (relación correcta para REPs)
+- `sat-api/app/Http/Controllers/ReconciliationController.php` — reescritura del algoritmo
+- `ui/src/components/MovementReconcileRow.tsx` — mostrar facturas relacionadas en REPs
 
 ### Pasos
-- [ ] Backend: `withCount` de movimientos con `cfdi_id IS NOT NULL` → campo `reconciled_count`
-- [ ] Frontend: truncar descripción a ~60 chars con tooltip completo + borde izquierdo de color por estado
-- [ ] Frontend: barra de progreso usa `reconciled_count / movements_count` real
+- [ ] PLANNING.md actualizado
+- [ ] Migration: `reconciliation_patterns` (business_id, description_keyword, counterpart_rfc, confirmed_count)
+- [ ] Model + Cfdi::pagosPropios()
+- [ ] Backend: REP matching por suma total (no por pago individual)
+- [ ] Backend: Extracción de nombre/RFC de descripción (patrones SPEI mexicanos)
+- [ ] Backend: Confidence score con nombre/RFC match
+- [ ] Backend: Aprendizaje — guardar patrón al confirmar manualmente
+- [ ] Backend: Boost de confidence si descripción coincide con patrón aprendido
+- [ ] Frontend: Mostrar facturas relacionadas en sugerencia de REP
+- [ ] Deploy
