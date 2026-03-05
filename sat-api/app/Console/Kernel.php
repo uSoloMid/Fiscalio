@@ -32,6 +32,11 @@ class Kernel extends ConsoleKernel
         // Respaldo de base de datos cada 12 horas
         $schedule->command('db:backup')
             ->twiceDaily(0, 12);
+
+        // Verificación de integridad: detecta pérdida crítica de datos y auto-restaura
+        $schedule->command('db:health-check')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
     }
 
     /**
