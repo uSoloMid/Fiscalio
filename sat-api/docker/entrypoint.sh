@@ -66,6 +66,21 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
     php artisan migrate --force
 fi
 
+# 5a. Límites PHP para uploads de PDFs bancarios
+echo "==> Configurando límites PHP para uploads..."
+PHP_INI_SCAN_DIR=$(php --ini | grep "Scan for additional" | awk -F': ' '{print $2}')
+if [ -n "$PHP_INI_SCAN_DIR" ] && [ -d "$PHP_INI_SCAN_DIR" ]; then
+    cat > "$PHP_INI_SCAN_DIR/upload-limits.ini" <<PHPINI
+upload_max_filesize = 20M
+post_max_size = 20M
+PHPINI
+    echo "    Escrito en $PHP_INI_SCAN_DIR/upload-limits.ini"
+else
+    echo "upload_max_filesize = 20M" >> /usr/local/etc/php/php.ini
+    echo "post_max_size = 20M"       >> /usr/local/etc/php/php.ini
+    echo "    Escrito en /usr/local/etc/php/php.ini"
+fi
+
 # 5. ✅ CONFIGURACIÓN DE PHP-FPM (Unix Socket)
 echo "==> Configurando PHP-FPM por Unix Socket..."
 
