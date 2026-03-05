@@ -5,6 +5,21 @@
 
 ---
 
+## Módulo Documentos SAT — CSF + Opinión 32-D (Mar 2026)
+
+**Commit estable:** `3d75e10`
+
+- Migración `sat_documents` table (MySQL): rfc, type [csf|opinion_32d], file_path, file_size, requested_at
+- Modelo `SatDocument.php` + controller `SatDocumentController.php`
+- Rutas: `GET /api/sat-documents`, `GET /api/sat-documents/{id}/download` (auth), `POST /api/agent/upload-document` (sin auth)
+- PDFs guardados en `storage/app/sat_docs/{rfc}/`
+- Scraper (`agent/scraper_sat.js`): upload al API + logout SAT preventivo después de cada documento (non-fatal)
+- Frontend: `SatDocumentsPage.tsx` — historial de docs por RFC, botones Descargar + Robot FIEL
+- Sidebar "Docs SAT" en sección Herramientas de InvoicesPage
+- `agent/` está en `.gitignore` — cambios al scraper se despliegan manualmente al MiniPC
+
+---
+
 ## 2026-03-05 — Optimización módulo de facturas (velocidad y filtros)
 **Commit:** `54dba27`
 - Migración con índices en `tipo`, `es_cancelado`, compuestos `(rfc_emisor, fecha_fiscal)` y `(rfc_receptor, fecha_fiscal)`
