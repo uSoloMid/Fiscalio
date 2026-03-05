@@ -1,43 +1,35 @@
 ---
 name: migrate
-description: Run Laravel database migrations on the Fiscalio dev or prod server. Defaults to dev (fiscalio_dev). Pass 'prod' to run on production — will ask for confirmation first.
-argument-hint: [dev|prod]
+description: Run Laravel database migrations on the production server (sat-api-app). Asks for confirmation before running.
+argument-hint: "confirm"
 allowed-tools: Bash
 ---
 
-# Run Migrations
+# Run Migrations — Fiscalio
 
-Run Laravel migrations on Fiscalio server.
+Solo existe **un container y una base de datos**: `sat-api-app` con SQLite en `/var/www/Base_datos/database.sqlite`.
 
-## Target
-- Default: **dev** (sat-api-app-dev → fiscalio_dev)
-- If $ARGUMENTS contains "prod": **prod** (sat-api-app → fiscalio_prod)
+## Proceso
 
-## Process
-
-### If target is PROD
-- Ask the user to confirm before proceeding: "Are you sure? This will modify fiscalio_prod."
-- Wait for explicit confirmation
-
-### Run migration
-Connect to MiniPC via paramiko: host=100.123.107.90, user=fiscalio, password=Solomid8
-
-For dev:
+### 1. Pedir confirmación
+Mostrar al usuario qué migraciones hay pendientes primero:
 ```bash
-docker exec sat-api-app-dev php artisan migrate --force 2>&1
+ssh fiscalio-server "docker exec sat-api-app php artisan migrate:status 2>&1 | grep Pending"
 ```
 
-For prod:
+Preguntar: "¿Confirmas correr las migraciones en producción?"
+
+### 2. Correr migraciones
+Solo tras confirmación explícita:
 ```bash
-docker exec sat-api-app php artisan migrate --force 2>&1
+ssh fiscalio-server "docker exec sat-api-app php artisan migrate --force 2>&1"
 ```
 
-### Report
-- Show migration output
-- List which migrations ran
-- If error: show full error and stop — do NOT retry automatically
+### 3. Reportar
+- Mostrar output completo
+- Si falla: mostrar error y detenerse — NO hacer rollback automático
 
-## Rules
-- Never run prod migrations without explicit user confirmation
-- If migration fails partway, report what ran and what failed — do not attempt rollback automatically
-- Always show the full output, not a summary
+## Reglas
+- Nunca correr `migrate:rollback` en producción
+- Si la migración falla a medias: reportar qué corrió y qué falló, esperar instrucciones del usuario
+- Las migraciones nuevas deben usar columnas `nullable` o con `default` para no romper datos existentes

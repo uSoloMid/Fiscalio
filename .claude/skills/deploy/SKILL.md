@@ -1,56 +1,68 @@
 ---
 name: deploy
-description: Deploy the current branch changes to the Fiscalio MiniPC server. Commits staged changes, pushes to dev, then pulls on the server and restarts the affected containers.
-argument-hint: [optional commit message]
+description: Commit and push current changes to dev, then merge to main and deploy to production server. Pass 'dev' to only push to dev (no merge). Pass 'main' to merge+deploy after changes are tested.
+argument-hint: "dev | main"
 allowed-tools: Bash
 ---
 
-# Deploy to Fiscalio MiniPC
+# Deploy Fiscalio
 
-Deploy current changes to the server.
+## Arquitectura de deploy
+- **`dev` branch** → Vercel preview automático (frontend solamente)
+- **`main` branch** → Autodeploy en servidor (cron cada 1 min detecta commits nuevos)
+  - Hace: `git reset --hard origin/main` + `nginx -s reload` + `artisan optimize:clear` + `artisan migrate --force`
+- **Un solo container:** `sat-api-app` en `ssh fiscalio-server`
+- **NUNCA** commitear directo a `main`
 
-## Steps
+---
 
-### 1. Verify Branch
-- Confirm we are on `dev` branch (NEVER deploy directly to `main`)
-- If on `main`, stop and ask the user
+## Paso 1 — Verificar rama
 
-### 2. Check Status
-- Run `git status` to see what's staged/unstaged
-- Run `git diff --stat` to summarize changes
+Confirmar que estamos en `dev`:
+```bash
+git branch --show-current
+```
+Si estamos en `main`, cambiar a `dev` primero.
 
-### 3. Commit (if there are changes)
-- Use commit message: $ARGUMENTS (or auto-generate a concise one from the diff)
-- Stage relevant files (not *.py debug scripts, not .env files)
-- Commit with Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+## Paso 2 — Ver cambios
 
-### 4. Push to dev
+```bash
+git status
+git diff --stat
+```
+
+## Paso 3 — Commit en dev
+
+- Stagear archivos relevantes (nunca `.env`, nunca scripts debug `*.py` sueltos en raíz)
+- Commit con mensaje descriptivo + Co-Authored-By
 - `git push origin dev`
 
-### 5. Pull on MiniPC via SSH
-Use paramiko to connect: host=100.123.107.90, user=fiscalio, password=Solomid8
+## Paso 4 — ¿Solo dev o también main?
 
-Run on server:
+Si $ARGUMENTS es `dev` o no se especifica: **terminar aquí**. Vercel preview se actualiza solo.
+
+Si $ARGUMENTS es `main` (cambios probados y listos para producción):
+
+### 4a. Merge dev → main
 ```bash
-cd /home/fiscalio/Fiscalio-Test
-git pull origin dev
+git checkout main
+git pull origin main
+git merge dev --no-edit
+git push origin main
+git checkout dev
 ```
 
-### 6. Restart affected containers
-If backend (sat-api/) changed:
+### 4b. Esperar autodeploy (~1 min)
 ```bash
-docker exec sat-api-app-dev php artisan optimize:clear
-cd /home/fiscalio/Fiscalio-Test/sat-api && docker compose up -d
+ssh fiscalio-server "tail -f /home/fiscalio/Fiscalio/autodeploy.log"
 ```
+Ctrl+C cuando veas "Deploy completado OK".
 
-If only frontend (ui/) changed: no server action needed (Vercel auto-deploys)
+### 4c. ¿Los cambios incluyen Dockerfile o entrypoint.sh?
+Si sí → se necesita `docker restart`. Usar el skill `/restart` (arregla permisos antes).
 
-### 7. Confirm
-- Check container is running: `docker ps | grep sat-api-app-dev`
-- Report success or error to user
-
-## Rules
-- Only deploy to `dev`, never `main`
-- Never commit .env files or debug *.py scripts in root
-- If git pull fails due to divergent branches, report to user — do NOT force push
-- Always run `php artisan optimize:clear` after backend changes
+## Reglas
+- Nunca commitear `.env`, secrets, ni archivos `desktop.ini`
+- Si el merge tiene conflictos → resolverlos manualmente, no forzar
+- Si el autodeploy falla por permisos → usar el skill `/restart`
+- Siempre terminar en branch `dev`
