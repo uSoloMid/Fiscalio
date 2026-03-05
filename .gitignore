@@ -21,7 +21,7 @@ Fiscalio_DB_Only.zip
 Base_datos/
 
 # Scripts de debug temporales (NO subir al repo)
-/scripts/
+
 /scripts_mantenimiento/
 /*.py
 /*.sh
