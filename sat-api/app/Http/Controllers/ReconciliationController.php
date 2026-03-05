@@ -133,8 +133,8 @@ class ReconciliationController extends Controller
 
         foreach ($cfdis as $cfdi) {
             // Direction filter by tipo
-            if ($isEgreso && !in_array($cfdi->tipo, ['E', 'P'])) continue;
-            if (!$isEgreso && $cfdi->tipo !== 'I') continue;
+            if ($isEgreso  && !in_array($cfdi->tipo, ['E', 'P'])) continue;
+            if (!$isEgreso && !in_array($cfdi->tipo, ['I', 'P'])) continue;
 
             // Skip foreign currency without exchange rate
             if ($cfdi->moneda !== 'MXN' && $cfdi->tipo_cambio != 1) continue;
@@ -161,6 +161,11 @@ class ReconciliationController extends Controller
 
             // ── REP (tipo P): match by SUM of all pagosPropios ──────────────
             if ($cfdi->tipo === 'P') {
+                // RFC direction: ingreso → business emitted the REP (they received money)
+                //                egreso → business is receptor on the REP (they paid)
+                if (!$isEgreso && $cfdi->rfc_emisor  !== $businessRfc) continue;
+                if ($isEgreso  && $cfdi->rfc_receptor !== $businessRfc) continue;
+
                 $propios = $cfdi->pagosPropios;
                 if ($propios->isEmpty()) continue;
 
