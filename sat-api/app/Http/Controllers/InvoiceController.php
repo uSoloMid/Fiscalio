@@ -521,8 +521,7 @@ class InvoiceController extends Controller
     {
         $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
 
-        // Try to build the expression directly from the XML so the SAT total matches exactly.
-        // Falling back to manual expression if the XML is unavailable.
+        $expressionUsed = null;
         $result = null;
         if ($cfdi->path_xml) {
             try {
@@ -531,20 +530,25 @@ class InvoiceController extends Controller
                     $dom = new \DOMDocument();
                     @$dom->loadXML((string) $xmlContent);
                     $extractor = new \PhpCfdi\CfdiExpresiones\DiscoverExtractor();
-                    $expression = $extractor->extract($dom);
-                    $result = $service->checkStatusByExpression($expression);
+                    $expressionUsed = $extractor->extract($dom);
+                    $result = $service->checkStatusByExpression($expressionUsed);
+                } else {
+                    Log::warning("refreshCfdiStatus [{$uuid}]: Storage::get returned empty for path: {$cfdi->path_xml}");
                 }
             } catch (\Exception $e) {
-                Log::warning("refreshCfdiStatus: could not extract expression from XML for {$uuid}: " . $e->getMessage());
+                Log::warning("refreshCfdiStatus [{$uuid}]: XML expression failed: " . $e->getMessage());
             }
         }
 
         if ($result === null) {
-            $result = $service->checkStatus($cfdi->uuid, $cfdi->rfc_emisor, $cfdi->rfc_receptor, number_format($cfdi->total, 2, '.', ''));
+            $tt = rtrim(number_format(floatval($cfdi->total), 6, '.', ''), '0');
+            if (str_ends_with($tt, '.')) $tt .= '0';
+            $expressionUsed = sprintf("?re=%s&rr=%s&tt=%s&id=%s", $cfdi->rfc_emisor, $cfdi->rfc_receptor, $tt, $uuid);
+            $result = $service->checkStatusByExpression($expressionUsed);
         }
 
-        // Only persist when the SAT gave a definitive answer — avoid overwriting a known-cancelled
-        // CFDI with 0 when the query fails or returns "No Encontrado".
+        Log::info("refreshCfdiStatus [{$uuid}] expression={$expressionUsed} estado={$result['estado']} codigo={$result['codigo_estatus']}");
+
         if ($result['estado'] === 'Vigente' || $result['estado'] === 'Cancelado') {
             $cfdi->update([
                 'estado_sat' => $result['estado'],
