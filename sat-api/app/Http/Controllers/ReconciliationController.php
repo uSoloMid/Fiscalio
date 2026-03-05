@@ -132,12 +132,32 @@ class ReconciliationController extends Controller
         $candidates = [];
 
         foreach ($cfdis as $cfdi) {
-            // Direction filter
+            // Direction filter by tipo
             if ($isEgreso && !in_array($cfdi->tipo, ['E', 'P'])) continue;
             if (!$isEgreso && $cfdi->tipo !== 'I') continue;
 
             // Skip foreign currency without exchange rate
             if ($cfdi->moneda !== 'MXN' && $cfdi->tipo_cambio != 1) continue;
+
+            // ── Tipo I: filter by RFC direction + metodo_pago ───────────────
+            if ($cfdi->tipo === 'I') {
+                // Ingreso (abono): business issued the invoice → they are emisor
+                if (!$isEgreso && $cfdi->rfc_emisor !== $businessRfc) continue;
+                // Egreso (cargo): business received the invoice → they are receptor
+                if ($isEgreso && $cfdi->rfc_receptor !== $businessRfc) continue;
+
+                // PPD invoices are paid via REP — skip direct match
+                if ($cfdi->metodo_pago === 'PPD') continue;
+
+                // PUE: only suggest for the same calendar month as the movement
+                if ($cfdi->metodo_pago === 'PUE') {
+                    $cfdiDate = Carbon::parse($cfdi->fecha);
+                    if ($cfdiDate->format('Y-m') !== $movDate->format('Y-m')) continue;
+                }
+            }
+
+            // ── Tipo E: business must be emisor (credit note they issued) ───
+            if ($cfdi->tipo === 'E' && $cfdi->rfc_emisor !== $businessRfc) continue;
 
             // ── REP (tipo P): match by SUM of all pagosPropios ──────────────
             if ($cfdi->tipo === 'P') {
@@ -233,25 +253,22 @@ class ReconciliationController extends Controller
     ): string {
         $counterpartRfc  = $isEgreso ? $cfdi->rfc_emisor  : $cfdi->rfc_receptor;
         $counterpartName = $isEgreso ? ($cfdi->name_emisor ?? '') : ($cfdi->name_receptor ?? '');
-        $ownRfcMatch     = ($cfdi->rfc_emisor === $businessRfc || $cfdi->rfc_receptor === $businessRfc);
 
         // Learned pattern — strongest signal
         if (in_array($counterpartRfc, $learnedRfcs)) return 'green';
 
         // RFC extracted from description matches CFDI counterpart
-        $rfcInDesc  = $extractedRfc && $extractedRfc === $counterpartRfc;
+        $rfcInDesc = $extractedRfc && $extractedRfc === $counterpartRfc;
 
         // Name extracted from description partially matches CFDI name
-        $nameMatch  = $extractedName && $counterpartName && $this->nameMatches($extractedName, $counterpartName);
+        $nameMatch = $extractedName && $counterpartName && $this->nameMatches($extractedName, $counterpartName);
 
         $identityMatch = $rfcInDesc || $nameMatch;
 
         if ($identityMatch && $daysDiff <= 10) return 'green';
-        if ($ownRfcMatch  && $daysDiff <= 5)  return 'green';
         if ($identityMatch)                    return 'yellow';
-        if ($ownRfcMatch  && $daysDiff <= 30)  return 'yellow';
         if ($daysDiff <= 5)                    return 'yellow';
-        return 'yellow'; // exact amount always at least yellow
+        return 'yellow'; // exact amount + direction always at least yellow
     }
 
     private function confidenceRank(string $confidence): int
