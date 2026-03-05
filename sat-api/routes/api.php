@@ -14,13 +14,11 @@ use App\Http\Controllers\AuthController;
 Route::get('/ping', function () {
     return 'pong';
 });
-Route::get('/debug/parser', [\App\Http\Controllers\DebugController::class , 'checkParser']);
-Route::get('/debug/update-dev', [\App\Http\Controllers\DebugController::class , 'updateDev']);
 Route::get('/health', function () {
     return response()->json(['status' => 'ok', 'ok' => true]);
 })->name('health');
 
-Route::post('/login', [AuthController::class , 'login']);
+Route::post('/login', [AuthController::class , 'login'])->middleware('throttle:login');
 
 // Agent routes (used by internal runner daemon/agent)
 Route::prefix('agent')->middleware('agent.secret')->group(function () {
