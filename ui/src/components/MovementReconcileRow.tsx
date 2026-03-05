@@ -52,8 +52,19 @@ export function MovementReconcileRow({ movement, onReconciled, onUnreconciled }:
 
     const previewConfidence = movement._confidence_preview ?? (suggestions[0]?.confidence ?? (suggestions.length === 0 ? 'black' : undefined));
 
+    const borderColor = isReconciled
+        ? 'border-l-emerald-400'
+        : previewConfidence === 'green'  ? 'border-l-emerald-400'
+        : previewConfidence === 'yellow' ? 'border-l-yellow-400'
+        : previewConfidence === 'red'    ? 'border-l-red-400'
+        : 'border-l-transparent';
+
+    const shortDesc = movement.description.length > 65
+        ? movement.description.slice(0, 65).trimEnd() + '…'
+        : movement.description;
+
     return (
-        <div className={`border-b border-gray-50 last:border-0 transition-colors ${isReconciled ? 'bg-emerald-50/20' : ''}`}>
+        <div className={`border-b border-gray-50 last:border-0 border-l-4 transition-colors ${borderColor} ${isReconciled ? 'bg-emerald-50/20' : ''}`}>
             {/* Main row */}
             <div
                 className={`grid grid-cols-[130px_1fr_140px_140px_140px_200px] gap-2 items-center px-8 py-4 ${!isReconciled ? 'cursor-pointer hover:bg-gray-50/80' : ''}`}
@@ -63,8 +74,8 @@ export function MovementReconcileRow({ movement, onReconciled, onUnreconciled }:
                 <span className="text-xs font-black text-gray-400 uppercase">{movement.date}</span>
 
                 {/* Description */}
-                <div>
-                    <p className="text-xs font-bold text-gray-900 uppercase leading-tight truncate">{movement.description}</p>
+                <div title={movement.description}>
+                    <p className="text-xs font-bold text-gray-900 uppercase leading-tight">{shortDesc}</p>
                     {movement.reference && (
                         <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">{movement.reference}</span>
                     )}

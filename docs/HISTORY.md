@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-03-05 — Fix parser Banamex: duplicación cargo/abono
+**Commits:** `ba2ab1b` (última sesión)
+
+- Lógica de asignación cambiada a midpoints entre columnas (cada píxel pertenece a exactamente una columna)
+- Fix cargo==abono artifact PDF de sucursales
+- Fix saldo final: parser exige decimales, controller calcula desde movimientos
+- Fix Route [login] → Handler.php siempre retorna 401 JSON
+- Fix autodeploy.sh permisos de ejecución en servidor
+- Confirmado funcionando en producción por usuario
+
+---
+
 ## 2026-03-05 — Fix módulo bancario Banamex (sesión completa)
 **Commits:** `8665c7f` → `9bb120c` → `cd6aa35`
 
