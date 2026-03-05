@@ -158,7 +158,7 @@ class BankStatementController extends Controller
                 'initial_balance' => $summary['initialBalance'] ?? 0,
                 'total_cargos' => $summary['totalCargos'] ?? 0,
                 'total_abonos' => $summary['totalAbonos'] ?? 0,
-                'final_balance' => $summary['finalBalance'] ?? 0,
+                'final_balance' => ($summary['initialBalance'] ?? 0) + ($summary['totalAbonos'] ?? 0) - ($summary['totalCargos'] ?? 0),
             ]);
 
             foreach ($request->input('movements') as $m) {

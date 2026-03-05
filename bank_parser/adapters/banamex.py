@@ -79,16 +79,18 @@ def extract_banamex(pdf_path):
                 if txt == "SALDO" and i + 1 < len(words_p1):
                     next_txt = words_p1[i+1]['text'].upper()
                     if next_txt == "AL":
-                        # Buscar el monto en la misma línea
+                        # Buscar el monto en la misma línea — solo valores con decimales (formato moneda)
                         for next_w in words_p1[i+1:i+20]:
                             if abs(next_w['top'] - w['top']) < 10:
-                                clean = next_w['text'].replace("$","").replace(",","")
-                                try:
-                                    val = float(clean)
-                                    if val > 0:
-                                        summary["final_balance"] = val
-                                        break
-                                except: pass
+                                raw = next_w['text']
+                                if '.' in raw:  # exigir punto decimal para distinguir de "28 DE FEBRERO"
+                                    clean = raw.replace("$","").replace(",","")
+                                    try:
+                                        val = float(clean)
+                                        if val > 0:
+                                            summary["final_balance"] = val
+                                            break
+                                    except: pass
                 # Fallbacks legacy: ACTUAL / FINAL
                 if "ACTUAL" in txt or "FINAL" in txt:
                     for next_w in words_p1[i+1:i+10]:
