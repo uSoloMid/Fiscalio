@@ -171,7 +171,10 @@ def extract_banamex(pdf_path):
                         match_str = f"{line_words[0]['text']} {line_words[1]['text']}"
                         date_match = re.match(r"^(\d{2})\s+([A-Z]{3})$", match_str.strip().upper())
 
-                    if date_match and "SALDO" not in text_upper:
+                    # Solo filtrar filas estructurales (SALDO ANTERIOR, SALDO AL DD MMM)
+                    # NO filtrar transacciones que en su concepto mencionen "SALDO"
+                    _is_balance_row = "SALDO ANTERIOR" in text_upper or bool(re.search(r"SALDO\s+AL\s+\d{2}", text_upper))
+                    if date_match and not _is_balance_row:
                         if current_tx:
                             transacciones.append(current_tx)
                         dia = date_match.group(1)
