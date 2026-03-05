@@ -2,6 +2,8 @@ import puppeteer from 'puppeteer';
 import fs from 'fs-extra';
 import path from 'path';
 import chalk from 'chalk';
+import axios from 'axios';
+import FormData from 'form-data';
 
 const FIEL_DIR = path.join(process.cwd(), 'fiel');
 const DOWNLOAD_DIR = path.join(process.cwd(), 'downloads');
@@ -19,6 +21,38 @@ const SAT_ERRORS = [
 
 function isSatError(text) {
     return SAT_ERRORS.some(err => text.toLowerCase().includes(err.toLowerCase()));
+}
+
+async function uploadToApi(rfc, type, filePath) {
+    try {
+        const form = new FormData();
+        form.append('rfc', rfc);
+        form.append('type', type);
+        form.append('pdf', fs.createReadStream(filePath), path.basename(filePath));
+
+        const apiUrl = process.env.API_URL || 'http://localhost:10000';
+        await axios.post(`${apiUrl}/api/agent/upload-document`, form, {
+            headers: form.getHeaders(),
+            timeout: 30000,
+        });
+        console.log(chalk.green(`[UPLOAD] ${type} subido exitosamente para ${rfc}`));
+    } catch (e) {
+        console.log(chalk.yellow(`[UPLOAD] Advertencia: no se pudo subir ${type}: ${e.message}`));
+        // Non-fatal: PDF stays on disk even if upload fails
+    }
+}
+
+async function logoutSat(browser, logoutUrl) {
+    try {
+        const page = await browser.newPage();
+        await page.goto(logoutUrl, { waitUntil: 'load', timeout: 15000 });
+        await new Promise(r => setTimeout(r, 2000));
+        await page.close();
+        console.log(chalk.gray(`[LOGOUT] Sesión cerrada en ${logoutUrl}`));
+    } catch (e) {
+        console.log(chalk.gray(`[LOGOUT] No se pudo cerrar sesión (ignorado): ${e.message}`));
+        // Non-fatal
+    }
 }
 
 async function loginWithFiel(page, loginUrl, rfc) {
@@ -162,6 +196,8 @@ async function downloadCSF(browser, rfc) {
                 if (pdfBuffer) {
                     await fs.writeFile(path.join(DOWNLOAD_DIR, rfc, 'Constancia_Situacion_Fiscal.pdf'), pdfBuffer);
                     console.log(chalk.green(`[CSF] ¡ÉXITO! PDF interceptado por red.`));
+                    await uploadToApi(rfc, 'csf', path.join(DOWNLOAD_DIR, rfc, 'Constancia_Situacion_Fiscal.pdf'));
+                    await logoutSat(browser, 'https://wwwmat.sat.gob.mx/aplicacion/salir/general');
                     if (lastPopup) await lastPopup.close();
                     browser.removeListener('targetcreated', onTarget);
                     await page.close();
@@ -185,6 +221,8 @@ async function downloadCSF(browser, rfc) {
                     if (base64) {
                         await fs.writeFile(path.join(DOWNLOAD_DIR, rfc, 'Constancia_Situacion_Fiscal.pdf'), Buffer.from(base64, 'base64'));
                         console.log(chalk.green(`[CSF] ¡ÉXITO! PDF extraído de la memoria del navegador.`));
+                        await uploadToApi(rfc, 'csf', path.join(DOWNLOAD_DIR, rfc, 'Constancia_Situacion_Fiscal.pdf'));
+                        await logoutSat(browser, 'https://wwwmat.sat.gob.mx/aplicacion/salir/general');
                         await lastPopup.close();
                         browser.removeListener('targetcreated', onTarget);
                         await page.close();
@@ -228,6 +266,8 @@ async function downloadOpinion(browser, rfc) {
                 if (pdfBuffer) {
                     await fs.writeFile(path.join(DOWNLOAD_DIR, rfc, 'Opinion_Cumplimiento_32D.pdf'), pdfBuffer);
                     console.log(chalk.green(`[32-D] ¡ÉXITO! Opinión guardada.`));
+                    await uploadToApi(rfc, 'opinion_32d', path.join(DOWNLOAD_DIR, rfc, 'Opinion_Cumplimiento_32D.pdf'));
+                    await logoutSat(browser, 'https://ptsc32d.clouda.sat.gob.mx/logout');
                     await page.close();
                     return;
                 }

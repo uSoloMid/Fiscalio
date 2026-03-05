@@ -499,3 +499,21 @@ export async function resolveBusinessNote(noteId: number): Promise<void> {
     const response = await authFetch(`${API_BASE_URL}/api/clients/notes/${noteId}/resolve`, { method: 'POST' });
     if (!response.ok) throw new Error('Error al resolver nota');
 }
+
+export async function listSatDocuments(rfc: string): Promise<any[]> {
+    const response = await authFetch(`${API_BASE_URL}/api/sat-documents?rfc=${encodeURIComponent(rfc)}`);
+    if (!response.ok) throw new Error('Error cargando documentos SAT');
+    return response.json();
+}
+
+export async function downloadSatDocument(id: number, filename: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/api/sat-documents/${id}/download`);
+    if (!response.ok) throw new Error('Error descargando documento');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+}
