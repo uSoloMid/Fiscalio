@@ -521,7 +521,6 @@ class InvoiceController extends Controller
     {
         $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
 
-        $expressionUsed = null;
         $result = null;
         if ($cfdi->path_xml) {
             try {
@@ -530,10 +529,7 @@ class InvoiceController extends Controller
                     $dom = new \DOMDocument();
                     @$dom->loadXML((string) $xmlContent);
                     $extractor = new \PhpCfdi\CfdiExpresiones\DiscoverExtractor();
-                    $expressionUsed = $extractor->extract($dom);
-                    $result = $service->checkStatusByExpression($expressionUsed);
-                } else {
-                    Log::warning("refreshCfdiStatus [{$uuid}]: Storage::get returned empty for path: {$cfdi->path_xml}");
+                    $result = $service->checkStatusByExpression($extractor->extract($dom));
                 }
             } catch (\Exception $e) {
                 Log::warning("refreshCfdiStatus [{$uuid}]: XML expression failed: " . $e->getMessage());
@@ -543,11 +539,10 @@ class InvoiceController extends Controller
         if ($result === null) {
             $tt = rtrim(number_format(floatval($cfdi->total), 6, '.', ''), '0');
             if (str_ends_with($tt, '.')) $tt .= '0';
-            $expressionUsed = sprintf("?re=%s&rr=%s&tt=%s&id=%s", $cfdi->rfc_emisor, $cfdi->rfc_receptor, $tt, $uuid);
-            $result = $service->checkStatusByExpression($expressionUsed);
+            $result = $service->checkStatusByExpression(
+                sprintf("?re=%s&rr=%s&tt=%s&id=%s", $cfdi->rfc_emisor, $cfdi->rfc_receptor, $tt, $uuid)
+            );
         }
-
-        Log::info("refreshCfdiStatus [{$uuid}] expression={$expressionUsed} estado={$result['estado']} codigo={$result['codigo_estatus']}");
 
         if ($result['estado'] === 'Vigente' || $result['estado'] === 'Cancelado') {
             $cfdi->update([
