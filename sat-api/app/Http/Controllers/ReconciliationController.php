@@ -90,8 +90,12 @@ class ReconciliationController extends Controller
             'reconciled_at' => now(),
         ]);
 
-        // Learn from this manual/confirmed reconciliation
-        $this->learnPattern($movement, $cfdi);
+        // Learn from this manual/confirmed reconciliation (non-critical — don't fail if table missing)
+        try {
+            $this->learnPattern($movement, $cfdi);
+        } catch (\Throwable $e) {
+            // Pattern learning is best-effort; ignore errors so reconcile still succeeds
+        }
 
         return response()->json([
             'success'  => true,

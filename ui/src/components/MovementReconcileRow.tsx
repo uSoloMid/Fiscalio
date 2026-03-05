@@ -29,6 +29,7 @@ export function MovementReconcileRow({ movement, onReconciled, onUnreconciled }:
             onReconciled({ ...res.movement, suggestions: [] });
         } catch (e) {
             console.error(e);
+            alert('Error al conciliar. Revisa la consola del servidor.');
         } finally {
             setLoadingId(null);
             setIsExpanded(false);
