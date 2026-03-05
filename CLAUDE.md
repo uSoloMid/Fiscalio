@@ -1,211 +1,168 @@
-# Fiscalio — Contexto Global para Agentes IA
+# Fiscalio — Contexto para Claude Code
 
-> **Este archivo es el contrato entre el proyecto y todos los agentes IA (Claude, Gemini/Antigravity, etc.).**
-> Leerlo completo antes de tocar cualquier cosa. No hacer suposiciones que contradigan lo escrito aquí.
+## Propósito del proyecto
+Sistema de gestión fiscal mexicano. Descarga, clasifica y audita CFDIs del SAT.
+Multi-cliente con controles provisionales, conciliación bancaria y scraper SAT.
 
----
+## Arquitectura
+- **Frontend:** React 19 + TypeScript + Vite + Tailwind → desplegado en Vercel
+- **Backend:** Laravel 10 + PHP 8.3 → Docker en Mini PC Linux (Ubuntu)
+- **Base de datos:** SQLite única compartida (`/c/Fiscalio/Base_datos/database.sqlite`)
+- **Scraper SAT:** Node.js + Puppeteer (`/c/Fiscalio/agent/`)
+- **Parser bancario:** Python + pdfplumber (`/c/Fiscalio/bank_parser/`)
+- **Acceso al servidor:** `ssh fiscalio-server` (alias en ~/.ssh/config, vía Tailscale)
 
-## 🗺️ Arquitectura del Sistema
+## Containers en el MiniPC
 
-```
-[Usuario] → [Vercel Frontend] → [Cloudflare Tunnel] → [MiniPC Docker] → [MariaDB]
-                                  api.fiscalio.cloud         sat-api-app
-                                  api-dev.fiscalio.cloud     sat-api-app-dev
-```
+Un solo container activo:
 
-| Componente | Tecnología | Ubicación |
-|---|---|---|
-| Frontend | React 19 + TypeScript + Vite + Tailwind | Vercel (branch `main` → prod, `dev` → preview) |
-| Backend API | Laravel 10 + PHP 8.3 | MiniPC Docker, imagen `fiscalio-sat-api` |
-| Base de datos | MariaDB 10.6 (container `fiscalio-db`) | MiniPC local |
-| SAT Runner | PHP Artisan command (scraper background) | MiniPC Docker |
-| Bank Parser | Python 3 + pdfplumber | MiniPC, montado en `/var/www/bank_parser` |
-| Túnel | Cloudflare Tunnel (`fiscalio-tunnel`) | MiniPC |
+| Container | Puerto | URL externa |
+|-----------|--------|-------------|
+| `sat-api-app` | 10000 | `api.fiscalio.cloud` |
 
----
+Tanto el frontend de `main` (prod) como el de `dev` (preview Vercel) apuntan al **mismo backend y la misma base de datos**.
 
-## 🐳 Containers en el MiniPC
-
-| Container | Puerto Host | BD | Rama Git | URL externa |
-|---|---|---|---|---|
-| `sat-api-app` | 10000 | `fiscalio_prod` | `main` | `api.fiscalio.cloud` |
-| `sat-api-app-dev` | 10001 | `fiscalio_dev` | `dev` | `api-dev.fiscalio.cloud` |
-| `fiscalio-db` | 3306 | ambas BDs | — | solo interno |
-| `fiscalio-tunnel` | — | — | — | Cloudflare |
-| `fiscalio-runner` | — | prod | `main` | — |
-| `fiscalio-runner-dev` | — | dev | `dev` | — |
-
-**Acceso SSH al MiniPC:** `fiscalio@100.123.107.90` (Tailscale)
-
----
-
-## 🚦 Flujo de Trabajo Git
+## Flujo de trabajo Git
 
 ```
-feature/fix → dev (prueba en preview Vercel + api-dev) → merge a main (producción)
+feature/fix → dev → prueba en Vercel preview → merge a main (producción)
 ```
 
-- **Nunca commitear directo a `main`**
-- Todo nuevo trabajo va a `dev`
-- Solo hacer merge a `main` cuando esté probado en dev
-- Al inicio de cada sesión: `git pull origin dev`
+- **Nunca commitear directo a `main`** — todo va a `dev` primero
+- Solo hacer merge a `main` cuando esté probado en `dev`
+- Al inicio de sesión: `git checkout dev && git pull origin dev`
 
----
-
-## 🔗 URLs del Proyecto
+## URLs del proyecto
 
 | Entorno | Frontend | API |
-|---|---|---|
-| **Producción** | `https://fiscalio.cloud` (o Vercel main) | `https://api.fiscalio.cloud` |
-| **Desarrollo** | Vercel preview del branch `dev` | `https://api-dev.fiscalio.cloud` |
+|---------|----------|-----|
+| Producción | `https://fiscalio.cloud` | `https://api.fiscalio.cloud` |
+| Dev preview | Vercel preview (branch `dev`) | `https://api.fiscalio.cloud` (misma) |
 
----
+## Directorios clave
+| Ruta | Descripción |
+|------|-------------|
+| `sat-api/` | Laravel API backend |
+| `ui/` | React frontend |
+| `agent/` | Scraper Puppeteer SAT |
+| `bank_parser/` | Parser PDF estados de cuenta |
+| `Base_datos/` | Almacenamiento SQLite |
+| `docs/` | Documentación |
 
-## 🚫 REGLAS CRÍTICAS — NO TOCAR SIN ENTENDER
+## Archivos backend importantes
+- `sat-api/routes/api.php` — 40+ endpoints API
+- `sat-api/app/Http/Controllers/InvoiceController.php` — gestión CFDIs (37KB)
+- `sat-api/app/Http/Controllers/ProvisionalControlController.php` — resúmenes fiscales (41KB)
+- `sat-api/app/Console/Commands/SatRunnerCommand.php` — daemon background (con optimistic lock)
+- `sat-api/app/Services/SatDescargaMasivaService.php` — descarga masiva SAT
+- `sat-api/app/Console/Commands/AnalyzeCoverageCommand.php` — diagnóstico FIEL/cobertura
+- `sat-api/app/Models/BusinessNote.php` — notas diagnóstico por RFC
 
-### 1. `API_BASE_URL` debe estar vacío (`''`)
-**Archivo:** `ui/src/api/config.ts`
-```typescript
-export const API_BASE_URL = '';  // NO cambiar a URL directa
-```
-Razón: el frontend usa el proxy de Vercel (`vercel.json`) para evitar errores CORS.
-Cambiar esto a una URL directa rompe la autenticación en producción.
+## Archivos frontend importantes
+- `ui/src/pages/DashboardPage.tsx` — dashboard principal (desktop + mobile responsive)
+- `ui/src/pages/InvoicesPage.tsx` — listado/filtrado CFDIs
+- `ui/src/pages/ProvisionalControlPage.tsx` — resúmenes fiscales + Diagnóstico SAT
+- `ui/src/pages/ProvisionalExplorers.tsx` — drill-down PPD/REP
+- `ui/src/pages/SatRequestsHistoryPage.tsx` — historial solicitudes SAT
+- `ui/src/components/RecentRequests.tsx` — solicitudes recientes (prop `compact` para móvil)
+- `ui/src/App.tsx` — Router + estado (localStorage para RFC activo)
+- `ui/src/models.ts` — interfaces TypeScript
+- `ui/src/services.ts` — llamadas API centralizadas
 
-### 2. `config:cache` y `route:cache` están desactivados en entrypoint
-**Archivo:** `sat-api/docker/entrypoint.sh`
-Razón: prod y dev comparten el volumen `/var/www`. Cachear config sobreescribe
-la configuración del otro container con la DB equivocada.
+## Tech Stack
+| Capa | Tecnología | Versión |
+|------|-----------|---------|
+| Frontend | React + TypeScript | 19.2 / 5.9 |
+| Build | Vite | 7.2.4 |
+| CSS | Tailwind | 4.1.18 |
+| Backend | Laravel | 8.62+ |
+| PHP | PHP-FPM | 8.3 |
+| DB | SQLite | 3 |
+| Auth | Sanctum | 2.11+ |
+| SAT libs | phpcfdi/* | 0.5+ |
+| Scraper | Puppeteer | 21.5.0 |
+| Parser | pdfplumber | — |
 
-### 3. Unzip del SAT Runner usa comando de sistema, no ZipArchive PHP
-**Archivo:** `sat-api/app/Console/Commands/SatRunnerCommand.php`
-Razón: ZipArchive de PHP fallaba en el servidor. El comando `unzip` de Linux funciona.
+## Funcionalidades principales
+1. **Descarga CFDI** — SAT Descarga Masiva vía phpcfdi, en lotes de 6 meses
+2. **Controles Provisionales** — PUE, PPD, REP con desglose de cubetas
+3. **Auditoría de deducibilidad** — auto-flag gastos no deducibles, overrides manuales
+4. **Conciliación bancaria** — parsing PDF BBVA, Banamex, Inbursa, Banbajío
+5. **Scraper SAT** — Constancia Fiscal (CSF), Opinión de Cumplimiento (32-D)
+6. **Multi-cliente** — Workspaces, Grupos, Etiquetas, gestión FIEL
 
-### 4. Smart Extraction en XmlProcessorService
-**Archivo:** `sat-api/app/Services/XmlProcessorService.php`
-Razón: busca carpetas ya descomprimidas antes de intentar descomprimir de nuevo.
+## Esquema de base de datos (SQLite)
+Tablas principales: `cfdis`, `sat_requests`, `businesses`, `accounts`,
+`bank_statements`, `bank_movements`, `users`, `workspaces`, `groups`, `tags`, `business_notes`
 
-### 5. `vercel.json` del branch `dev` apunta a `api-dev.fiscalio.cloud`
-**Archivo:** `ui/vercel.json` (branch dev)
-El branch `main` apunta a `api.fiscalio.cloud` (prod).
+## Despliegue
+- **Branch `main`** → producción Vercel (frontend) + Mini PC Docker (backend)
+- **Branch `dev`** → preview Vercel auto-deploy (misma API/DB que prod)
+- Docker Compose: monta `Base_datos/` y `bank_parser/` en el contenedor sat-api
+- Auto-deploy: script cron en el servidor detecta commits nuevos en `origin/main` → `git reset --hard` + `nginx -s reload` + `artisan optimize:clear` + `artisan migrate --force`
 
----
+## Notas técnicas importantes
+- **SAT sync threshold:** 6 horas (re-sync automático)
+- **Optimistic lock en SatRunnerCommand:** usa `UPDATE WHERE attempts = X` para evitar solicitudes duplicadas concurrentes
+- **"Solicitudes de por vida":** es colisión de duplicados, NO límite real del SAT → runner hace retry en 5 min
+- **`business_notes`:** tabla para diagnósticos persistentes por RFC (credencial inválida, cert caducado, etc.)
+- **Memory limit:** infinite para extracción de XMLs grandes
+- **Backups DB:** automatizados, retiene 3 más recientes + backup permanente
+- **`config:cache` y `route:cache` desactivados** en entrypoint.sh — solo hay 1 container pero el volumen es compartido con git y no queremos archivos de cache commiteados
 
-## 📁 Estructura de Archivos Clave
+## Reglas para agentes IA
+1. **Todo trabajo nuevo va a `dev`** — nunca commitear directo a `main`
+2. **No tocar `SatRunnerCommand.php` ni `XmlProcessorService.php`** sin permiso explícito
+3. **Nunca correr `migrate:rollback`** en producción
+4. **`API_BASE_URL` en `ui/src/api/config.ts` debe ser `''`** — el frontend usa proxy Vercel para evitar CORS
+5. **Al inicio de sesión:** `git checkout dev && git pull origin dev`
 
-```
-Fiscalio/
-├── CLAUDE.md                          ← Este archivo (leer primero)
-├── sat-api/                           ← Backend Laravel
-│   ├── app/
-│   │   ├── Http/Controllers/          ← Controladores API
-│   │   ├── Models/                    ← Eloquent models
-│   │   ├── Console/Commands/
-│   │   │   └── SatRunnerCommand.php   ← 🚫 NO TOCAR (scraper SAT)
-│   │   └── Services/
-│   │       └── XmlProcessorService.php ← 🚫 NO TOCAR (extractor XML)
-│   ├── database/migrations/           ← Migraciones (nunca rollback en prod)
-│   ├── docker/
-│   │   └── entrypoint.sh             ← 🚫 config:cache desactivado intencionalmente
-│   └── nginx/
-│       └── render.conf               ← Nginx config (client_max_body_size 50M)
-├── ui/                                ← Frontend React
-│   ├── src/
-│   │   ├── api/config.ts             ← 🚫 API_BASE_URL debe ser ''
-│   │   ├── services.ts               ← Todas las llamadas API
-│   │   ├── models.ts                 ← Tipos TypeScript
-│   │   └── pages/                    ← Páginas principales
-│   └── vercel.json                   ← Proxy config (diferente en main vs dev)
-└── bank_parser/
-    └── adapters/
-        ├── bbva.py                    ← Parser BBVA (funcional)
-        └── banamex.py                 ← Parser Banamex (mejorado Mar 2026)
-```
-
----
-
-## 🗄️ Base de Datos — Tablas Principales
-
-| Tabla | Descripción |
-|---|---|
-| `users` | Usuarios del sistema |
-| `businesses` | Clientes/empresas (RFC, nombre, etc.) |
-| `cfdis` | Facturas descargadas del SAT |
-| `cfdi_payments` | Complementos de pago (tipo P) |
-| `accounts` | Catálogo de cuentas contables |
-| `bank_statements` | Estados de cuenta bancarios importados |
-| `bank_movements` | Movimientos individuales (cargo/abono) |
-| `sat_requests` | Cola de solicitudes al SAT |
-| `groups` | Grupos de clientes |
-| `tags` | Etiquetas para facturas |
-
-**Migraciones:** nunca correr `migrate:rollback` en producción.
-
----
-
-## 🔧 Cómo Hacer Deploy
-
-### Deploy normal (código):
+## Comandos útiles
 ```bash
-git add .
-git commit -m "descripción"
-git push origin dev   # nunca main directo
-```
-Vercel detecta el push y redespliega automáticamente el frontend.
-El backend (MiniPC) toma el código del volumen montado — cambios en archivos PHP/Python
-son inmediatos sin reiniciar el container.
+# Análisis de cobertura SAT (desde el servidor)
+docker exec sat-api-app php artisan sat:analyze-coverage --clear
 
-### Si hay que reiniciar un container:
-```bash
-# PRECAUCIÓN: reiniciar sat-api-app-dev puede afectar sat-api-app si comparten volumen
-docker restart sat-api-app-dev
-# Después del restart, verificar que config:clear corrió bien
-docker exec sat-api-app php artisan config:clear
-docker exec sat-api-app-dev php artisan config:clear
-```
+# SSH al servidor
+ssh fiscalio-server
 
-### Migraciones en dev:
-```bash
-docker exec sat-api-app-dev php artisan migrate --force
+# Dev frontend
+cd ui && npm run dev
+
+# Build frontend
+cd ui && npm run build
+
+# Migraciones
+docker exec sat-api-app php artisan migrate --force
+
+# Reiniciar container (avisar al usuario antes)
+docker restart sat-api-app
 ```
 
 ---
 
-## 📦 Módulos del Sistema (Estado Actual)
+## Workflow de Planning — OBLIGATORIO para toda IA
 
-| Módulo | Estado | Notas |
-|---|---|---|
-| Login / Auth | ✅ Producción | Sanctum token en localStorage |
-| Dashboard | ✅ Producción | |
-| CFDIs / Facturas | ✅ Producción | Descarga del SAT automática |
-| SAT Runner | ✅ Producción | Background worker |
-| Estados de Cuenta | ✅ Producción | Parser BBVA + Banamex |
-| Conciliación Bancaria | ✅ Dev (Mar 2026) | Semi-automático, niveles de confianza |
-| Grupos y Tags | ✅ Producción | |
-| Opiniones SAT | 🔲 Pendiente | |
-| Pólizas CONTPAQi | 🔲 Futuro | Via n8n (Paso 13) |
+Antes de empezar cualquier tarea no trivial, y durante su ejecución:
 
----
+### 1. Al iniciar una tarea
+Abre `docs/PLANNING.md` y escribe la entrada con:
+- Nombre de la tarea
+- Lista de pasos a seguir (pueden ser estimados al inicio)
+- Archivos que se van a modificar
 
-## 🤝 Reglas para Agentes IA
+### 2. Durante la tarea
+Actualiza `docs/PLANNING.md` conforme avanzas:
+- Marca pasos completados con `[x]`
+- Añade notas de decisiones técnicas relevantes
+- Ajusta pasos si el plan cambia
 
-1. **Leer este archivo antes de cualquier cambio**
-2. **Nunca modificar main directamente** — solo dev
-3. **Antes de reiniciar containers**, avisar al usuario y verificar que no hay cache compartido
-4. **Nunca cambiar `API_BASE_URL`** sin leer la sección de reglas críticas
-5. **Antes de agregar migraciones**, verificar que no rompen prod (columnas nullable, defaults seguros)
-6. **No tocar `SatRunnerCommand.php` ni `XmlProcessorService.php`** sin permiso explícito
-7. **Al inicio de sesión**: hacer `git pull origin dev` para tener el contexto actualizado
-8. **Documentar los NO TOCAR** en este archivo cuando se descubran nuevos
+### 3. Al terminar y commitear
+1. Mueve la entrada de `docs/PLANNING.md` a `docs/HISTORY.md`
+   - Añade el hash del commit donde quedó estable
+   - Deja solo el resumen final (sin los checkboxes internos)
+2. Deja `docs/PLANNING.md` con `_No hay tarea activa actualmente._`
 
----
-
-## 🖥️ Estaciones de Trabajo
-
-| Lugar | Equipo | Acceso |
-|---|---|---|
-| Casa | PC principal | VS Code + Claude Code |
-| Oficina | PC oficina | VS Code + Claude Code |
-| Laptop | Portátil | VS Code + Claude Code / Antigravity |
-
-**Sincronización:** `git pull origin dev` al inicio de cada sesión en cualquier equipo.
-El MiniPC siempre está encendido y accesible via Tailscale (`100.123.107.90`).
+### Reglas
+- **Una sola tarea activa** en PLANNING.md a la vez
+- **No borrar** entradas de HISTORY.md — es el registro permanente
+- El historial anterior está en `docs/HISTORY.md`
