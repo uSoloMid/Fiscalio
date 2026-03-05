@@ -25,12 +25,12 @@ Tanto el frontend de `main` (prod) como el de `dev` (preview Vercel) apuntan al 
 ## Flujo de trabajo Git
 
 ```
-feature/fix → dev → prueba en Vercel preview → merge a main (producción)
+feature/fix → commit a dev → merge inmediato a main (producción)
 ```
 
-- **Nunca commitear directo a `main`** — todo va a `dev` primero
-- Solo hacer merge a `main` cuando esté probado en `dev`
-- Al inicio de sesión: `git checkout dev && git pull origin dev`
+- **Todo trabajo va a `dev` primero** — nunca commitear directo a `main`
+- El merge a `main` se hace inmediatamente después de commitear a `dev` (no hay staging prolongado)
+- Al inicio de sesión: `git checkout dev && git pull origin dev && git pull origin main`
 
 ## URLs del proyecto
 
@@ -115,7 +115,7 @@ Tablas principales: `cfdis`, `sat_requests`, `businesses`, `accounts`,
 2. **No tocar `SatRunnerCommand.php` ni `XmlProcessorService.php`** sin permiso explícito
 3. **Nunca correr `migrate:rollback`** en producción
 4. **`API_BASE_URL` en `ui/src/api/config.ts` debe ser `''`** — el frontend usa proxy Vercel para evitar CORS
-5. **Al inicio de sesión:** `git checkout dev && git pull origin dev`
+5. **Al inicio de sesión:** `git checkout dev && git pull origin dev && git pull origin main`
 
 ## Comandos útiles
 ```bash

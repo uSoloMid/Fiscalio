@@ -174,6 +174,10 @@ class ReconciliationController extends Controller
 
                 // Use the first payment's date as the REP date
                 $payDate  = Carbon::parse($propios->first()->fecha_pago);
+
+                // Only suggest REPs whose payment date falls in the same month as the movement
+                if ($payDate->format('Y-m') !== $movDate->format('Y-m')) continue;
+
                 $daysDiff = (int) abs($movDate->diffInDays($payDate));
 
                 $confidence = $this->computeConfidence(
