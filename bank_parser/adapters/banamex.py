@@ -1,6 +1,11 @@
 import pdfplumber
 import re
 import sys
+import unicodedata
+
+def _strip_accents(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+                   if unicodedata.category(c) != 'Mn')
 
 def extract_banamex(pdf_path):
     transacciones = []
@@ -141,12 +146,14 @@ def extract_banamex(pdf_path):
                         break
 
                     # Fila de encabezado de columnas → detectar posiciones dinámicamente
-                    if "RETIROS" in text_upper and "DEPOSITOS" in text_upper and "SALDO" in text_upper:
+                    text_norm = _strip_accents(text_upper)
+                    if "RETIROS" in text_norm and "DEPOSITOS" in text_norm and "SALDO" in text_norm:
                         col_centers = {}
                         for w in line_words:
-                            wt = w['text'].upper()
+                            wt = _strip_accents(w['text'].upper())
                             if wt in ("RETIROS", "DEPOSITOS", "SALDO"):
                                 col_centers[wt] = (w['x0'] + w['x1']) / 2
+                        sys.stderr.write(f"[BANAMEX-DEBUG] col_centers: {col_centers}\n")
                         continue
 
                     # Saltar fila "SALDO ANTERIOR" de la tabla
@@ -225,6 +232,7 @@ def extract_banamex(pdf_path):
                                 elif len(cols_sorted) == 1:
                                     assigned = cols_sorted[0][0]
 
+                                sys.stderr.write(f"[BANAMEX-DEBUG] monto={val} x_center={w_center:.1f} assigned={assigned} cols={cols_sorted}\n")
                                 if assigned == "RETIROS":
                                     current_tx["cargo"] = val
                                 elif assigned == "DEPOSITOS":
@@ -234,6 +242,7 @@ def extract_banamex(pdf_path):
                             else:
                                 # Fallback con rangos hardcodeados
                                 x1 = w['x1']
+                                sys.stderr.write(f"[BANAMEX-DEBUG] FALLBACK monto={val} x1={x1} (no col_centers)\n")
                                 if 240 <= x1 <= 345:
                                     current_tx["cargo"] = val
                                 elif 346 <= x1 <= 435:
