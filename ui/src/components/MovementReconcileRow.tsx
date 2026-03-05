@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ConfidenceBadge } from './ConfidenceBadge';
-import { reconcileMovement, unreconcileMovement } from '../services';
+import { reconcileMovement, unreconcileMovement, exportCfdiPdf } from '../services';
 import type { BankMovement, ReconciliationSuggestion } from '../models';
 
 interface Props {
@@ -105,9 +105,18 @@ export function MovementReconcileRow({ movement, onReconciled, onUnreconciled }:
                 <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
                     {isReconciled ? (
                         <>
-                            <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 truncate max-w-[120px]">
+                            <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100 truncate max-w-[100px]">
                                 {movement.cfdi?.uuid?.slice(0, 8)}…
                             </span>
+                            {movement.cfdi?.uuid && (
+                                <button
+                                    onClick={() => exportCfdiPdf(movement.cfdi!.uuid!)}
+                                    title="Ver PDF"
+                                    className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                >
+                                    <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+                                </button>
+                            )}
                             <button
                                 onClick={handleUnlink}
                                 disabled={loadingUnlink}
@@ -178,6 +187,13 @@ export function MovementReconcileRow({ movement, onReconciled, onUnreconciled }:
                                     )}
                                 </div>
                                 <span className="text-sm font-black text-gray-900 whitespace-nowrap">{fmt(s.total)}</span>
+                                <button
+                                    onClick={() => exportCfdiPdf(s.uuid)}
+                                    title="Ver PDF"
+                                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0"
+                                >
+                                    <span className="material-symbols-outlined text-base">picture_as_pdf</span>
+                                </button>
                                 <button
                                     onClick={() => handleConfirm(s)}
                                     disabled={loadingId !== null}
