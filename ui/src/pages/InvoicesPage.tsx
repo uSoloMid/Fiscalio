@@ -34,7 +34,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [activeRequests, setActiveRequests] = useState<any[]>([]);
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
-    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation'>('invoices');
+    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation' | 'sat-docs'>('invoices');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [contabilidadOpen, setContabilidadOpen] = useState(true);
 
