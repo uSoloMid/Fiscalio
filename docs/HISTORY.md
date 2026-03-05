@@ -5,6 +5,17 @@
 
 ---
 
+## Optimización rendimiento Ronda 2 — Control Provisional (Mar 2026)
+
+**Commit estable:** `1584d4e`
+
+- Cache throttle en `performAudit`: solo corre 1 vez por RFC+período cada 30 min (antes tardaba 18s en cada GET)
+- Reemplaza `COALESCE(fecha_fiscal, fecha)` por `whereBetween` index-friendly en performAudit para usar índice existente
+- Migración: índice `(rfc_receptor, deduction_type, fecha_fiscal)` para acelerar lookup de CFDIs sin etiquetar
+- Root cause: 116K CFDIs con `deduction_type IS NULL`, audit corría full scan en cada request
+
+---
+
 ## Optimización rendimiento — Control Provisional (Mar 2026)
 
 **Commit estable:** `b05478f`

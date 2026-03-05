@@ -7,14 +7,4 @@
 
 ---
 
-## Tarea: Optimización rendimiento Ronda 2 — Control Provisional
-
-**Archivos modificados:**
-- `sat-api/app/Http/Controllers/ProvisionalControlController.php`
-- `sat-api/database/migrations/2026_03_05_000004_add_deduction_type_index_to_cfdis.php`
-
-**Pasos:**
-- [x] Cache throttle en `performAudit`: solo corre 1 vez por RFC+período cada 30 min
-- [x] Reemplazar `COALESCE(fecha_fiscal, fecha)` por condición `whereBetween` index-friendly en `performAudit`
-- [x] Migración: índice compuesto `(rfc_receptor, deduction_type, fecha_fiscal)` para acelerar lookup de NULL audit
-- [ ] Deploy + `migrate --force`
+_No hay tarea activa actualmente._
