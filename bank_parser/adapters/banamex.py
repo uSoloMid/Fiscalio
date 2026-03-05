@@ -182,6 +182,10 @@ def extract_banamex(pdf_path):
                     _is_balance_row = "SALDO ANTERIOR" in text_upper or bool(re.search(r"SALDO\s+AL\s+\d{2}", text_upper))
                     if date_match and not _is_balance_row:
                         if current_tx:
+                            # Si cargo == abono > 0: el PDF duplicó el monto en ambas columnas
+                            # (artifact de Banamex en depósitos de sucursal). Solo abono es correcto.
+                            if current_tx["cargo"] > 0 and current_tx["cargo"] == current_tx["abono"]:
+                                current_tx["cargo"] = 0.0
                             transacciones.append(current_tx)
                         dia = date_match.group(1)
                         mes = meses_str.get(date_match.group(2), "01")
@@ -262,6 +266,8 @@ def extract_banamex(pdf_path):
                         current_tx["referencia"] = ref_match.group(1)
 
             if current_tx:
+                if current_tx["cargo"] > 0 and current_tx["cargo"] == current_tx["abono"]:
+                    current_tx["cargo"] = 0.0
                 transacciones.append(current_tx)
 
         return {"movements": transacciones, "summary": summary}
