@@ -18,6 +18,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'agent_secret' => env('AGENT_SECRET', ''),
+
     /*
      |--------------------------------------------------------------------------
      | Application Environment

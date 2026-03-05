@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import puppeteer from 'puppeteer';
 import fs from 'fs-extra';
 import path from 'path';
@@ -31,8 +32,9 @@ async function uploadToApi(rfc, type, filePath) {
         form.append('pdf', fs.createReadStream(filePath), path.basename(filePath));
 
         const apiUrl = process.env.API_URL || 'http://localhost:10000';
+        const agentSecret = process.env.AGENT_SECRET || '';
         await axios.post(`${apiUrl}/api/agent/upload-document`, form, {
-            headers: form.getHeaders(),
+            headers: { ...form.getHeaders(), 'X-Agent-Secret': agentSecret },
             timeout: 30000,
         });
         console.log(chalk.green(`[UPLOAD] ${type} subido exitosamente para ${rfc}`));
@@ -286,11 +288,16 @@ async function main() {
     if (!rfc) { console.log('RFC requerido'); process.exit(1); }
 
     await fs.ensureDir(path.join(DOWNLOAD_DIR, rfc));
-    const browser = await puppeteer.launch({
-        headless: false,
+    const isHeadless = process.env.DISPLAY === undefined || process.env.DISPLAY === '';
+    const launchOptions = {
+        headless: isHeadless ? 'new' : false,
         protocolTimeout: 300000,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+    };
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
         await downloadCSF(browser, rfc);

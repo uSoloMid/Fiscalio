@@ -10,7 +10,10 @@ import { exec } from 'child_process';
 
 // Configuración
 const API_URL = process.env.API_URL || 'http://localhost:3333';
+const AGENT_SECRET = process.env.AGENT_SECRET || '';
 const FIEL_DIR = path.join(process.cwd(), 'fiel');
+
+const agentHeaders = { 'X-Agent-Secret': AGENT_SECRET };
 
 console.log(chalk.green.bold('\n🚀 Fiscalio Agent - Sistema de Descarga Masiva'));
 console.log(chalk.gray('================================================'));
@@ -24,13 +27,13 @@ async function syncCredentials() {
 
         // 0. Pulsar el Runner (Marcapasos) para procesar solicitudes en la nube
         try {
-            await axios.get(`${API_URL}/api/agent/runner-tick`);
+            await axios.get(`${API_URL}/api/agent/runner-tick`, { headers: agentHeaders });
         } catch (tickErr) {
             // Ignoramos si falla el pulso, puede ser timeout de Render
         }
 
         // Petición a la API de clientes
-        const response = await axios.get(`${API_URL}/api/agent/sync-clients`);
+        const response = await axios.get(`${API_URL}/api/agent/sync-clients`, { headers: agentHeaders });
         const clients = response.data;
 
         if (!clients || clients.length === 0) {

@@ -18,6 +18,13 @@
 - Sidebar "Docs SAT" en sección Herramientas de InvoicesPage
 - `agent/` está en `.gitignore` — cambios al scraper se despliegan manualmente al MiniPC
 
+**Fixes al scraper (desplegados manualmente Mar 5 2026):**
+- Instalado `chromium` (Debian) en container `fiscalio-agent`
+- `.env` del container: `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium`
+- `scraper_sat.js`: `import 'dotenv/config'`, auto-detect headless, soporte `executablePath`, `--disable-dev-shm-usage`
+- CSF descarga y sube al API correctamente verificado
+- 32-D: login funciona pero PDF no aparece (pendiente investigar botón en portal)
+
 ---
 
 ## 2026-03-05 — Optimización módulo de facturas (velocidad y filtros)

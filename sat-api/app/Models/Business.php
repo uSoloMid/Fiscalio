@@ -33,7 +33,7 @@ class Business extends Model
     ];
 
     /** @var array<string> */
-    protected $hidden = ['passphrase', 'ciec'];
+    protected $hidden = ['passphrase', 'ciec', 'certificate', 'private_key'];
 
     /** @var array<string, string> */
     protected $casts = [

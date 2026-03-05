@@ -75,6 +75,7 @@ class Kernel extends HttpKernel
      * @var array<string,string>
      */
     protected $routeMiddleware = [
+        'agent.secret' => \App\Http\Middleware\AgentSecret::class,
         'auth' => Authenticate::class,
         'auth.basic' => AuthenticateWithBasicAuth::class,
         'cache.headers' => SetCacheHeaders::class,

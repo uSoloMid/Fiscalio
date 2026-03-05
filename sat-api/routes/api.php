@@ -23,7 +23,7 @@ Route::get('/health', function () {
 Route::post('/login', [AuthController::class , 'login']);
 
 // Agent routes (used by internal runner daemon/agent)
-Route::prefix('agent')->group(function () {
+Route::prefix('agent')->middleware('agent.secret')->group(function () {
     Route::get('sync-clients', [AgentController::class , 'syncClients']);
     Route::post('confirm-credentials', [AgentController::class , 'confirmCredentials']);
     Route::get('runner-tick', [AgentController::class , 'runnerTick']);
