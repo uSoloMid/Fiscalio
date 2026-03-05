@@ -5,6 +5,17 @@
 
 ---
 
+## Optimización rendimiento — Control Provisional (Mar 2026)
+
+**Commit estable:** `b05478f`
+
+- `performAudit`: cambia condición a `whereNull('deduction_type')` — ya no re-procesa CFDIs auditados en cada GET, solo nuevos sin etiqueta
+- `getPendSum`: batch query a `cfdi_payments` con `whereIn+groupBy` en lugar de N+1 (una query por CFDI PPD)
+- `getBucketDetails` bucket PENDIENTE: mismo fix batch
+- `getPpdExplorer` y `getRepExplorer`: batch queries para pagos relacionados
+
+---
+
 ## Seguridad — Hardening general (Mar 2026)
 
 **Commit estable:** `46bd66f`

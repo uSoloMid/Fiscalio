@@ -7,15 +7,4 @@
 
 ---
 
-## Tarea: Optimización de rendimiento — Módulo Control Provisional
-
-**Archivos modificados:**
-- `sat-api/app/Http/Controllers/ProvisionalControlController.php`
-
-**Pasos:**
-- [x] Fix `performAudit`: cambiar condición a `whereNull('deduction_type')` para no re-auditar CFDIs ya procesados en cada carga
-- [x] Fix N+1 en `getPendSum`: batch query a `cfdi_payments` con `whereIn` + `groupBy`
-- [x] Fix N+1 en `getBucketDetails` bucket PENDIENTE: mismo patrón batch
-- [x] Fix N+1 en `getPpdExplorer`: batch query con `groupBy`
-- [x] Fix N+1 en `getRepExplorer`: batch query con `groupBy`
-- [ ] Deploy a producción
+_No hay tarea activa actualmente._
