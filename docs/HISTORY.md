@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-03-05 — Backfill cfdi_payments para REPs existentes
+**Commit:** `ae541a1`
+
+- **Causa raíz:** REPs importadas antes de que existiera la tabla `cfdi_payments` → `pagosPropios` siempre vacío → matching de REPs no funciona
+- Nuevo comando `cfdi:backfill-payments`: lee XML desde `path_xml` (fallback a `xml_data` JSON), popula `cfdi_payments` con `firstOrCreate`
+- Soporta `--rfc=` para backfill selectivo y `--dry-run` para inspección previa
+- Ejecutado en producción: 1,732 REPs de César García → 2,755 pagos insertados (0 errores)
+- Comando disponible para otras empresas: `php artisan cfdi:backfill-payments` (sin `--rfc` = todas las empresas)
+
+---
+
 ## 2026-03-05 — Conciliación inteligente: REPs, SPEI, aprendizaje
 **Commits:** `5806b45`, `31e7f14`
 
