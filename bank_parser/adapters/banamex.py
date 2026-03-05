@@ -205,14 +205,22 @@ def extract_banamex(pdf_path):
                             w_center = (w['x0'] + w['x1']) / 2
 
                             if col_centers:
-                                # Asignar al centro de columna más cercano
-                                closest = min(col_centers.keys(), key=lambda k: abs(col_centers[k] - w_center))
-                                if closest == "RETIROS":
-                                    current_tx["cargo"] = val
-                                elif closest == "DEPOSITOS":
-                                    current_tx["abono"] = val
-                                elif closest == "SALDO":
-                                    current_tx["saldo"] = val
+                                # Asignar al más cercano DENTRO de ±MARGIN px
+                                # Si ninguna columna está dentro del margen, se ignora el valor
+                                # (evita que el SALDO se confunda con RETIROS/DEPOSITOS)
+                                MARGIN = 30
+                                candidates = {k: abs(col_centers[k] - w_center)
+                                              for k in col_centers
+                                              if abs(col_centers[k] - w_center) <= MARGIN}
+                                if candidates:
+                                    closest = min(candidates, key=candidates.get)
+                                    if closest == "RETIROS":
+                                        current_tx["cargo"] = val
+                                    elif closest == "DEPOSITOS":
+                                        current_tx["abono"] = val
+                                    elif closest == "SALDO":
+                                        current_tx["saldo"] = val
+                                # Si está fuera del margen de todas las columnas: se ignora
                             else:
                                 # Fallback con rangos hardcodeados
                                 x1 = w['x1']

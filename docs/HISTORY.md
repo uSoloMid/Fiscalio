@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-03-05 — Fix módulo bancario Banamex (sesión completa)
+**Commits:** `8665c7f` → `9bb120c` → `cd6aa35`
+
+- **413 en upload PDF:** `nginx/render.conf` → `client_max_body_size 50M`; PHP upload limits en Dockerfile
+- **RouteNotFoundException:** `Authenticate.php` siempre retorna `null` (uploads multipart no son JSON)
+- **Nginx sin rebuild:** symlink `Dockerfile` → `render.conf` del volumen; puerto 10000 hardcodeado
+- **Permisos storage:** autodeploy restaura `www-data` después de `git reset --hard`
+- **Autodeploy en git:** `scripts/autodeploy.sh` trackeado en repo; cron apunta al repo
+- **Parser Banamex cargos incorrectos:** filtro `SALDO not in text` reemplazado por detección exacta de filas estructurales (`SALDO ANTERIOR` / `SALDO AL DD`)
+- **Skills actualizados:** `/deploy`, `/migrate`, `/restart` reflejan arquitectura real
+- **CLAUDE.md limpiado:** eliminadas todas las referencias a 2 DBs, sat-api-app-dev, MariaDB
+
+---
+
 ## 2026-03-04 07:55 — Dashboard móvil responsive
 **Commit:** `2735a68`
 
