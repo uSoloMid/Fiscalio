@@ -556,16 +556,16 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                                     </td>
                                                     <td className="px-6 py-6 text-right">
                                                         <span className={`text-sm font-black ${m.cargo > 0 ? 'text-[#FF4D4D]' : 'text-gray-200'}`}>
-                                                            {m.cargo > 0 ? `-${(m.cargo || 0).toFixed(2)}` : '0.00'}
+                                                            {m.cargo > 0 ? `-${formatCurrency(m.cargo)}` : '$0.00'}
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-6 text-right">
                                                         <span className={`text-sm font-black ${m.abono > 0 ? 'text-[#10B981]' : 'text-gray-200'}`}>
-                                                            {m.abono > 0 ? `+${(m.abono || 0).toFixed(2)}` : '0.00'}
+                                                            {m.abono > 0 ? `+${formatCurrency(m.abono)}` : '$0.00'}
                                                         </span>
                                                     </td>
                                                     <td className="px-10 py-6 text-right">
-                                                        <span className="text-sm font-black text-gray-900">{(m.saldo || 0).toFixed(2)}</span>
+                                                        <span className="text-sm font-black text-gray-900">{formatCurrency(m.saldo || 0)}</span>
                                                     </td>
                                                 </tr>
                                             ))}
