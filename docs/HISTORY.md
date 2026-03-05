@@ -71,7 +71,7 @@
 ---
 
 ## 2026-03-04 — Fix error 413 en módulo bancario (upload PDF)
-**Commit:** pendiente
+**Commit:** `8665c7f`
 
 - `nginx/render.conf`: agregado `client_max_body_size 20M` (defecto nginx era 1MB)
 - `docker/entrypoint.sh`: configura `upload_max_filesize=20M` y `post_max_size=20M` al arrancar

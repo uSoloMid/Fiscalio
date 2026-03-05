@@ -87,7 +87,7 @@ Tablas principales: `cfdis`, `sat_requests`, `businesses`, `accounts`,
 docker exec sat-api php artisan sat:analyze-coverage --clear
 
 # SSH al servidor
-ssh user@100.123.107.90   # vía Tailscale
+ssh fiscalio-server   # alias configurado en ~/.ssh/config
 
 # Dev frontend
 cd ui && npm run dev
@@ -98,23 +98,29 @@ cd ui && npm run build
 
 ---
 
-## Historial de trabajo reciente
-> Actualizar esta sección al terminar cada sesión. Quitar entradas antiguas conforme se agregan nuevas.
+## Workflow de Planning — OBLIGATORIO para toda IA
 
-### Mar 2026 — Dashboard móvil responsive
-- `DashboardPage.tsx`: sidebar `hidden md:flex`, header móvil con badge SAT activo/inactivo
-- Contenido desktop envuelto en `hidden md:flex`; contenido móvil `md:hidden` con 3 pestañas:
-  - **Inicio**: tarjeta Riesgos Críticos colapsable, solicitudes compactas, clientes con error
-  - **Clientes**: búsqueda + lista agrupada con indicadores de sync
-  - **Ajustes**: botones para Grupos, Etiquetas, Cerrar sesión
-- FAB verde fijo (abre drawer nuevo cliente) + barra navegación inferior 4 tabs
-- `RecentRequests.tsx`: prop `compact` → tarjetas simples en móvil
+Antes de empezar cualquier tarea no trivial, y durante su ejecución:
 
-### Mar 2026 — Diagnóstico de cobertura SAT + correcciones runner
-- Nueva tabla `business_notes` + modelo `BusinessNote` + comando `sat:analyze-coverage`
-- Solo reporta problemas reales: `wrong_passphrase`, `certificate_invalid`, `duplicate_request`, `server_error`
-- Panel "Diagnóstico de Cobertura SAT" en `ProvisionalControlPage.tsx` (solo si hay notas)
-- `SatRunnerCommand.php`: optimistic lock (`WHERE attempts = X`) para evitar duplicados concurrentes
-- "Solicitudes de por vida" → reclasificado como colisión de duplicados, runner hace retry en 5 min
-- Endpoints: `GET /clients/{rfc}/notes`, `POST /clients/notes/{noteId}/resolve`
-- Estado final: 40/42 clientes limpios; MABY y MURT pendientes (wrong passphrase), GASS (cert inválido)
+### 1. Al iniciar una tarea
+Abre `docs/PLANNING.md` y escribe la entrada con:
+- Nombre de la tarea
+- Lista de pasos a seguir (pueden ser estimados al inicio)
+- Archivos que se van a modificar
+
+### 2. Durante la tarea
+Actualiza `docs/PLANNING.md` conforme avanzas:
+- Marca pasos completados con `[x]`
+- Añade notas de decisiones técnicas relevantes
+- Ajusta pasos si el plan cambia
+
+### 3. Al terminar y commitear
+1. Mueve la entrada de `docs/PLANNING.md` a `docs/HISTORY.md`
+   - Añade el hash del commit donde quedó estable
+   - Deja solo el resumen final (sin los checkboxes internos)
+2. Deja `docs/PLANNING.md` con `_No hay tarea activa actualmente._`
+
+### Reglas
+- **Una sola tarea activa** en PLANNING.md a la vez
+- **No borrar** entradas de HISTORY.md — es el registro permanente
+- El historial anterior está en `docs/HISTORY.md`
