@@ -12,49 +12,65 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class InvoiceController extends Controller
 {
-    public function indexCfdis(Request $request)
+    /**
+     * Builds the base CFDI query from common filter parameters.
+     * Using date ranges instead of whereYear/whereMonth so indexes can be used.
+     */
+    private function buildCfdiQuery(Request $request)
     {
         $query = Cfdi::query();
+
         if ($request->has('rfc_user')) {
             $rfcUser = trim(strtoupper($request->input('rfc_user')));
             $tipo = $request->input('tipo');
             if ($tipo === 'emitidas') {
-                $query->where('rfc_emisor', 'like', "$rfcUser%");
-            }
-            elseif ($tipo === 'recibidas') {
-                $query->where('rfc_receptor', 'like', "$rfcUser%");
-            }
-            else {
+                $query->where('rfc_emisor', $rfcUser);
+            } elseif ($tipo === 'recibidas') {
+                $query->where('rfc_receptor', $rfcUser);
+            } else {
                 $query->where(function ($q) use ($rfcUser) {
-                    $q->where('rfc_emisor', 'like', "$rfcUser%")->orWhere('rfc_receptor', 'like', "$rfcUser%");
+                    $q->where('rfc_emisor', $rfcUser)->orWhere('rfc_receptor', $rfcUser);
                 });
             }
         }
-        if ($request->filled('year')) {
-            $query->whereYear('fecha_fiscal', $request->input('year'));
+
+        // Use date range instead of YEAR()/MONTH() function calls so the fecha_fiscal index is used
+        $year = $request->filled('year') ? (int) $request->input('year') : null;
+        $month = $request->filled('month') ? (int) $request->input('month') : null;
+        if ($year && $month) {
+            $start = sprintf('%04d-%02d-01', $year, $month);
+            $end   = date('Y-m-d', strtotime($start . ' +1 month'));
+            $query->where('fecha_fiscal', '>=', $start)->where('fecha_fiscal', '<', $end);
+        } elseif ($year) {
+            $query->where('fecha_fiscal', '>=', "$year-01-01")->where('fecha_fiscal', '<', ($year + 1) . '-01-01');
         }
-        if ($request->filled('month')) {
-            $query->whereMonth('fecha_fiscal', $request->input('month'));
-        }
+
         if ($request->filled('q')) {
             $q = $request->input('q');
             $query->where(function ($sub) use ($q) {
-                $sub->where('uuid', 'like', "%$q%")->orWhere('rfc_emisor', 'like', "%$q%")->orWhere('rfc_receptor', 'like', "%$q%");
+                $sub->where('uuid', 'like', "%$q%")
+                    ->orWhere('rfc_emisor', 'like', "%$q%")
+                    ->orWhere('rfc_receptor', 'like', "%$q%");
             });
         }
+
         if ($request->filled('cfdi_tipo')) {
             $query->where('tipo', $request->input('cfdi_tipo'));
         }
+
         if ($request->filled('status')) {
-            if ($request->input('status') === 'cancelados') {
-                $query->where('es_cancelado', 1);
-            }
-            else {
-                $query->where('es_cancelado', 0);
-            }
+            $query->where('es_cancelado', $request->input('status') === 'cancelados' ? 1 : 0);
         }
+
+        return $query;
+    }
+
+    public function indexCfdis(Request $request)
+    {
+        $query = $this->buildCfdiQuery($request);
         $query->orderBy('fecha_fiscal', 'desc');
-        return response()->json($query->paginate($request->input('pageSize', 20)));
+        $pageSize = min((int) $request->input('pageSize', 50), 200);
+        return response()->json($query->paginate($pageSize));
     }
 
     public function getPeriods(Request $request)
@@ -638,45 +654,7 @@ class InvoiceController extends Controller
 
     public function exportExcel(Request $request)
     {
-        $query = Cfdi::query();
-        if ($request->has('rfc_user')) {
-            $rfcUser = trim(strtoupper($request->input('rfc_user')));
-            $tipo = $request->input('tipo');
-            if ($tipo === 'emitidas') {
-                $query->where('rfc_emisor', 'like', "$rfcUser%");
-            }
-            elseif ($tipo === 'recibidas') {
-                $query->where('rfc_receptor', 'like', "$rfcUser%");
-            }
-            else {
-                $query->where(function ($q) use ($rfcUser) {
-                    $q->where('rfc_emisor', 'like', "$rfcUser%")->orWhere('rfc_receptor', 'like', "$rfcUser%");
-                });
-            }
-        }
-        if ($request->filled('year')) {
-            $query->whereYear('fecha_fiscal', $request->input('year'));
-        }
-        if ($request->filled('month')) {
-            $query->whereMonth('fecha_fiscal', $request->input('month'));
-        }
-        if ($request->filled('q')) {
-            $q = $request->input('q');
-            $query->where(function ($sub) use ($q) {
-                $sub->where('uuid', 'like', "%$q%")->orWhere('rfc_emisor', 'like', "%$q%")->orWhere('rfc_receptor', 'like', "%$q%");
-            });
-        }
-        if ($request->filled('cfdi_tipo')) {
-            $query->where('tipo', $request->input('cfdi_tipo'));
-        }
-        if ($request->filled('status')) {
-            if ($request->input('status') === 'cancelados') {
-                $query->where('es_cancelado', 1);
-            }
-            else {
-                $query->where('es_cancelado', 0);
-            }
-        }
+        $query = $this->buildCfdiQuery($request);
         $query->orderBy('fecha_fiscal', 'desc');
 
         $rows = $query->get();
@@ -712,43 +690,7 @@ class InvoiceController extends Controller
     public function downloadBulkPdf(Request $request)
     {
         try {
-            $query = Cfdi::query();
-            if ($request->has('rfc_user')) {
-                $rfcUser = trim(strtoupper($request->input('rfc_user')));
-                $tipo = $request->input('tipo');
-                if ($tipo === 'emitidas') {
-                    $query->where('rfc_emisor', 'like', "$rfcUser%");
-                }
-                elseif ($tipo === 'recibidas') {
-                    $query->where('rfc_receptor', 'like', "$rfcUser%");
-                }
-                else {
-                    $query->where(function ($q) use ($rfcUser) {
-                        $q->where('rfc_emisor', 'like', "$rfcUser%")->orWhere('rfc_receptor', 'like', "$rfcUser%");
-                    });
-                }
-            }
-            if ($request->filled('year')) {
-                $query->whereYear('fecha_fiscal', $request->input('year'));
-            }
-            if ($request->filled('month')) {
-                $query->whereMonth('fecha_fiscal', $request->input('month'));
-            }
-            if ($request->filled('q')) {
-                $q = $request->input('q');
-                $query->where(function ($sub) use ($q) {
-                    $sub->where('uuid', 'like', "%$q%")->orWhere('rfc_emisor', 'like', "%$q%")->orWhere('rfc_receptor', 'like', "%$q%");
-                });
-            }
-            if ($request->filled('status')) {
-                if ($request->input('status') === 'cancelados') {
-                    $query->where('es_cancelado', 1);
-                }
-                else {
-                    $query->where('es_cancelado', 0);
-                }
-            }
-
+            $query = $this->buildCfdiQuery($request);
             $cfdis = $query->get();
 
             if ($cfdis->isEmpty()) {

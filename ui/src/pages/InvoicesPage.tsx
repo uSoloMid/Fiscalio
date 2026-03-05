@@ -13,6 +13,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [filterType, setFilterType] = useState<'all' | 'emitidas' | 'recibidas' | 'canceladas'>('all');
     const [cfdiTipo, setCfdiTipo] = useState<'I' | 'E' | 'N' | 'P' | 'T' | ''>('I');
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
 
     const [activeClientName, setActiveClientName] = useState('');
@@ -179,16 +180,22 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         loadPeriods();
     }, [activeRfc]);
 
+    // Debounce search input — wait 400ms after last keystroke before triggering a fetch
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 400);
+        return () => clearTimeout(timer);
+    }, [search]);
+
     // Reset page when filters change
     useEffect(() => {
         setPage(1);
-    }, [year, month, filterType, search, cfdiTipo, showCancelled]);
+    }, [year, month, filterType, debouncedSearch, cfdiTipo, showCancelled]);
 
     useEffect(() => {
         if (!activeRfc) return;
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeRfc, year, month, filterType, search, cfdiTipo, showCancelled, page]);
+    }, [activeRfc, year, month, filterType, debouncedSearch, cfdiTipo, showCancelled, page]);
 
     useEffect(() => {
         if (selectedUuid) {
@@ -209,7 +216,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                 tipo: (filterType === 'all' || filterType === 'canceladas') ? undefined : filterType,
                 cfdi_tipo: filterType === 'canceladas' ? undefined : cfdiTipo,
                 status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
-                q: search,
+                q: debouncedSearch,
                 page: page,
                 pageSize: 50
             });
