@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listSatRequests, verifySatRequest, getRunnerStatus, bulkDeleteSatRequests, listClients, createManualRequest } from '../services';
+import { listSatRequests, verifySatRequest, getRunnerStatus, bulkDeleteSatRequests, listClients, createManualRequest, fillSatGaps, getSatCoverage } from '../services';
 
 interface SatRequest {
     id: string;
@@ -25,6 +25,19 @@ interface Client {
 
 const EMPTY_MANUAL = { rfc: '', start_date: '', end_date: '', type: 'all' };
 
+function CoveragePct({ pct, gaps }: { pct: number; gaps: number }) {
+    const color = pct >= 99 ? 'text-green-600 bg-green-50' : pct >= 80 ? 'text-yellow-600 bg-yellow-50' : 'text-red-600 bg-red-50';
+    return (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${color}`}>
+            {pct >= 99
+                ? <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                : <span className="material-symbols-outlined text-[14px]">warning</span>}
+            {pct.toFixed(0)}%
+            {gaps > 0 && <span className="opacity-70">({gaps} {gaps === 1 ? 'hueco' : 'huecos'})</span>}
+        </span>
+    );
+}
+
 export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [requests, setRequests] = useState<SatRequest[]>([]);
     const [loading, setLoading] = useState(true);
@@ -41,6 +54,12 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
     const [clients, setClients] = useState<Client[]>([]);
     const [manualRequest, setManualRequest] = useState(EMPTY_MANUAL);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Coverage State
+    const [showCoverage, setShowCoverage] = useState(false);
+    const [coverage, setCoverage] = useState<any[]>([]);
+    const [loadingCoverage, setLoadingCoverage] = useState(false);
+    const [fillingGaps, setFillingGaps] = useState(false);
 
     const fetchRequests = async () => {
         try {
@@ -112,6 +131,38 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
             alert(error.message || 'Error al limpiar historial');
         } finally {
             setIsDeleting(false);
+        }
+    };
+
+    const handleToggleCoverage = async () => {
+        if (showCoverage) { setShowCoverage(false); return; }
+        setShowCoverage(true);
+        setLoadingCoverage(true);
+        try {
+            const data = await getSatCoverage();
+            setCoverage(data);
+        } catch (e) {
+            console.error('Error loading coverage', e);
+        } finally {
+            setLoadingCoverage(false);
+        }
+    };
+
+    const handleFillGaps = async (rfc?: string) => {
+        setFillingGaps(true);
+        try {
+            const res = await fillSatGaps(rfc);
+            const msg = rfc
+                ? `Se crearon ${res.requests_created} solicitudes para ${rfc}`
+                : `Se crearon ${res.requests_created} solicitudes para ${res.clients_processed} clientes`;
+            alert(msg);
+            // Refrescar cobertura y solicitudes
+            const [data] = await Promise.all([getSatCoverage(), fetchRequests()]);
+            setCoverage(data);
+        } catch (e: any) {
+            alert(e.message || 'Error al rellenar huecos');
+        } finally {
+            setFillingGaps(false);
         }
     };
 
@@ -204,6 +255,13 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                             className="hidden md:block px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300 w-44"
                         />
                         <button
+                            onClick={handleToggleCoverage}
+                            className={`flex items-center gap-2 px-4 py-2 border text-xs font-black rounded-xl transition-all uppercase tracking-wider ${showCoverage ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border-indigo-200'}`}
+                        >
+                            <span className="material-symbols-outlined text-sm">verified</span>
+                            Cobertura
+                        </button>
+                        <button
                             onClick={handleOpenModal}
                             className="flex items-center gap-2 px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-200 text-xs font-black rounded-xl transition-all uppercase tracking-wider"
                         >
@@ -226,7 +284,84 @@ export function SatRequestsHistoryPage({ onBack }: { onBack: () => void }) {
                 </div>
             </header>
 
-            <main className="flex-1 p-4 md:p-10 overflow-y-auto">
+            <main className="flex-1 p-4 md:p-10 overflow-y-auto space-y-6">
+
+                {/* Panel de Cobertura */}
+                {showCoverage && (
+                    <div className="bg-white rounded-[32px] border border-indigo-100 shadow-sm overflow-hidden">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                            <div>
+                                <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Cobertura por Cliente</h2>
+                                <p className="text-xs text-gray-400 mt-0.5">Últimos 5 años. Un hueco = periodo sin solicitud completada.</p>
+                            </div>
+                            <button
+                                onClick={() => handleFillGaps()}
+                                disabled={fillingGaps}
+                                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl transition-all disabled:opacity-50 uppercase tracking-wider"
+                            >
+                                {fillingGaps
+                                    ? <span className="material-symbols-outlined text-sm animate-spin">refresh</span>
+                                    : <span className="material-symbols-outlined text-sm">auto_fix_high</span>}
+                                Rellenar todos los huecos
+                            </button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            {loadingCoverage ? (
+                                <div className="flex justify-center items-center py-12 text-gray-400 text-sm">
+                                    <span className="material-symbols-outlined animate-spin mr-2">refresh</span>
+                                    Calculando cobertura...
+                                </div>
+                            ) : (
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-50/50 text-gray-400 font-black uppercase text-[10px] tracking-widest border-b border-gray-100">
+                                        <tr>
+                                            <th className="px-6 py-4">Cliente</th>
+                                            <th className="px-6 py-4 text-center">Emitidas</th>
+                                            <th className="px-6 py-4 text-center">Recibidas</th>
+                                            <th className="px-6 py-4 text-center">Último cubierto</th>
+                                            <th className="px-6 py-4"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {coverage.map((c) => {
+                                            const hasGaps = (c.coverage?.issued?.gaps_count ?? 0) > 0 || (c.coverage?.received?.gaps_count ?? 0) > 0;
+                                            const lastCovered = c.coverage?.issued?.last_covered || c.coverage?.received?.last_covered;
+                                            return (
+                                                <tr key={c.rfc} className="hover:bg-gray-50/50">
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-semibold text-gray-900 text-sm">{c.legal_name}</div>
+                                                        <div className="text-xs font-mono text-gray-400">{c.rfc}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <CoveragePct pct={c.coverage?.issued?.covered_pct ?? 0} gaps={c.coverage?.issued?.gaps_count ?? 0} />
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <CoveragePct pct={c.coverage?.received?.covered_pct ?? 0} gaps={c.coverage?.received?.gaps_count ?? 0} />
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center text-xs text-gray-500">
+                                                        {lastCovered ? new Date(lastCovered).toLocaleDateString('es-MX') : '—'}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        {hasGaps && (
+                                                            <button
+                                                                onClick={() => handleFillGaps(c.rfc)}
+                                                                disabled={fillingGaps}
+                                                                className="text-xs text-indigo-600 hover:text-indigo-800 font-bold disabled:opacity-50"
+                                                            >
+                                                                Rellenar
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">

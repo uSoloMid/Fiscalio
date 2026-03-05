@@ -230,6 +230,23 @@ export async function getRunnerStatus(): Promise<{ is_alive: boolean; last_activ
     return response.json();
 }
 
+export async function fillSatGaps(rfc?: string): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/sat/fill-gaps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc }),
+    });
+    if (!response.ok) throw new Error('Error al rellenar huecos');
+    return response.json();
+}
+
+export async function getSatCoverage(rfc?: string): Promise<any[]> {
+    const q = rfc ? `?rfc=${encodeURIComponent(rfc)}` : '';
+    const response = await authFetch(`${API_BASE_URL}/api/sat/coverage${q}`);
+    if (!response.ok) throw new Error('Error al obtener cobertura');
+    return response.json();
+}
+
 export async function listSatRequests(params: any = {}): Promise<any> {
     const query = new URLSearchParams();
     if (params.rfc) query.append('rfc', params.rfc);

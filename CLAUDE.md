@@ -7,10 +7,37 @@ Multi-cliente con controles provisionales, conciliación bancaria y scraper SAT.
 ## Arquitectura
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind → desplegado en Vercel
 - **Backend:** Laravel 10 + PHP 8.3 → Docker en Mini PC Linux (Ubuntu)
-- **Base de datos:** SQLite (`/c/Fiscalio/Base_datos/database.sqlite`)
+- **Base de datos:** SQLite única compartida (`/c/Fiscalio/Base_datos/database.sqlite`)
 - **Scraper SAT:** Node.js + Puppeteer (`/c/Fiscalio/agent/`)
 - **Parser bancario:** Python + pdfplumber (`/c/Fiscalio/bank_parser/`)
-- **Acceso al servidor:** Tailscale IP `100.123.107.90`, SSH
+- **Acceso al servidor:** `ssh fiscalio-server` (alias en ~/.ssh/config, vía Tailscale)
+
+## Containers en el MiniPC
+
+Un solo container activo:
+
+| Container | Puerto | URL externa |
+|-----------|--------|-------------|
+| `sat-api-app` | 10000 | `api.fiscalio.cloud` |
+
+Tanto el frontend de `main` (prod) como el de `dev` (preview Vercel) apuntan al **mismo backend y la misma base de datos**.
+
+## Flujo de trabajo Git
+
+```
+feature/fix → dev → prueba en Vercel preview → merge a main (producción)
+```
+
+- **Nunca commitear directo a `main`** — todo va a `dev` primero
+- Solo hacer merge a `main` cuando esté probado en `dev`
+- Al inicio de sesión: `git checkout dev && git pull origin dev`
+
+## URLs del proyecto
+
+| Entorno | Frontend | API |
+|---------|----------|-----|
+| Producción | `https://fiscalio.cloud` | `https://api.fiscalio.cloud` |
+| Dev preview | Vercel preview (branch `dev`) | `https://api.fiscalio.cloud` (misma) |
 
 ## Directorios clave
 | Ruta | Descripción |
@@ -70,8 +97,9 @@ Tablas principales: `cfdis`, `sat_requests`, `businesses`, `accounts`,
 
 ## Despliegue
 - **Branch `main`** → producción Vercel (frontend) + Mini PC Docker (backend)
-- **Branch `dev`** → preview Vercel auto-deploy
+- **Branch `dev`** → preview Vercel auto-deploy (misma API/DB que prod)
 - Docker Compose: monta `Base_datos/` y `bank_parser/` en el contenedor sat-api
+- Auto-deploy: script cron en el servidor detecta commits nuevos en `origin/main` → `git reset --hard` + `nginx -s reload` + `artisan optimize:clear` + `artisan migrate --force`
 
 ## Notas técnicas importantes
 - **SAT sync threshold:** 6 horas (re-sync automático)
@@ -80,20 +108,34 @@ Tablas principales: `cfdis`, `sat_requests`, `businesses`, `accounts`,
 - **`business_notes`:** tabla para diagnósticos persistentes por RFC (credencial inválida, cert caducado, etc.)
 - **Memory limit:** infinite para extracción de XMLs grandes
 - **Backups DB:** automatizados, retiene 3 más recientes + backup permanente
+- **`config:cache` y `route:cache` desactivados** en entrypoint.sh — solo hay 1 container pero el volumen es compartido con git y no queremos archivos de cache commiteados
+
+## Reglas para agentes IA
+1. **Todo trabajo nuevo va a `dev`** — nunca commitear directo a `main`
+2. **No tocar `SatRunnerCommand.php` ni `XmlProcessorService.php`** sin permiso explícito
+3. **Nunca correr `migrate:rollback`** en producción
+4. **`API_BASE_URL` en `ui/src/api/config.ts` debe ser `''`** — el frontend usa proxy Vercel para evitar CORS
+5. **Al inicio de sesión:** `git checkout dev && git pull origin dev`
 
 ## Comandos útiles
 ```bash
 # Análisis de cobertura SAT (desde el servidor)
-docker exec sat-api php artisan sat:analyze-coverage --clear
+docker exec sat-api-app php artisan sat:analyze-coverage --clear
 
 # SSH al servidor
-ssh fiscalio-server   # alias configurado en ~/.ssh/config
+ssh fiscalio-server
 
 # Dev frontend
 cd ui && npm run dev
 
 # Build frontend
 cd ui && npm run build
+
+# Migraciones
+docker exec sat-api-app php artisan migrate --force
+
+# Reiniciar container (avisar al usuario antes)
+docker restart sat-api-app
 ```
 
 ---

@@ -1,7 +1,8 @@
 
 // Configuración base para la API
-// En producción (Vercel), VITE_API_URL debe apuntar al backend de Render (ej. https://fiscalio-re4i.onrender.com)
-// En desarrollo local, se deja vacío para usar el proxy de Vite configurado en vite.config.ts
-
-// Forzamos el uso del Proxy (vercel.json) para que todo ocurra en el mismo dominio
+// API_BASE_URL vacío fuerza el uso del Proxy de Vercel (vercel.json) para evitar CORS
+// NO cambiar a una URL directa — rompería autenticación y CORS
 export const API_BASE_URL = '';
+
+// URL directa al backend (solo para uploads grandes que superan el límite de 4.5MB de Vercel)
+export const DIRECT_API_URL = 'https://api.fiscalio.cloud';

@@ -56,9 +56,10 @@ php artisan route:clear || true
 php artisan cache:clear || true
 php artisan view:clear || true
 
-echo "==> Re-generando caché de producción..."
-php artisan config:cache || true
-php artisan route:cache || true
+# NOTA: config:cache y route:cache están desactivados intencionalmente.
+# Prod y dev comparten el mismo volumen /var/www — cachear aquí sobreescribiría
+# la config del otro container con settings incorrectos (ej. DB equivocada).
+# Cada container lee sus env vars directamente sin cache.
 
 # 4.1. Migraciones (Auto-Schema)
 if [ "$RUN_MIGRATIONS" = "true" ]; then
@@ -121,17 +122,9 @@ fi
 echo "==> PHP-FPM listen (después):"
 grep -R "^\s*listen\s*=" -n /usr/local/etc/php-fpm.d 2>/dev/null || true
 
-# 6. ✅ CONFIGURACIÓN DE NGINX ($PORT)
-REAL_PORT=${PORT:-10000}
-echo "==> Usando PORT=$REAL_PORT"
-
-# Forzar el config correcto desde el código hacia la carpeta de Nginx
-cp -f /var/www/nginx/render.conf /etc/nginx/conf.d/default.conf 2>/dev/null || true
-
-# Reemplazar ${PORT} en TODOS los conf de nginx para no fallar
-sed -i "s/\${PORT}/$REAL_PORT/g" /etc/nginx/conf.d/*.conf
-
-# Debug: Verificar config
+# 6. ✅ NGINX — el symlink /etc/nginx/conf.d/default.conf → /var/www/nginx/render.conf
+# ya está creado en el Dockerfile. El puerto está hardcodeado en render.conf (10000).
+# Los deploys de git solo necesitan "nginx -s reload" para aplicar cambios.
 echo "==> Nginx conf test:"
 nginx -t || true
 

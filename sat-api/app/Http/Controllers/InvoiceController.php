@@ -570,6 +570,57 @@ class InvoiceController extends Controller
 
         return response()->json($query->paginate($request->input('pageSize', 20)));
     }
+    public function fillGaps(Request $request, \App\Services\BusinessSyncService $service)
+    {
+        $rfc = $request->input('rfc');
+
+        if ($rfc) {
+            $business = \App\Models\Business::where('rfc', strtoupper($rfc))->firstOrFail();
+            return response()->json($service->fillGaps($business));
+        }
+
+        // Sin RFC: ejecutar para todos los clientes
+        $businesses = \App\Models\Business::all();
+        $totalRequests = 0;
+        $allGaps = [];
+
+        foreach ($businesses as $business) {
+            $result = $service->fillGaps($business);
+            $totalRequests += $result['requests_created'];
+            foreach ($result['gaps_found'] as $gap) {
+                $allGaps[] = array_merge($gap, ['rfc' => $business->rfc, 'legal_name' => $business->legal_name]);
+            }
+        }
+
+        return response()->json([
+            'status'            => 'success',
+            'clients_processed' => $businesses->count(),
+            'requests_created'  => $totalRequests,
+            'gaps_found'        => $allGaps,
+        ]);
+    }
+
+    public function getSatCoverage(Request $request, \App\Services\BusinessSyncService $service)
+    {
+        $rfc = $request->input('rfc');
+
+        $query = \App\Models\Business::orderBy('legal_name');
+        if ($rfc) {
+            $query->where('rfc', strtoupper($rfc));
+        }
+
+        $businesses = $query->get(['rfc', 'legal_name', 'last_sync_at']);
+
+        $result = $businesses->map(fn($b) => [
+            'rfc'          => $b->rfc,
+            'legal_name'   => $b->legal_name,
+            'last_sync_at' => $b->last_sync_at,
+            'coverage'     => $service->getCoverageStatus($b),
+        ]);
+
+        return response()->json($result);
+    }
+
     public function getRunnerStatus()
     {
         $lastRequest = \App\Models\SatRequest::orderBy('updated_at', 'desc')->first();

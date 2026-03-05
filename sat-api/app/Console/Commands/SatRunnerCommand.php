@@ -102,6 +102,7 @@ class SatRunnerCommand extends Command
 
             $this->xmlProcessor = new XmlProcessorService();
 
+            $oldState = $req->state;
             switch ($req->state) {
                 case 'created':
                     $this->stepCreate($req);
@@ -114,9 +115,17 @@ class SatRunnerCommand extends Command
                     break;
             }
 
-            // Reset error and retry timer if successful step
-            $req->last_error = null;
-            $req->next_retry_at = null;
+            // Reset error if successful step (unless it's already failed)
+            if ($req->state !== 'failed') {
+                $req->last_error = null;
+            }
+
+            // Only clear next_retry_at if state changed (moving to next step)
+            // If state is the same (e.g. still polling), keep the retry timer set by the step
+            if ($req->state !== $oldState) {
+                $req->next_retry_at = null;
+            }
+
             $req->save();
 
         }
@@ -265,7 +274,8 @@ class SatRunnerCommand extends Command
         // Llamamos al método de extracción e indexación
         try {
             $this->stepExtract($req, $packageIds);
-        } catch (Exception $e) {
+        }
+        catch (Exception $e) {
             $req->last_error = "Error en extracción: " . $e->getMessage();
             $req->state = 'failed';
             $req->save();

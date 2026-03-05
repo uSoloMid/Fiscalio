@@ -1,6 +1,7 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1)
+;
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -18,9 +19,9 @@ class CreateBusinessesTable extends Migration
             $table->string('rfc')->unique();
             $table->string('legal_name');
             $table->string('common_name');
-            $table->text('certificate');
-            $table->text('private_key');
-            $table->string('passphrase');
+            $table->text('certificate')->nullable();
+            $table->text('private_key')->nullable();
+            $table->string('passphrase')->nullable();
             $table->dateTime('valid_until');
 
             $table->timestamps();
