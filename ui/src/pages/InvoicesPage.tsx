@@ -5,6 +5,7 @@ import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import { BankStatementPage } from './BankStatementPage';
 import { ReconciliationPage } from './ReconciliationPage';
+import { SatDocumentsPage } from './SatDocumentsPage';
 import type { Cfdi } from '../models';
 
 export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, activeValidUntil }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string, activeValidUntil?: string }) => {
@@ -576,6 +577,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                             <span className="material-symbols-outlined text-xl">monitoring</span>
                             Control Prov.
                         </button>
+                        <button
+                            onClick={() => { setCurrentView('sat-docs'); setIsSidebarOpen(false); }}
+                            className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'sat-docs' ? 'active bg-gray-900 text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <span className="material-symbols-outlined text-xl">description</span>
+                            Docs SAT
+                        </button>
                     </div>
                 </nav>
                 <div className="p-4 border-t border-gray-100 mt-auto">
@@ -622,6 +630,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
             ) : currentView === 'reconciliation' ? (
                 <div className="flex-1 h-screen overflow-hidden">
                     <ReconciliationPage
+                        activeRfc={activeRfc}
+                        clientName={clientName || activeClientName || activeRfc}
+                        onBack={() => setCurrentView('invoices')}
+                    />
+                </div>
+            ) : currentView === 'sat-docs' ? (
+                <div className="flex-1 h-screen overflow-hidden">
+                    <SatDocumentsPage
                         activeRfc={activeRfc}
                         clientName={clientName || activeClientName || activeRfc}
                         onBack={() => setCurrentView('invoices')}
