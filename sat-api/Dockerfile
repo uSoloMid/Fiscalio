@@ -38,9 +38,10 @@ RUN chown -R www-data:www-data /var/www
 # Instalación de dependencias (Optimizado para producción)
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
-# ✅ Preparación de Nginx: Limpiamos todo rastro de configs por defecto
-RUN rm -rf /etc/nginx/sites-enabled/* && rm -rf /etc/nginx/conf.d/*
-COPY ./nginx/render.conf /etc/nginx/conf.d/default.conf
+# ✅ Preparación de Nginx: symlink al volumen para que git-deploy aplique sin rebuild
+# nginx lee /etc/nginx/conf.d/default.conf → /var/www/nginx/render.conf (en runtime es el volumen montado)
+RUN rm -rf /etc/nginx/sites-enabled/* && rm -rf /etc/nginx/conf.d/* \
+    && ln -sf /var/www/nginx/render.conf /etc/nginx/conf.d/default.conf
 COPY ./docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY ./docker/entrypoint.sh /entrypoint.sh
 
