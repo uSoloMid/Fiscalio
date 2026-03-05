@@ -7,4 +7,13 @@
 
 ---
 
-_No hay tarea activa actualmente._
+## Fix Banamex parser: duplicación cargo/abono
+
+**Problema:** Amounts en DEPOSITOS también se asignan a RETIROS (cargo).
+**Causa raíz:** Enfoque center±MARGIN crea zonas de overlap entre columnas adyacentes.
+**Solución:** Usar midpoints entre columnas como fronteras duras (cada px pertenece a exactamente una columna).
+
+### Pasos
+- [ ] Cambiar lógica de asignación en `bank_parser/adapters/banamex.py`
+- [ ] Commit en dev
+- [ ] Merge a main cuando funcione

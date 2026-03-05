@@ -1,6 +1,11 @@
 import pdfplumber
 import re
 import sys
+import unicodedata
+
+def _strip_accents(s):
+    return ''.join(c for c in unicodedata.normalize('NFD', s)
+                   if unicodedata.category(c) != 'Mn')
 
 def extract_banamex(pdf_path):
     transacciones = []
@@ -141,12 +146,14 @@ def extract_banamex(pdf_path):
                         break
 
                     # Fila de encabezado de columnas → detectar posiciones dinámicamente
-                    if "RETIROS" in text_upper and "DEPOSITOS" in text_upper and "SALDO" in text_upper:
+                    text_norm = _strip_accents(text_upper)
+                    if "RETIROS" in text_norm and "DEPOSITOS" in text_norm and "SALDO" in text_norm:
                         col_centers = {}
                         for w in line_words:
-                            wt = w['text'].upper()
+                            wt = _strip_accents(w['text'].upper())
                             if wt in ("RETIROS", "DEPOSITOS", "SALDO"):
                                 col_centers[wt] = (w['x0'] + w['x1']) / 2
+                        sys.stderr.write(f"[BANAMEX-DEBUG] col_centers: {col_centers}\n")
                         continue
 
                     # Saltar fila "SALDO ANTERIOR" de la tabla
@@ -205,25 +212,37 @@ def extract_banamex(pdf_path):
                             w_center = (w['x0'] + w['x1']) / 2
 
                             if col_centers:
-                                # Asignar al más cercano DENTRO de ±MARGIN px
-                                # Si ninguna columna está dentro del margen, se ignora el valor
-                                # (evita que el SALDO se confunda con RETIROS/DEPOSITOS)
-                                MARGIN = 30
-                                candidates = {k: abs(col_centers[k] - w_center)
-                                              for k in col_centers
-                                              if abs(col_centers[k] - w_center) <= MARGIN}
-                                if candidates:
-                                    closest = min(candidates, key=candidates.get)
-                                    if closest == "RETIROS":
-                                        current_tx["cargo"] = val
-                                    elif closest == "DEPOSITOS":
-                                        current_tx["abono"] = val
-                                    elif closest == "SALDO":
-                                        current_tx["saldo"] = val
-                                # Si está fuera del margen de todas las columnas: se ignora
+                                # Asignar usando fronteras de punto medio entre columnas.
+                                # Cada píxel pertenece a exactamente UNA columna (sin zonas de overlap).
+                                cols_sorted = sorted(col_centers.items(), key=lambda x: x[1])
+                                # cols_sorted: [(nombre, centro), ...] ordenado por posición X
+                                assigned = None
+                                if len(cols_sorted) >= 2:
+                                    # Calcular fronteras (midpoints entre columnas adyacentes)
+                                    boundaries = []
+                                    for i in range(len(cols_sorted) - 1):
+                                        mid = (cols_sorted[i][1] + cols_sorted[i+1][1]) / 2
+                                        boundaries.append(mid)
+                                    # Determinar a qué segmento pertenece w_center
+                                    seg = 0
+                                    for b in boundaries:
+                                        if w_center >= b:
+                                            seg += 1
+                                    assigned = cols_sorted[seg][0]
+                                elif len(cols_sorted) == 1:
+                                    assigned = cols_sorted[0][0]
+
+                                sys.stderr.write(f"[BANAMEX-DEBUG] monto={val} x_center={w_center:.1f} assigned={assigned} cols={cols_sorted}\n")
+                                if assigned == "RETIROS":
+                                    current_tx["cargo"] = val
+                                elif assigned == "DEPOSITOS":
+                                    current_tx["abono"] = val
+                                elif assigned == "SALDO":
+                                    current_tx["saldo"] = val
                             else:
                                 # Fallback con rangos hardcodeados
                                 x1 = w['x1']
+                                sys.stderr.write(f"[BANAMEX-DEBUG] FALLBACK monto={val} x1={x1} (no col_centers)\n")
                                 if 240 <= x1 <= 345:
                                     current_tx["cargo"] = val
                                 elif 346 <= x1 <= 435:
