@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use App\Models\Cfdi;
@@ -29,7 +30,12 @@ class ProvisionalControlController extends Controller
             $endDate = $carbonEnd->format('Y-m-d 23:59:59');
 
             $alertas = $this->calculateAlerts($rfc, $startDate, $endDate);
-            $this->performAudit($rfc, $startDate, $endDate);
+
+            $auditKey = "audit_done_{$rfc}_{$year}_{$strMonth}";
+            if (!Cache::has($auditKey)) {
+                $this->performAudit($rfc, $startDate, $endDate);
+                Cache::put($auditKey, true, 1800); // 30 minutos
+            }
 
             $tcSql = "CASE WHEN moneda = 'MXN' OR moneda IS NULL THEN 1 ELSE COALESCE(NULLIF(tipo_cambio, 0), 1) END";
 
@@ -761,22 +767,31 @@ class ProvisionalControlController extends Controller
 
         $rfc = trim($rfc);
 
+        // Helper: condición de fecha index-friendly (evita COALESCE que impide usar índice)
+        $dateWhere = function($q) use ($startDate, $endDate) {
+            $q->where(function($q2) use ($startDate, $endDate) {
+                $q2->whereBetween('fecha_fiscal', [$startDate, $endDate]);
+            })->orWhere(function($q2) use ($startDate, $endDate) {
+                $q2->whereNull('fecha_fiscal')->whereBetween('fecha', [$startDate, $endDate]);
+            });
+        };
+
         // 1. Marcar efectivo > 2000 como no deducible (PUE)
         $res1 = Cfdi::where('rfc_receptor', $rfc)
             ->whereIn('metodo_pago', ['PUE', 'PUE '])
             ->whereIn('forma_pago', ['01', '1', '01 '])
             ->where('total', '>', 2000)
             ->where('es_cancelado', false)
-            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->whereNull('deduction_type')
+            ->where($dateWhere)
             ->update(['is_deductible' => 0, 'deduction_type' => 'auto_cash_gt_2000']);
 
         // 2. Marcar combustible en efectivo
         $res2 = Cfdi::where('rfc_receptor', $rfc)
             ->whereIn('forma_pago', ['01', '1', '01 '])
             ->where('es_cancelado', false)
-            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->whereNull('deduction_type')
+            ->where($dateWhere)
             ->where(function($q) {
                 $q->where('concepto', 'like', '%GASOLINA%')
                   ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
@@ -789,9 +804,9 @@ class ProvisionalControlController extends Controller
         // 3. Marcar deducciones personales
         $res3 = Cfdi::where('rfc_receptor', $rfc)
             ->where('es_cancelado', false)
-            ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
-            ->where('uso_cfdi', 'like', 'D%')
             ->whereNull('deduction_type')
+            ->where($dateWhere)
+            ->where('uso_cfdi', 'like', 'D%')
             ->update(['is_deductible' => 0, 'deduction_type' => 'auto_personal_deduction']);
 
         // 4. Marcar REPs pagados en efectivo (Deducción no válida para PPD relacionado)
