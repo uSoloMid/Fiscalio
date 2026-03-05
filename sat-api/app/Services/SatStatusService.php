@@ -28,14 +28,16 @@ class SatStatusService
 
     public function checkStatus(string $uuid, string $rfcEmisor, string $rfcReceptor, string $total): array
     {
-        // El SAT requiere que el total sea un string formateado con el número de decimales que tiene el CFDI
-        // pero la expresión estándar suele usar el total tal cual. 
-        // Generamos la expresión (id=UUID&re=RFC_EMISOR&rr=RFC_RECEPTOR&tt=TOTAL&fe=ULTIMOS_8_CARACTERES_SELLO)
-        // Pero la librería phpcfdi/sat-estado-cfdi prefiere la expresión completa o los parámetros.
-
-        // Usaremos la expresión básica: ?re=...&rr=...&tt=...&id=...
         $expression = sprintf("?re=%s&rr=%s&tt=%s&id=%s", $rfcEmisor, $rfcReceptor, $total, $uuid);
+        return $this->checkStatusByExpression($expression);
+    }
 
+    /**
+     * Query SAT status using a pre-built expression (preferred — avoids total format mismatches).
+     * Use DiscoverExtractor on the original XML to get the exact expression the SAT expects.
+     */
+    public function checkStatusByExpression(string $expression): array
+    {
         try {
             $response = $this->consumer->execute($expression);
 
@@ -47,9 +49,7 @@ class SatStatusService
                 'validacion_efos' => $response->efos->name,
                 'raw_status' => $response->document->name,
             ];
-
-        }
-        catch (\Exception $e) {
+        } catch (\Exception $e) {
             return [
                 'estado' => 'Error',
                 'codigo_estatus' => 'Error',

@@ -7,16 +7,4 @@
 
 ---
 
-## Tarea: Optimización módulo de facturas (velocidad y filtros)
-
-**Archivos a modificar:**
-- `sat-api/database/migrations/` — nueva migración con índices faltantes
-- `sat-api/app/Http/Controllers/InvoiceController.php` — extraer query builder, usar rangos de fecha
-- `ui/src/pages/InvoicesPage.tsx` — debounce en búsqueda, fix state de filtros
-
-**Pasos:**
-- [ ] Migración: agregar índices en `tipo`, `es_cancelado`, compuestos (rfc+fecha_fiscal)
-- [ ] Controller: extraer `buildCfdiQuery()`, reemplazar `whereYear`/`whereMonth` con `BETWEEN`
-- [ ] Frontend: debounce 400ms en campo de búsqueda
-- [ ] Frontend: reset `cfdiTipo` al cambiar a "canceladas"
-- [ ] Deploy
+_No hay tarea activa actualmente._
