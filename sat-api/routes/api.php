@@ -27,6 +27,7 @@ Route::prefix('agent')->group(function () {
     Route::get('sync-clients', [AgentController::class , 'syncClients']);
     Route::post('confirm-credentials', [AgentController::class , 'confirmCredentials']);
     Route::get('runner-tick', [AgentController::class , 'runnerTick']);
+    Route::post('upload-document', [\App\Http\Controllers\SatDocumentController::class, 'uploadFromAgent']);
 });
 
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -129,6 +130,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/reconciliation/suggest/{statementId}', [\App\Http\Controllers\ReconciliationController::class, 'suggest']);
         Route::post('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class, 'reconcile']);
         Route::delete('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class, 'unreconcile']);
+
+        // SAT Documents (CSF + Opinión 32-D)
+        Route::get('/sat-documents', [\App\Http\Controllers\SatDocumentController::class, 'index']);
+        Route::get('/sat-documents/{id}/download', [\App\Http\Controllers\SatDocumentController::class, 'download']);
     });
 
 require __DIR__ . '/debug_routes.php';
