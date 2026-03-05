@@ -21,6 +21,12 @@ interface TaxBreakdown {
     pendiente: number;
 }
 
+interface CreditNoteBreakdown {
+    subtotal: number;
+    iva: number;
+    total: number;
+}
+
 interface SummaryData {
     ingresos: {
         total_efectivo: number;
@@ -28,6 +34,7 @@ interface SummaryData {
         iva: TaxBreakdown;
         retenciones: TaxBreakdown;
         total: TaxBreakdown;
+        notas_credito: CreditNoteBreakdown;
     };
     egresos: {
         total_efectivo: number;
@@ -35,6 +42,7 @@ interface SummaryData {
         iva: TaxBreakdown;
         retenciones: TaxBreakdown;
         total: TaxBreakdown;
+        notas_credito: CreditNoteBreakdown;
     };
     no_deducibles: {
         total_efectivo: number;
@@ -517,6 +525,20 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                 <TableRow label="Base (Subtotal)" data={summary?.ingresos?.subtotal} bucketPrefix="ingresos_subtotal" />
                                                 <TableRow label="IVA (16%)" data={summary?.ingresos?.iva} bucketPrefix="ingresos_iva" />
                                                 <TableRow label="Total Facturado" data={summary?.ingresos?.total} bucketPrefix="ingresos_total" />
+                                                {(summary?.ingresos?.notas_credito?.total ?? 0) > 0 && (
+                                                    <tr className="border-t border-dashed border-red-100">
+                                                        <td className="py-3 px-4 text-[11px] font-bold text-red-500">Notas de Crédito / Devoluciones</td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                        <td className="py-3 px-4 text-center">
+                                                            <button onClick={() => loadBucketDetail('ingresos_notascredito')} className="text-[11px] font-black text-red-500 hover:text-red-700 transition-colors">
+                                                                -{formatCurrency(summary?.ingresos?.notas_credito?.total ?? 0)}
+                                                            </button>
+                                                        </td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                    </tr>
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
@@ -550,6 +572,20 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                                                 <TableRow label="Base (Subtotal)" data={summary?.egresos?.subtotal} bucketPrefix="egresos_subtotal" mode="egresos" />
                                                 <TableRow label="IVA (16%)" data={summary?.egresos?.iva} bucketPrefix="egresos_iva" mode="egresos" />
                                                 <TableRow label="Total Gastado" data={summary?.egresos?.total} bucketPrefix="egresos_total" mode="egresos" />
+                                                {(summary?.egresos?.notas_credito?.total ?? 0) > 0 && (
+                                                    <tr className="border-t border-dashed border-red-100">
+                                                        <td className="py-3 px-4 text-[11px] font-bold text-red-500">Notas de Crédito / Devoluciones</td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                        <td className="py-3 px-4 text-center">
+                                                            <button onClick={() => loadBucketDetail('egresos_notascredito')} className="text-[11px] font-black text-red-500 hover:text-red-700 transition-colors">
+                                                                -{formatCurrency(summary?.egresos?.notas_credito?.total ?? 0)}
+                                                            </button>
+                                                        </td>
+                                                        <td className="py-3 px-4 text-center text-[11px] text-gray-300">—</td>
+                                                    </tr>
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>

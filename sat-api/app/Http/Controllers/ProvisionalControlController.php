@@ -97,6 +97,33 @@ class ProvisionalControlController extends Controller
                     )->first();
             };
 
+            $getCreditNotesSum = function ($direction, $onlyDeductible = true) use ($rfc, $startDate, $endDate, $tcSql) {
+                $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
+                $query = DB::table('cfdis')
+                    ->where($field, $rfc)
+                    ->where('tipo', 'E')
+                    ->where('es_cancelado', false)
+                    ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN '{$startDate}' AND '{$endDate}'");
+
+                if ($direction === 'egresos') {
+                    if ($onlyDeductible) {
+                        $query->where(function($q) {
+                            $q->where('is_deductible', '!=', 0)
+                              ->orWhereNull('is_deductible');
+                        });
+                    } else {
+                        $query->where('is_deductible', 0);
+                    }
+                }
+
+                return $query->select(
+                    DB::raw("SUM(subtotal * $tcSql) as subtotal"),
+                    DB::raw("SUM(iva * $tcSql) as iva"),
+                    DB::raw("SUM(retenciones * $tcSql) as retenciones"),
+                    DB::raw("SUM(total * $tcSql) as total")
+                )->first();
+            };
+
             $getPendSum = function($direction, $onlyDeductible = true) use ($rfc, $startDate, $endDate) {
                 $field = ($direction === 'ingresos') ? 'rfc_emisor' : 'rfc_receptor';
                 $query = DB::table('cfdis')
@@ -163,8 +190,12 @@ class ProvisionalControlController extends Controller
             $ndRep = $getRepSum('egresos', false);
             $ndPend = $getPendSum('egresos', false);
 
-            $totalEfectivoIng = (float)($ingPue?->total ?? 0) + (float)($ingRep?->total ?? 0);
-            $totalEfectivoEgr = (float)($egrPue?->total ?? 0) + (float)($egrRep?->total ?? 0);
+            $ingCreditNotes = $getCreditNotesSum('ingresos');
+            $egrCreditNotes = $getCreditNotesSum('egresos', true);
+            $ndCreditNotes  = $getCreditNotesSum('egresos', false);
+
+            $totalEfectivoIng = (float)($ingPue?->total ?? 0) + (float)($ingRep?->total ?? 0) - (float)($ingCreditNotes?->total ?? 0);
+            $totalEfectivoEgr = (float)($egrPue?->total ?? 0) + (float)($egrRep?->total ?? 0) - (float)($egrCreditNotes?->total ?? 0);
 
             $formatRow = function($pue, $ppd, $rep, $pend, $field) {
                 $vP = (float)($pue?->$field ?? 0); 
@@ -181,6 +212,11 @@ class ProvisionalControlController extends Controller
                     'iva' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'iva'),
                     'retenciones' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'retenciones'),
                     'total' => $formatRow($ingPue, $ingPpd, $ingRep, $ingPend, 'total'),
+                    'notas_credito' => [
+                        'subtotal' => (float)($ingCreditNotes?->subtotal ?? 0),
+                        'iva'      => (float)($ingCreditNotes?->iva ?? 0),
+                        'total'    => (float)($ingCreditNotes?->total ?? 0),
+                    ],
                 ],
                 'egresos' => [
                     'total_efectivo' => $totalEfectivoEgr,
@@ -188,12 +224,21 @@ class ProvisionalControlController extends Controller
                     'iva' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'iva'),
                     'retenciones' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'retenciones'),
                     'total' => $formatRow($egrPue, $egrPpd, $egrRep, $egrPend, 'total'),
+                    'notas_credito' => [
+                        'subtotal' => (float)($egrCreditNotes?->subtotal ?? 0),
+                        'iva'      => (float)($egrCreditNotes?->iva ?? 0),
+                        'total'    => (float)($egrCreditNotes?->total ?? 0),
+                    ],
                 ],
                 'no_deducibles' => [
                     'total_efectivo' => (float)($ndPue?->total ?? 0) + (float)($ndRep?->total ?? 0),
                     'total_pendiente' => (float)($ndPend['total'] ?? 0),
                     'subtotal' => $formatRow($ndPue, $ndPpd, $ndRep, $ndPend, 'subtotal'),
                     'total' => $formatRow($ndPue, $ndPpd, $ndRep, $ndPend, 'total'),
+                    'notas_credito' => [
+                        'subtotal' => (float)($ndCreditNotes?->subtotal ?? 0),
+                        'total'    => (float)($ndCreditNotes?->total ?? 0),
+                    ],
                 ],
                 'alertas' => $alertas
             ]);
@@ -307,6 +352,30 @@ class ProvisionalControlController extends Controller
                         ];
                     });
                 $results = $results->concat($resReps);
+            }
+
+            // Bucket especial: notas de crédito (tipo E)
+            if ($cat === 'notascredito') {
+                $query = DB::table('cfdis')
+                    ->where($fieldRfc, $rfc)
+                    ->where('tipo', 'E')
+                    ->where('es_cancelado', false)
+                    ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN '{$startDate}' AND '{$endDate}'");
+
+                $resNC = $query->get()->map(function($c) use ($dir) {
+                    $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
+                    $nombre = ($dir === 'ingresos') ? $c->name_receptor : $c->name_emisor;
+                    return [
+                        'uuid' => $c->uuid, 'fecha' => substr($c->fecha ?? $c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
+                        'subtotal' => (float)$c->subtotal * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
+                        'total' => (float)$c->total * $tc, 'metodo_pago' => 'E',
+                        'forma_pago' => $c->forma_pago, 'is_deductible' => (bool)($c->is_deductible ?? true),
+                        'uso_cfdi' => $c->uso_cfdi ?? '',
+                        'warning' => null,
+                        'reason' => $this->getReasonFriendly($c->deduction_type)
+                    ];
+                });
+                $results = $results->concat($resNC);
             }
 
             if (!$metodo || $metodo === 'PENDIENTE') {
@@ -826,7 +895,43 @@ class ProvisionalControlController extends Controller
                 ->update(['is_deductible' => 0, 'deduction_type' => 'auto_rep_cash']);
         }
 
-        Log::info("Auditoria finalizada. E>2000: $res1, Comb: $res2, Pers: $res3, REP_Cash: $res4");
+        // 5. Notas de crédito (tipo E) recibidas — mismas reglas de deducibilidad
+        // 5a. Efectivo > $2,000
+        $res5a = Cfdi::where('rfc_receptor', $rfc)
+            ->where('tipo', 'E')
+            ->whereIn('forma_pago', ['01', '1', '01 '])
+            ->where('total', '>', 2000)
+            ->where('es_cancelado', false)
+            ->whereNull('deduction_type')
+            ->where($dateWhere)
+            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_cash_gt_2000']);
+
+        // 5b. Combustible en efectivo
+        $res5b = Cfdi::where('rfc_receptor', $rfc)
+            ->where('tipo', 'E')
+            ->whereIn('forma_pago', ['01', '1', '01 '])
+            ->where('es_cancelado', false)
+            ->whereNull('deduction_type')
+            ->where($dateWhere)
+            ->where(function($q) {
+                $q->where('concepto', 'like', '%GASOLINA%')
+                  ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
+                  ->orWhere('concepto', 'like', '%DIESEL%')
+                  ->orWhere('concepto', 'like', '%MAGNA%')
+                  ->orWhere('concepto', 'like', '%PREMIUM%');
+            })
+            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_fuel_cash']);
+
+        // 5c. Deducciones personales (uso_cfdi D%)
+        $res5c = Cfdi::where('rfc_receptor', $rfc)
+            ->where('tipo', 'E')
+            ->where('es_cancelado', false)
+            ->whereNull('deduction_type')
+            ->where($dateWhere)
+            ->where('uso_cfdi', 'like', 'D%')
+            ->update(['is_deductible' => 0, 'deduction_type' => 'auto_personal_deduction']);
+
+        Log::info("Auditoria finalizada. E>2000: $res1, Comb: $res2, Pers: $res3, REP_Cash: $res4, NC_E>2000: $res5a, NC_Comb: $res5b, NC_Pers: $res5c");
     }
 
     private function getWarningForCfdi($c)
