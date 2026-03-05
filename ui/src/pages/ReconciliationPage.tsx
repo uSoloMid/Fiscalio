@@ -49,15 +49,27 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         }
     };
 
+    const adjustReconciledCount = (delta: number) => {
+        if (!selectedId) return;
+        setStatements(prev => prev.map(s =>
+            s.id === selectedId
+                ? { ...s, reconciled_count: Math.max(0, ((s as any).reconciled_count ?? 0) + delta) }
+                : s
+        ));
+    };
+
     const handleMovementReconciled = (updated: BankMovement) => {
         setReconciliationData(prev => {
             if (!prev) return prev;
+            const wasReconciled = prev.movements.find(m => m.id === updated.id)?.cfdi_id;
+            if (!wasReconciled) adjustReconciledCount(+1);
             const movements = prev.movements.map(m => m.id === updated.id ? { ...updated, suggestions: [] } : m);
             return { movements, stats: computeStats(movements) };
         });
     };
 
     const handleMovementUnreconciled = (movementId: number) => {
+        adjustReconciledCount(-1);
         setReconciliationData(prev => {
             if (!prev) return prev;
             const movements = prev.movements.map(m =>
@@ -86,6 +98,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                 if (idx !== -1) updatedMovements[idx] = { ...res.movement, suggestions: [] };
             }
             setReconciliationData({ movements: updatedMovements, stats: computeStats(updatedMovements) });
+            adjustReconciledCount(greenPending.length);
         } finally {
             setIsBulkConfirming(false);
         }
@@ -106,12 +119,6 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
             }
         });
         return stats;
-    };
-
-    const getReconciledCount = (s: any) => {
-        // We don't have per-statement reconciliation counts from the list endpoint yet
-        // This is a placeholder — will be accurate once statements include reconciled_count
-        return s.reconciled_count ?? 0;
     };
 
     const selectedStatement = statements.find(s => s.id === selectedId);
@@ -147,7 +154,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                             {statements.map(s => {
                                 const isSelected = s.id === selectedId;
                                 const total = (s as any).movements_count ?? 0;
-                                const reconciled = getReconciledCount(s);
+                                const reconciled = (s as any).reconciled_count ?? 0;
                                 const pct = total > 0 ? Math.round((reconciled / total) * 100) : 0;
                                 return (
                                     <button

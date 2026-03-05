@@ -7,13 +7,16 @@
 
 ---
 
-## Fix Banamex parser: duplicación cargo/abono
+## Mejoras UX módulo de conciliación
 
-**Problema:** Amounts en DEPOSITOS también se asignan a RETIROS (cargo).
-**Causa raíz:** Enfoque center±MARGIN crea zonas de overlap entre columnas adyacentes.
-**Solución:** Usar midpoints entre columnas como fronteras duras (cada px pertenece a exactamente una columna).
+**Objetivo:** Hacer la interfaz legible y funcional — descripción truncada, filas con identidad visual por estado, barra de progreso real.
+
+### Archivos a modificar
+- `sat-api/app/Http/Controllers/BankStatementController.php` — agregar `reconciled_count`
+- `ui/src/components/MovementReconcileRow.tsx` — truncar descripción + highlight por estado
+- `ui/src/pages/ReconciliationPage.tsx` — usar `reconciled_count` real
 
 ### Pasos
-- [ ] Cambiar lógica de asignación en `bank_parser/adapters/banamex.py`
-- [ ] Commit en dev
-- [ ] Merge a main cuando funcione
+- [ ] Backend: `withCount` de movimientos con `cfdi_id IS NOT NULL` → campo `reconciled_count`
+- [ ] Frontend: truncar descripción a ~60 chars con tooltip completo + borde izquierdo de color por estado
+- [ ] Frontend: barra de progreso usa `reconciled_count / movements_count` real
