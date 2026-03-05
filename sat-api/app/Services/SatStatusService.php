@@ -28,7 +28,14 @@ class SatStatusService
 
     public function checkStatus(string $uuid, string $rfcEmisor, string $rfcReceptor, string $total): array
     {
-        $expression = sprintf("?re=%s&rr=%s&tt=%s&id=%s", $rfcEmisor, $rfcReceptor, $total, $uuid);
+        // SAT requires total in same format as cfdi-expresiones FormatTotal18x6:
+        // 6 decimal places, trailing zeros stripped, minimum 1 decimal.
+        // e.g. "1500.00" → "1500.0", "1500.54" → "1500.54", "1500.50" → "1500.5"
+        $tt = rtrim(number_format(floatval($total), 6, '.', ''), '0');
+        if (str_ends_with($tt, '.')) {
+            $tt .= '0';
+        }
+        $expression = sprintf("?re=%s&rr=%s&tt=%s&id=%s", $rfcEmisor, $rfcReceptor, $tt, $uuid);
         return $this->checkStatusByExpression($expression);
     }
 
