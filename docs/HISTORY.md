@@ -5,6 +5,19 @@
 
 ---
 
+## Seguridad — Hardening general (Mar 2026)
+
+**Commit estable:** `46bd66f`
+
+- Rutas `/debug/parser` y `/debug/update-dev` eliminadas (ejecutaban código shell sin autenticación)
+- Rate limiting en `POST /api/login`: 5 intentos/min por IP → 429 con mensaje claro
+- `APP_ENV=production` y `APP_DEBUG=false` aplicados en servidor (evita stack traces públicos)
+- Middleware `AgentSecret` (commit `6ae80f9`): rutas `/api/agent/*` protegidas con `X-Agent-Secret` + `hash_equals`
+- `certificate` y `private_key` ocultos en `Business.$hidden`
+- Limpieza de DB: 20 businesses faker + 40 sat_requests basura + 6 usuarios de prueba eliminados
+
+---
+
 ## Módulo Documentos SAT — CSF + Opinión 32-D (Mar 2026)
 
 **Commit estable:** `3d75e10`

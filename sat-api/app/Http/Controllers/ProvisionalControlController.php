@@ -114,16 +114,26 @@ class ProvisionalControlController extends Controller
                 $invoices = $query->get();
 
                 $res = ['subtotal' => 0, 'iva' => 0, 'retenciones' => 0, 'total' => 0];
+                if ($invoices->isEmpty()) return $res;
+
+                $uuids = $invoices->pluck('uuid');
+                $pagadoMap = DB::table('cfdi_payments')
+                    ->whereIn('uuid_relacionado', $uuids)
+                    ->where('fecha_pago', '<=', $endDate)
+                    ->selectRaw('uuid_relacionado, SUM(monto_pagado) as total_pagado')
+                    ->groupBy('uuid_relacionado')
+                    ->pluck('total_pagado', 'uuid_relacionado');
+
                 foreach ($invoices as $c) {
                     $moneda = strtoupper($c->moneda ?? 'MXN');
                     $tc = ($moneda === 'MXN') ? 1.0 : (float)($c->tipo_cambio ?? 1);
                     if ($tc <= 0) $tc = 1.0;
 
-                    $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->where('fecha_pago', '<=', $endDate)->sum('monto_pagado');
+                    $pagado = $pagadoMap[$c->uuid] ?? 0;
                     $balance = max(0, (float)$c->total - (float)$pagado);
                     if ($balance < 0.05) continue;
                     $ratio = $c->total > 0 ? ($balance / (float)$c->total) : 0;
-                    
+
                     $res['subtotal'] += (float)$c->subtotal * $ratio * $tc;
                     $res['iva'] += (float)$c->iva * $ratio * $tc;
                     $res['retenciones'] += (float)$c->retenciones * $ratio * $tc;
@@ -305,9 +315,18 @@ class ProvisionalControlController extends Controller
                     });
                 }
 
-                $resPend = $query->get()->map(function($c) use ($endDate, $dir) {
+                $pendInvoices = $query->get();
+                $pendUuids = $pendInvoices->pluck('uuid');
+                $pendPagadoMap = $pendUuids->isEmpty() ? collect() : DB::table('cfdi_payments')
+                    ->whereIn('uuid_relacionado', $pendUuids)
+                    ->where('fecha_pago', '<=', $endDate)
+                    ->selectRaw('uuid_relacionado, SUM(monto_pagado) as total_pagado')
+                    ->groupBy('uuid_relacionado')
+                    ->pluck('total_pagado', 'uuid_relacionado');
+
+                $resPend = $pendInvoices->map(function($c) use ($dir, $pendPagadoMap) {
                     $tc = (strtoupper($c->moneda ?? 'MXN') === 'MXN') ? 1 : ($c->tipo_cambio ?: 1);
-                    $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->where('fecha_pago', '<=', $endDate)->sum('monto_pagado');
+                    $pagado = $pendPagadoMap[$c->uuid] ?? 0;
                     $bal = max(0, (float)$c->total - (float)$pagado);
                     if ($bal < 0.05) return null;
                     $ratio = $c->total > 0 ? ($bal / (float)$c->total) : 0;
@@ -315,8 +334,8 @@ class ProvisionalControlController extends Controller
                     return [
                         'uuid' => $c->uuid, 'fecha' => substr($c->fecha_fiscal, 0, 10), 'nombre' => $nombre,
                         'subtotal' => (float)$c->subtotal * $ratio * $tc, 'iva' => (float)($c->iva ?? 0) * $tc,
-                        'total' => $bal * $tc, 'metodo_pago' => $c->metodo_pago, 
-                        'is_deductible' => (bool)($c->is_deductible ?? true), 'uso_cfdi' => $c->uso_cfdi ?? 'G03', 
+                        'total' => $bal * $tc, 'metodo_pago' => $c->metodo_pago,
+                        'is_deductible' => (bool)($c->is_deductible ?? true), 'uso_cfdi' => $c->uso_cfdi ?? 'G03',
                         'forma_pago' => $c->forma_pago,
                         'warning' => $this->getWarningForCfdi($c),
                         'reason' => $this->getReasonFriendly($c->deduction_type)
@@ -359,8 +378,16 @@ class ProvisionalControlController extends Controller
                 ->whereYear('fecha_fiscal', $year)
                 ->whereMonth('fecha_fiscal', $month);
 
-            $results = $query->get()->map(function($c) {
-                $pagado = DB::table('cfdi_payments')->where('uuid_relacionado', $c->uuid)->sum('monto_pagado');
+            $ppdList = $query->get();
+            $ppdUuids = $ppdList->pluck('uuid');
+            $ppdPagadoMap = $ppdUuids->isEmpty() ? collect() : DB::table('cfdi_payments')
+                ->whereIn('uuid_relacionado', $ppdUuids)
+                ->selectRaw('uuid_relacionado, SUM(monto_pagado) as total_pagado')
+                ->groupBy('uuid_relacionado')
+                ->pluck('total_pagado', 'uuid_relacionado');
+
+            $results = $ppdList->map(function($c) use ($ppdPagadoMap) {
+                $pagado = $ppdPagadoMap[$c->uuid] ?? 0;
                 $c->monto_pagado = (float)$pagado;
                 $c->saldo_pendiente = (float)$c->total - (float)$pagado;
                 $c->status_pago = $c->saldo_pendiente <= 0.05 ? 'Liquidada' : ($pagado > 0 ? 'Parcial' : 'Pendiente');
@@ -389,11 +416,15 @@ class ProvisionalControlController extends Controller
                 ->whereYear('fecha', $year)
                 ->whereMonth('fecha', $month);
 
-            $results = $query->get()->map(function($c) {
-                $relacionados = DB::table('cfdi_payments')
-                    ->where('uuid_pago', $c->uuid)
-                    ->get();
-                $c->relacionados = $relacionados;
+            $repList = $query->get();
+            $repUuids = $repList->pluck('uuid');
+            $relacionadosMap = $repUuids->isEmpty() ? collect() : DB::table('cfdi_payments')
+                ->whereIn('uuid_pago', $repUuids)
+                ->get()
+                ->groupBy('uuid_pago');
+
+            $results = $repList->map(function($c) use ($relacionadosMap) {
+                $c->relacionados = $relacionadosMap[$c->uuid] ?? collect();
                 return $c;
             });
 
@@ -733,14 +764,11 @@ class ProvisionalControlController extends Controller
         // 1. Marcar efectivo > 2000 como no deducible (PUE)
         $res1 = Cfdi::where('rfc_receptor', $rfc)
             ->whereIn('metodo_pago', ['PUE', 'PUE '])
-            ->whereIn('forma_pago', ['01', '1', '01 ']) 
+            ->whereIn('forma_pago', ['01', '1', '01 '])
             ->where('total', '>', 2000)
             ->where('es_cancelado', false)
             ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
-            ->where(function($q) {
-                $q->whereNull('deduction_type')
-                  ->orWhere('deduction_type', '!=', 'manual');
-            })
+            ->whereNull('deduction_type')
             ->update(['is_deductible' => 0, 'deduction_type' => 'auto_cash_gt_2000']);
 
         // 2. Marcar combustible en efectivo
@@ -748,10 +776,7 @@ class ProvisionalControlController extends Controller
             ->whereIn('forma_pago', ['01', '1', '01 '])
             ->where('es_cancelado', false)
             ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
-            ->where(function($q) {
-                $q->whereNull('deduction_type')
-                  ->orWhere('deduction_type', '!=', 'manual');
-            })
+            ->whereNull('deduction_type')
             ->where(function($q) {
                 $q->where('concepto', 'like', '%GASOLINA%')
                   ->orWhere('concepto', 'like', '%COMBUSTIBLE%')
@@ -766,10 +791,7 @@ class ProvisionalControlController extends Controller
             ->where('es_cancelado', false)
             ->whereRaw("COALESCE(fecha_fiscal, fecha) BETWEEN ? AND ?", [$startDate, $endDate])
             ->where('uso_cfdi', 'like', 'D%')
-            ->where(function($q) {
-                $q->whereNull('deduction_type')
-                  ->orWhere('deduction_type', '!=', 'manual');
-            })
+            ->whereNull('deduction_type')
             ->update(['is_deductible' => 0, 'deduction_type' => 'auto_personal_deduction']);
 
         // 4. Marcar REPs pagados en efectivo (Deducción no válida para PPD relacionado)
@@ -785,10 +807,7 @@ class ProvisionalControlController extends Controller
         $res4 = 0;
         if ($cashReps->count() > 0) {
             $res4 = Cfdi::whereIn('uuid', $cashReps)
-                ->where(function($q) {
-                    $q->whereNull('deduction_type')
-                      ->orWhere('deduction_type', '!=', 'manual');
-                })
+                ->whereNull('deduction_type')
                 ->update(['is_deductible' => 0, 'deduction_type' => 'auto_rep_cash']);
         }
 
