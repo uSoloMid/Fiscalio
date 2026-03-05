@@ -67,8 +67,15 @@ class Cfdi extends Model
         'retenciones_locales' => 'decimal:2',
         'xml_data' => 'array',
     ];
+    // Payments that reference THIS invoice as the one being paid (uuid_relacionado = this.uuid)
     public function pagosRelacionados()
     {
         return $this->hasMany(CfdiPayment::class , 'uuid_relacionado', 'uuid');
+    }
+
+    // Payments emitted BY this REP CFDI (uuid_pago = this.uuid) — use for tipo=P matching
+    public function pagosPropios()
+    {
+        return $this->hasMany(CfdiPayment::class , 'uuid_pago', 'uuid');
     }
 }

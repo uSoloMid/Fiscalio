@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-03-05 — Mejoras UX conciliación + fix autodeploy definitivo
+**Commits:** `e824f30`, `e9260be`
+
+- `MovementReconcileRow`: descripción truncada a 65 chars con tooltip completo al hover
+- `MovementReconcileRow`: borde izquierdo de color por confianza (verde/amarillo/rojo/transparente)
+- `ReconciliationPage`: barra de progreso usa `reconciled_count` real del API; se actualiza en tiempo real al conciliar/desvincular
+- `BankStatementController`: `withCount reconciled_count` (cfdi_id IS NOT NULL)
+- Fix autodeploy definitivo: cron usa `bash script.sh` — ya no depende del bit `+x`
+
+---
+
 ## 2026-03-05 — Fix parser Banamex: duplicación cargo/abono
 **Commits:** `ba2ab1b` (última sesión)
 
