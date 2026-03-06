@@ -121,7 +121,7 @@ export const DashboardPage = ({
             setGroups(gRes);
             setTags(tRes);
             setTotalSystemClients(totalRes.total || 0);
-            setMissingDocs(missingRes);
+            setMissingDocs({ missing_csf: missingRes?.missing_csf ?? [], missing_opinion: missingRes?.missing_opinion ?? [] });
 
             // Limpiar filtros obsoletos de localStorage que ya no existen en la BD
             const validTagIds = selectedTagIds.filter(id => tRes.some((t: any) => t.id === id));
