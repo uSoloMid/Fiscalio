@@ -66,7 +66,7 @@ async function loginWithFiel(page, loginUrl, rfc) {
         throw new Error(`Faltan archivos FIEL para el RFC: ${rfc}`);
     }
 
-    const password = (await fs.readFile(passPath, 'utf8')).trim();
+    const password = (await fs.readFile(passPath, 'utf8')).replace(/[\r\n]+$/, '');
 
     console.log(chalk.yellow(`=> Navegando a ${loginUrl}...`));
     await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 90000 });
@@ -129,7 +129,19 @@ async function loginWithFiel(page, loginUrl, rfc) {
         await passInput.type(password);
 
         console.log(chalk.yellow(`=> Enviando credenciales...`));
-        await loginFrame.click('#submit').catch(() => { });
+        let submitClicked = false;
+        for (const sel of ['#submit', '#btnAceptar', '#btnEnviar', 'button[type="submit"]', 'input[type="submit"]']) {
+            const btn = await loginFrame.$(sel).catch(() => null);
+            if (btn) { await btn.click(); submitClicked = true; break; }
+        }
+        if (!submitClicked) {
+            // Fallback: click by text "Enviar"
+            await loginFrame.evaluate(() => {
+                const btns = [...document.querySelectorAll('button, input[type="submit"], input[type="button"]')];
+                const b = btns.find(b => /enviar/i.test(b.textContent || b.value || ''));
+                if (b) b.click();
+            }).catch(() => { });
+        }
         await new Promise(r => setTimeout(r, 15000));
 
     } catch (e) {
@@ -252,6 +264,8 @@ async function downloadOpinion(browser, rfc) {
         if (!page) continue;
 
         let pdfBuffer = null;
+
+        // Intercept HTTP responses with PDF content type
         page.on('response', async (res) => {
             try {
                 if ((res.headers()['content-type'] || '').includes('application/pdf')) {
@@ -261,22 +275,130 @@ async function downloadOpinion(browser, rfc) {
             } catch (e) { }
         });
 
+        // Set up CDP download capture for when user clicks download button
+        const cdp = await page.createCDPSession().catch(() => null);
+        const downloadPath = path.join(DOWNLOAD_DIR, rfc);
+        let downloadedFilename = null;
+        let downloadComplete = false;
+        if (cdp) {
+            await cdp.send('Browser.setDownloadBehavior', {
+                behavior: 'allow', downloadPath, eventsEnabled: true,
+            }).catch(() => { });
+            cdp.on('Browser.downloadWillBegin', ({ suggestedFilename }) => {
+                downloadedFilename = suggestedFilename;
+                console.log(chalk.gray(`[32-D] Descarga iniciada: ${suggestedFilename}`));
+            });
+            cdp.on('Browser.downloadProgress', ({ state }) => {
+                if (state === 'completed') downloadComplete = true;
+            });
+        }
+
         try {
             await loginWithFiel(page, 'https://ptsc32d.clouda.sat.gob.mx/', rfc);
-            console.log(chalk.green(`[32-D] Monitoreando descarga...`));
-            for (let i = 0; i < 40; i++) {
-                if (pdfBuffer) {
-                    await fs.writeFile(path.join(DOWNLOAD_DIR, rfc, 'Opinion_Cumplimiento_32D.pdf'), pdfBuffer);
-                    console.log(chalk.green(`[32-D] ¡ÉXITO! Opinión guardada.`));
-                    await uploadToApi(rfc, 'opinion_32d', path.join(DOWNLOAD_DIR, rfc, 'Opinion_Cumplimiento_32D.pdf'));
-                    await logoutSat(browser, 'https://ptsc32d.clouda.sat.gob.mx/logout');
-                    await page.close();
-                    return;
+            console.log(chalk.green(`[32-D] Login completado, esperando página del reporte...`));
+
+            // Step 1: Wait for OAuth redirect to reach ptsc32d (up to 60s)
+            let onPtsc32d = false;
+            for (let i = 0; i < 60; i++) {
+                const url = page.url();
+                if (url.includes('ptsc32d.clouda.sat.gob.mx') && !url.includes('login.mat')) {
+                    onPtsc32d = true;
+                    console.log(chalk.green(`[32-D] En ptsc32d. URL: ${url}`));
+                    break;
                 }
-                const body = await page.evaluate(() => document.body.innerText).catch(() => '');
-                if (isSatError(body)) break;
                 await new Promise(r => setTimeout(r, 1000));
             }
+            if (!onPtsc32d) throw new Error(`No se llegó a ptsc32d tras el login. URL: ${page.url()}`);
+
+            // Navigate explicitly to the report route (in case Angular landed on /#/ instead)
+            const currentUrl = page.url();
+            if (!currentUrl.includes('reporteOpinion32DContribuyente')) {
+                console.log(chalk.yellow(`[32-D] Navegando a la ruta del reporte...`));
+                await page.goto('https://ptsc32d.clouda.sat.gob.mx/#/reporteOpinion32DContribuyente', { waitUntil: 'networkidle2', timeout: 30000 }).catch(() => { });
+                await new Promise(r => setTimeout(r, 3000));
+            }
+
+            // Step 2: Wait for "Procesando" to APPEAR (Angular finished routing and started report, up to 20s)
+            console.log(chalk.yellow(`[32-D] Esperando que inicie procesamiento...`));
+            for (let i = 0; i < 20; i++) {
+                if (pdfBuffer) break;
+                const body = await page.evaluate(() => document.body.innerText).catch(() => '');
+                if (isSatError(body)) throw new Error(`SAT_ERROR: ${body.substring(0, 100)}`);
+                if (body.toLowerCase().includes('procesando')) { console.log(chalk.yellow(`[32-D] Procesando detectado.`)); break; }
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            // Step 3: Wait for "Procesando" to DISAPPEAR (report generated, up to 45s)
+            console.log(chalk.yellow(`[32-D] Esperando resultado...`));
+            for (let i = 0; i < 45; i++) {
+                if (pdfBuffer) break;
+                const body = await page.evaluate(() => document.body.innerText).catch(() => '');
+                if (isSatError(body)) throw new Error(`SAT_ERROR: ${body.substring(0, 100)}`);
+                if (!body.toLowerCase().includes('procesando')) { console.log(chalk.green(`[32-D] Procesamiento terminado.`)); break; }
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            await new Promise(r => setTimeout(r, 2000));
+
+            // If PDF was captured via HTTP response, use it directly
+            if (pdfBuffer) {
+                console.log(chalk.green(`[32-D] PDF capturado por intercepción HTTP.`));
+            } else {
+                // PDF is rendered inline (blob/data URL) — click the download button
+                console.log(chalk.yellow(`[32-D] PDF inline detectado, buscando botón de descarga...`));
+                const downloadBtn = await page.evaluateHandle(() => {
+                    // PDF.js viewer download button or Angular download button
+                    const selectors = [
+                        'button[title*="escargar"]', 'button[aria-label*="escargar"]',
+                        'button[title*="ownload"]', 'button[aria-label*="ownload"]',
+                        '#download', '.download', '[ng-click*="download"]',
+                        'a[download]',
+                    ];
+                    for (const sel of selectors) {
+                        const el = document.querySelector(sel);
+                        if (el) return el;
+                    }
+                    // Fallback: button/link with download text
+                    const all = [...document.querySelectorAll('button, a')];
+                    return all.find(el => /descargar|download/i.test(el.textContent || el.title || '')) || null;
+                }).catch(() => null);
+
+                if (downloadBtn && (await downloadBtn.asElement())) {
+                    await downloadBtn.asElement().click();
+                    console.log(chalk.yellow(`[32-D] Botón de descarga clicado, esperando archivo...`));
+                    for (let i = 0; i < 30; i++) {
+                        if (downloadComplete) break;
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                    if (downloadComplete && downloadedFilename) {
+                        pdfBuffer = await fs.readFile(path.join(downloadPath, downloadedFilename));
+                        await fs.remove(path.join(downloadPath, downloadedFilename)).catch(() => { });
+                    }
+                } else {
+                    // Last resort: try to extract PDF from embedded iframe src
+                    const pdfUrl = await page.evaluate(() => {
+                        const iframe = document.querySelector('iframe[src*=".pdf"], embed[src*=".pdf"], object[data*=".pdf"]');
+                        return iframe ? (iframe.src || iframe.data) : null;
+                    }).catch(() => null);
+                    if (pdfUrl) {
+                        const res = await page.goto(pdfUrl, { waitUntil: 'load', timeout: 30000 }).catch(() => null);
+                        if (res) {
+                            const buf = await res.buffer().catch(() => null);
+                            if (buf && buf.length > 5000) pdfBuffer = buf;
+                        }
+                    }
+                }
+            }
+
+            if (!pdfBuffer || pdfBuffer.length < 5000) throw new Error('No se pudo obtener el PDF');
+
+            const outPath = path.join(DOWNLOAD_DIR, rfc, 'Opinion_Cumplimiento_32D.pdf');
+            await fs.writeFile(outPath, pdfBuffer);
+            console.log(chalk.green(`[32-D] ¡ÉXITO! Opinión guardada.`));
+            await uploadToApi(rfc, 'opinion_32d', outPath);
+            await logoutSat(browser, 'https://ptsc32d.clouda.sat.gob.mx/logout');
+            await page.close();
+            return;
+
         } catch (e) { console.log(chalk.red(`[32-D] Error: ${e.message}`)); }
         finally { await page.close().catch(() => { }); }
         await new Promise(r => setTimeout(r, 5000));

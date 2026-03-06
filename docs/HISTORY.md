@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-03-05 — CFDIs tipo E (Notas de crédito) en Control Provisional
+
+**Commit estable:** `d2e8853`
+
+- Nueva closure `getCreditNotesSum`: suma CFDIs `tipo = 'E'` no cancelados por período
+- `total_efectivo` de ingresos y egresos ahora es neto (descuenta notas de crédito)
+- JSON de respuesta incluye `notas_credito: {subtotal, iva, total}` en ingresos, egresos y no_deducibles
+- `performAudit`: extiende reglas a tipo E (efectivo > $2,000, combustible, uso_cfdi D%)
+- `getBucketDetails`: nuevos buckets `egresos_notascredito` / `ingresos_notascredito` para drill-down
+- Frontend: fila "Notas de Crédito / Devoluciones" en rojo en tablas de gastos e ingresos (solo visible si hay notas en el período)
+- Cubre anticipos (rel. 07), devoluciones, descuentos y cualquier CFDI tipo E recibido/emitido
+
+---
+
 ## Optimización rendimiento Ronda 2 — Control Provisional (Mar 2026)
 
 **Commit estable:** `1584d4e`
