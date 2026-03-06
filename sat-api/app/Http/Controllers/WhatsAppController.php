@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Cfdi;
 use App\Models\SatDocument;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
@@ -227,6 +228,17 @@ class WhatsAppController extends Controller
                     $this->sendInvoiceList($from, $data, 0);
                 }
                 break;
+
+            case 'awaiting_invoice_pick':
+                $this->clearConversation($from);
+                $uuids = $data['uuids'] ?? [];
+                $num   = (int) trim($body);
+                if ($num < 1 || $num > count($uuids) || !preg_match('/^\d+$/', trim($body))) {
+                    $this->whatsapp->sendText($from, "Responde con un numero del 1 al " . count($uuids) . ", o envia *MAS* para continuar.");
+                    return;
+                }
+                $this->sendCfdiPdf($from, $uuids[$num - 1]);
+                break;
         }
     }
 
@@ -277,14 +289,17 @@ class WhatsAppController extends Controller
         }
 
         $total = $query->count();
-        $rows  = (clone $query)->orderBy('fecha', 'desc')->offset($offset)->limit(10)->get();
+        $rows  = (clone $query)->orderBy('fecha', 'desc')->offset($offset)->limit(10)->get(['uuid', 'fecha', 'total', 'es_cancelado', 'serie', 'folio', 'name_emisor', 'rfc_emisor', 'name_receptor', 'rfc_receptor']);
 
         if ($rows->isEmpty()) {
             $this->whatsapp->sendText($from, "No hay facturas con ese filtro.");
             return;
         }
 
-        $lines = $rows->map(function ($r) use ($data) {
+        $uuids = $rows->pluck('uuid')->toArray();
+
+        $lines = $rows->values()->map(function ($r, $i) use ($data) {
+            $num       = $i + 1;
             $date      = Carbon::parse($r->fecha)->format('d/m');
             $amount    = '$' . number_format($r->total, 0);
             $cancelado = $r->es_cancelado ? ' CANC' : '';
@@ -293,20 +308,46 @@ class WhatsAppController extends Controller
             $counterpart = $data['direction'] === 'E'
                 ? ($r->name_receptor ?: $r->rfc_receptor)
                 : ($r->name_emisor   ?: $r->rfc_emisor);
-            $counterpart = mb_substr($counterpart, 0, 22);
-            return "• {$date}{$folioStr} {$counterpart} {$amount}{$cancelado}";
+            $counterpart = mb_substr($counterpart, 0, 20);
+            return "{$num}. {$date}{$folioStr} {$counterpart} {$amount}{$cancelado}";
         })->implode("\n");
 
         $showing = $offset + $rows->count();
-        $msg     = "Mostrando {$showing}/{$total}:\n\n{$lines}";
+        $msg     = "Mostrando {$showing}/{$total}:\n\n{$lines}\n\nEnvia el *numero* para descargar el PDF de esa factura.";
+
+        // Save UUIDs so user can pick one
+        $data['uuids']  = $uuids;
+        $data['offset'] = $offset;
+        $nextStep = 'awaiting_invoice_pick';
 
         if ($showing < $total) {
-            $data['offset'] = $offset;
-            $this->saveConversation($from, 'awaiting_detail', $data);
-            $msg .= "\n\nEnvia *MAS* para ver las siguientes.";
+            $msg .= " O envia *MAS* para ver las siguientes.";
         }
 
+        $this->saveConversation($from, $nextStep, $data);
         $this->whatsapp->sendText($from, $msg);
+    }
+
+    private function sendCfdiPdf(string $from, string $uuid): void
+    {
+        try {
+            $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
+            $invoiceCtrl = app(InvoiceController::class);
+            $pdfBytes    = $invoiceCtrl->generatePdfBytes($uuid);
+
+            $date     = Carbon::parse($cfdi->fecha)->format('Y-m-d');
+            $folio    = ($cfdi->serie ?? '') . ($cfdi->folio ?? $uuid);
+            $filename = "CFDI_{$folio}_{$date}.pdf";
+            $caption  = ($cfdi->name_emisor ?? $cfdi->rfc_emisor) . ' → ' . ($cfdi->name_receptor ?? $cfdi->rfc_receptor) . ' $' . number_format($cfdi->total, 2);
+
+            $ok = $this->whatsapp->sendPdfBytes($from, $pdfBytes, $filename, $caption);
+            if (!$ok) {
+                $this->whatsapp->sendText($from, "Error al generar el PDF. Intenta de nuevo.");
+            }
+        } catch (\Exception $e) {
+            Log::error('WhatsApp sendCfdiPdf failed', ['uuid' => $uuid, 'error' => $e->getMessage()]);
+            $this->whatsapp->sendText($from, "No se pudo generar el PDF de esa factura.");
+        }
     }
 
     // ─────────────────────────────────────────────

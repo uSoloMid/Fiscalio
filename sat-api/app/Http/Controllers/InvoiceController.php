@@ -439,6 +439,12 @@ class InvoiceController extends Controller
         return $pdf->output();
     }
 
+    public function generatePdfBytes(string $uuid): string
+    {
+        $cfdi = Cfdi::where('uuid', $uuid)->firstOrFail();
+        return $this->generatePdfContent($cfdi);
+    }
+
     public function showCfdi($uuid)
     {
         return response()->json(['metadata' => Cfdi::where('uuid', $uuid)->firstOrFail(), 'xml_url' => url("api/cfdis/$uuid/xml")]);

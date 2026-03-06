@@ -95,8 +95,7 @@ class WhatsAppService
     }
 
     /**
-     * Upload and send a PDF to a phone number.
-     * Returns true on success.
+     * Upload and send a PDF from a storage path.
      */
     public function sendPdf(string $to, string $filePath, string $filename, string $caption = ''): bool
     {
@@ -105,6 +104,27 @@ class WhatsAppService
             return false;
         }
 
+        return $this->sendDocument($to, $mediaId, $filename, $caption);
+    }
+
+    /**
+     * Upload and send a PDF from raw bytes (in-memory).
+     */
+    public function sendPdfBytes(string $to, string $bytes, string $filename, string $caption = ''): bool
+    {
+        $response = Http::withToken($this->token)
+            ->attach('file', $bytes, $filename, ['Content-Type' => 'application/pdf'])
+            ->post("{$this->baseUrl}/{$this->phoneNumberId}/media", [
+                'messaging_product' => 'whatsapp',
+                'type'              => 'application/pdf',
+            ]);
+
+        if (!$response->successful()) {
+            Log::error('WhatsApp uploadMedia (bytes) failed', ['body' => $response->body()]);
+            return false;
+        }
+
+        $mediaId = $response->json('id');
         return $this->sendDocument($to, $mediaId, $filename, $caption);
     }
 }
