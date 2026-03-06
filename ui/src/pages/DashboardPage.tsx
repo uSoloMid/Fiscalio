@@ -23,6 +23,7 @@ export const DashboardPage = ({
     const [groups, setGroups] = useState<any[]>([]);
     const [tags, setTags] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [totalSystemClients, setTotalSystemClients] = useState(0);
 
     // UI states
@@ -116,6 +117,16 @@ export const DashboardPage = ({
             setGroups(gRes);
             setTags(tRes);
             setTotalSystemClients(totalRes.total || 0);
+
+            // Limpiar filtros obsoletos de localStorage que ya no existen en la BD
+            const validTagIds = selectedTagIds.filter(id => tRes.some((t: any) => t.id === id));
+            if (validTagIds.length !== selectedTagIds.length) {
+                setSelectedTagIds(validTagIds);
+            }
+            if (selectedGroupId !== 'all' && selectedGroupId !== 'null') {
+                const groupExists = gRes.some((g: any) => String(g.id) === String(selectedGroupId));
+                if (!groupExists) setSelectedGroupId('all');
+            }
         } catch (err) {
             console.error("Error loading metadata", err);
         }
@@ -124,6 +135,7 @@ export const DashboardPage = ({
     const loadClientsData = async () => {
         try {
             setLoading(true);
+            setLoadError(false);
             const res = await listClients({
                 q: search,
                 group_id: selectedGroupId === 'all' ? undefined : (selectedGroupId === 'null' ? 'null' : selectedGroupId),
@@ -133,6 +145,7 @@ export const DashboardPage = ({
             setClients(res.data || []);
         } catch (err) {
             console.error("Error loading clients", err);
+            setLoadError(true);
         } finally {
             setLoading(false);
         }
@@ -625,6 +638,18 @@ export const DashboardPage = ({
                                 {[1, 2, 3, 4, 5, 6].map(i => (
                                     <div key={i} className="bg-white h-48 rounded-[32px] border border-gray-100 animate-pulse"></div>
                                 ))}
+                            </div>
+                        ) : loadError ? (
+                            <div className="text-center py-20 bg-white rounded-[40px] border-2 border-dashed border-red-100">
+                                <span className="material-symbols-outlined text-red-200 text-8xl mb-6">cloud_off</span>
+                                <h3 className="text-xl font-bold text-gray-900 mb-2">Error al cargar clientes</h3>
+                                <p className="text-gray-400 mb-8 max-w-xs mx-auto text-sm font-medium">No se pudo conectar con el servidor. Los datos están intactos.</p>
+                                <button
+                                    onClick={loadClientsData}
+                                    className="px-6 py-2.5 bg-gray-50 text-gray-600 font-bold rounded-2xl hover:bg-gray-100 transition-all text-sm"
+                                >
+                                    Reintentar
+                                </button>
                             </div>
                         ) : groupedClients.length === 0 || (groupedClients.length === 1 && groupedClients[0].items.length === 0) ? (
                             <div className="text-center py-20 bg-white rounded-[40px] border-2 border-dashed border-gray-100">
