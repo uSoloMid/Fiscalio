@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Business;
 use App\Models\SatDocument;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
@@ -38,11 +39,10 @@ class WhatsAppController extends Controller
     {
         $payload = $request->json()->all();
 
-        // Walk to the message object
-        $entry   = $payload['entry'][0]         ?? null;
-        $change  = $entry['changes'][0]          ?? null;
-        $value   = $change['value']              ?? null;
-        $message = $value['messages'][0]         ?? null;
+        $entry   = $payload['entry'][0]    ?? null;
+        $change  = $entry['changes'][0]    ?? null;
+        $value   = $change['value']        ?? null;
+        $message = $value['messages'][0]   ?? null;
 
         if (!$message || ($message['type'] ?? '') !== 'text') {
             return response()->json(['ok' => true]);
@@ -63,34 +63,130 @@ class WhatsAppController extends Controller
     // ─────────────────────────────────────────────
     private function handleMessage(string $from, string $body): void
     {
-        // Detect command: CSF <RFC> or OPINION <RFC>
+        // ── 1. Numeric reply → pending selection
+        if (preg_match('/^\d+$/', $body)) {
+            $this->handleSelection($from, (int) $body);
+            return;
+        }
+
+        // ── 2. Detect type keyword + RFC  (e.g. "CSF XAXX010101000")
         if (preg_match('/\b(CSF|OPINION|CUMPLIMIENTO|32D)\b.*?([A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3})\b/iu', $body, $m)) {
-            $typeRaw = strtoupper($m[1]);
-            $rfc     = strtoupper($m[2]);
-            $type    = in_array($typeRaw, ['OPINION', 'CUMPLIMIENTO', '32D']) ? 'opinion_32d' : 'csf';
-            $this->processDocumentRequest($from, $rfc, $type);
+            $type = in_array(strtoupper($m[1]), ['OPINION', 'CUMPLIMIENTO', '32D']) ? 'opinion_32d' : 'csf';
+            $this->processDocumentRequest($from, strtoupper($m[2]), $type);
             return;
         }
 
-        // Try to detect bare RFC
+        // ── 3. Bare RFC  (e.g. "XAXX010101000")
         if (preg_match('/\b([A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3})\b/iu', $body, $m)) {
-            $rfc = strtoupper($m[1]);
-            $this->processDocumentRequest($from, $rfc, 'csf');
+            $this->processDocumentRequest($from, strtoupper($m[1]), 'csf');
             return;
         }
 
-        // Help / unknown
+        // ── 4. Type keyword + name  (e.g. "CSF Jose Salgado" or "OPINION Jose")
+        if (preg_match('/^(CSF|OPINION|CUMPLIMIENTO|32D)\s+(.+)$/iu', $body, $m)) {
+            $type = in_array(strtoupper($m[1]), ['OPINION', 'CUMPLIMIENTO', '32D']) ? 'opinion_32d' : 'csf';
+            $this->searchByName($from, trim($m[2]), $type);
+            return;
+        }
+
+        // ── 5. Just a name  (assume CSF)
+        if (strlen($body) >= 3) {
+            $this->searchByName($from, $body, 'csf');
+            return;
+        }
+
+        // ── 6. Help
         $this->whatsapp->sendText($from,
-            "Hola 👋 Para solicitar documentos del SAT envía:\n\n" .
-            "• *CSF TURF123456ABC* — Constancia de Situación Fiscal\n" .
-            "• *OPINION TURF123456ABC* — Opinión de Cumplimiento 32-D\n\n" .
-            "Recibirás el PDF en segundos si ya fue descargado, o en minutos si está pendiente."
+            "Hola! Para solicitar documentos del SAT puedes enviar:\n\n" .
+            "• *CSF TURF123456ABC* — por RFC\n" .
+            "• *CSF Jose Salgado* — buscar por nombre\n" .
+            "• *OPINION TURF123456ABC* — Opinion 32-D\n\n" .
+            "Recibes el PDF en segundos si ya existe, o en minutos si hay que descargarlo."
         );
     }
 
+    // ─────────────────────────────────────────────
+    // Search by name
+    // ─────────────────────────────────────────────
+    private function searchByName(string $from, string $name, string $type): void
+    {
+        $results = DB::table('businesses')
+            ->where(function ($q) use ($name) {
+                $q->where('legal_name', 'like', "%{$name}%")
+                  ->orWhere('common_name', 'like', "%{$name}%");
+            })
+            ->select('rfc', 'legal_name', 'common_name')
+            ->orderBy('legal_name')
+            ->limit(10)
+            ->get();
+
+        if ($results->isEmpty()) {
+            $this->whatsapp->sendText($from, "No encontre ningun cliente con el nombre *{$name}*. Intenta con otro nombre o envia el RFC directamente.");
+            return;
+        }
+
+        if ($results->count() === 1) {
+            $this->processDocumentRequest($from, $results->first()->rfc, $type);
+            return;
+        }
+
+        // Multiple results — store selection and ask user
+        $options = $results->map(fn($b) => [
+            'rfc'  => $b->rfc,
+            'name' => $b->common_name ?: $b->legal_name,
+        ])->values()->toArray();
+
+        // Clear any previous selection for this phone
+        DB::table('whatsapp_selections')->where('phone', $from)->delete();
+        DB::table('whatsapp_selections')->insert([
+            'phone'      => $from,
+            'type'       => $type,
+            'options'    => json_encode($options),
+            'expires_at' => now()->addMinutes(5),
+        ]);
+
+        $label = $type === 'csf' ? 'CSF' : 'Opinion 32-D';
+        $list  = collect($options)->map(fn($o, $i) => ($i + 1) . ". {$o['name']} ({$o['rfc']})")->implode("\n");
+        $this->whatsapp->sendText($from, "Encontre varios clientes para *{$name}*:\n\n{$list}\n\nResponde con el *numero* del que quieres la {$label}:");
+    }
+
+    // ─────────────────────────────────────────────
+    // Handle numeric selection
+    // ─────────────────────────────────────────────
+    private function handleSelection(string $from, int $number): void
+    {
+        $selection = DB::table('whatsapp_selections')
+            ->where('phone', $from)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if (!$selection) {
+            // No pending selection — maybe it's something else, show help
+            $this->whatsapp->sendText($from, "No hay ninguna seleccion pendiente. Envia el nombre o RFC del cliente.");
+            return;
+        }
+
+        $options = json_decode($selection->options, true);
+
+        if ($number < 1 || $number > count($options)) {
+            $max = count($options);
+            $this->whatsapp->sendText($from, "Opcion invalida. Responde con un numero del 1 al {$max}.");
+            return;
+        }
+
+        $chosen = $options[$number - 1];
+
+        // Clear the selection
+        DB::table('whatsapp_selections')->where('phone', $from)->delete();
+
+        $this->processDocumentRequest($from, $chosen['rfc'], $selection->type);
+    }
+
+    // ─────────────────────────────────────────────
+    // Process document request for a known RFC
+    // ─────────────────────────────────────────────
     private function processDocumentRequest(string $from, string $rfc, string $type): void
     {
-        // Check if we have the document already
         $doc = SatDocument::where('rfc', $rfc)
             ->where('type', $type)
             ->orderBy('requested_at', 'desc')
@@ -101,7 +197,6 @@ class WhatsAppController extends Controller
             return;
         }
 
-        // Queue the request
         DB::table('whatsapp_pending_requests')->insert([
             'phone'        => $from,
             'rfc'          => $rfc,
@@ -109,19 +204,18 @@ class WhatsAppController extends Controller
             'requested_at' => now(),
         ]);
 
-        // Trigger the agent scraper
         $this->triggerScraper($rfc);
 
-        $label = $type === 'csf' ? 'Constancia de Situación Fiscal' : 'Opinión de Cumplimiento 32-D';
+        $label = $type === 'csf' ? 'Constancia de Situacion Fiscal' : 'Opinion de Cumplimiento 32-D';
         $this->whatsapp->sendText($from,
             "Solicitud recibida para *{$rfc}* ({$label}).\n" .
-            "Estoy descargando el documento del SAT, te lo envío en cuanto esté listo (normalmente menos de 2 minutos)."
+            "Estoy descargando el documento del SAT, te lo envio en cuanto este listo (normalmente menos de 2 minutos)."
         );
     }
 
     private function sendDocumentToUser(string $from, SatDocument $doc): void
     {
-        $label    = $doc->type === 'csf' ? 'Constancia de Situación Fiscal' : 'Opinión de Cumplimiento 32-D';
+        $label    = $doc->type === 'csf' ? 'Constancia de Situacion Fiscal' : 'Opinion de Cumplimiento 32-D';
         $date     = Carbon::parse($doc->requested_at)->format('d/m/Y');
         $filename = $doc->type === 'csf'
             ? "CSF_{$doc->rfc}_{$date}.pdf"
@@ -141,7 +235,6 @@ class WhatsAppController extends Controller
 
     /**
      * Normalize Mexican mobile numbers: 521XXXXXXXXXX → 52XXXXXXXXXX
-     * Meta webhook delivers 521... but the API expects 52...
      */
     private function normalizePhone(string $phone): string
     {

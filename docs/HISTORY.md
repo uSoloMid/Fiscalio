@@ -5,6 +5,20 @@
 
 ---
 
+## 2026-03-06 — Bot WhatsApp Business para solicitar CSF/Opinión 32-D
+
+**Commits estables:** `bd4223d` (integración inicial), `43baa29` (fix número mexicano)
+
+- Webhook META configurado en `GET/POST /api/whatsapp/webhook`
+- Bot detecta RFC en mensaje y responde con PDF inmediato o encola scraper
+- `normalizePhone`: corrige formato mexicano `521XXXXXXXXXX` → `52XXXXXXXXXX`
+- `whatsapp_pending_requests`: tabla para entregas asíncronas (scraper → WhatsApp)
+- `SatDocumentController::uploadFromAgent` despacha PDF a pendientes tras recibirlo del agente
+- Token permanente de sistema Meta configurado en `.env` del servidor
+- Limitación: app Meta sin publicar → agregar destinatarios manualmente en sandbox
+
+---
+
 ## 2026-03-05 — CFDIs tipo E (Notas de crédito) en Control Provisional
 
 **Commit estable:** `d2e8853`
