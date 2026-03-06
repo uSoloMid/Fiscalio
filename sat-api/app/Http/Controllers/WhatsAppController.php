@@ -48,7 +48,7 @@ class WhatsAppController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        $from = $message['from'];                  // phone in E.164 without +
+        $from = $this->normalizePhone($message['from']);
         $body = trim($message['text']['body'] ?? '');
 
         Log::info('WhatsApp message received', ['from' => $from, 'body' => $body]);
@@ -137,6 +137,18 @@ class WhatsAppController extends Controller
         if (!$ok) {
             $this->whatsapp->sendText($from, "Hubo un error al enviar el documento. Intenta de nuevo en unos minutos.");
         }
+    }
+
+    /**
+     * Normalize Mexican mobile numbers: 521XXXXXXXXXX → 52XXXXXXXXXX
+     * Meta webhook delivers 521... but the API expects 52...
+     */
+    private function normalizePhone(string $phone): string
+    {
+        if (preg_match('/^521(\d{10})$/', $phone, $m)) {
+            return '52' . $m[1];
+        }
+        return $phone;
     }
 
     private function triggerScraper(string $rfc): void
