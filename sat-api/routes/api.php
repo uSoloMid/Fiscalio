@@ -130,6 +130,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class, 'unreconcile']);
 
         // SAT Documents (CSF + Opinión 32-D)
+        Route::get('/sat-documents/missing', [\App\Http\Controllers\SatDocumentController::class, 'missing']);
         Route::get('/sat-documents', [\App\Http\Controllers\SatDocumentController::class, 'index']);
         Route::get('/sat-documents/{id}/download', [\App\Http\Controllers\SatDocumentController::class, 'download']);
     });

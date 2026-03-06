@@ -25,6 +25,7 @@ export const DashboardPage = ({
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
     const [totalSystemClients, setTotalSystemClients] = useState(0);
+    const [missingDocs, setMissingDocs] = useState<{ missing_csf: any[], missing_opinion: any[] }>({ missing_csf: [], missing_opinion: [] });
 
     // UI states
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -113,10 +114,14 @@ export const DashboardPage = ({
 
     const loadInitialData = async () => {
         try {
-            const [gRes, tRes, totalRes] = await Promise.all([listGroups(), listTags(), listClients({ pageSize: 1 })]);
+            const [gRes, tRes, totalRes, missingRes] = await Promise.all([
+                listGroups(), listTags(), listClients({ pageSize: 1 }),
+                fetch('/api/sat-documents/missing', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json()).catch(() => ({ missing_csf: [], missing_opinion: [] }))
+            ]);
             setGroups(gRes);
             setTags(tRes);
             setTotalSystemClients(totalRes.total || 0);
+            setMissingDocs(missingRes);
 
             // Limpiar filtros obsoletos de localStorage que ya no existen en la BD
             const validTagIds = selectedTagIds.filter(id => tRes.some((t: any) => t.id === id));
@@ -611,9 +616,40 @@ export const DashboardPage = ({
                                     )}
                                 </div>
                             </div>
-                            <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50 opacity-40 grayscale pointer-events-none select-none">
-                                <h3 className="font-bold text-gray-400 mb-2">Proveedores 69-B</h3>
-                                <div className="h-2 w-full bg-gray-200 rounded-full"></div>
+                            <div className={`flex-1 p-6 rounded-3xl border ${missingDocs.missing_csf.length > 0 || missingDocs.missing_opinion.length > 0 ? 'border-amber-200 bg-amber-50' : 'border-gray-50 bg-gray-50/50'}`}>
+                                <h3 className={`font-bold mb-3 ${missingDocs.missing_csf.length > 0 || missingDocs.missing_opinion.length > 0 ? 'text-amber-700' : 'text-gray-400'}`}>Documentos SAT</h3>
+                                <div className="text-sm font-medium space-y-3">
+                                    {missingDocs.missing_csf.length === 0 && missingDocs.missing_opinion.length === 0 ? (
+                                        <div className="text-gray-500">Todos tienen CSF y Opinión 32-D.</div>
+                                    ) : (
+                                        <>
+                                            {missingDocs.missing_csf.length > 0 && (
+                                                <div className="space-y-1">
+                                                    <div className="text-amber-600 font-bold text-xs mb-1">Sin CSF ({missingDocs.missing_csf.length}):</div>
+                                                    {missingDocs.missing_csf.slice(0, 5).map((c: any) => (
+                                                        <div key={c.rfc} onClick={() => onSelectClient(c.rfc, c.name, '', '')} className="flex items-center justify-between bg-white p-2 rounded-xl border border-amber-100 shadow-sm cursor-pointer hover:border-amber-300 transition-colors">
+                                                            <span className="text-gray-800 text-xs truncate max-w-[130px] font-bold">{c.name}</span>
+                                                            <span className="text-amber-600 text-[10px] font-bold bg-amber-50 px-2 py-0.5 rounded">Sin CSF</span>
+                                                        </div>
+                                                    ))}
+                                                    {missingDocs.missing_csf.length > 5 && <div className="text-xs text-amber-500 font-medium">+{missingDocs.missing_csf.length - 5} más</div>}
+                                                </div>
+                                            )}
+                                            {missingDocs.missing_opinion.length > 0 && (
+                                                <div className="space-y-1 mt-2">
+                                                    <div className="text-orange-600 font-bold text-xs mb-1">Sin Opinión 32-D ({missingDocs.missing_opinion.length}):</div>
+                                                    {missingDocs.missing_opinion.slice(0, 3).map((c: any) => (
+                                                        <div key={c.rfc} onClick={() => onSelectClient(c.rfc, c.name, '', '')} className="flex items-center justify-between bg-white p-2 rounded-xl border border-orange-100 shadow-sm cursor-pointer hover:border-orange-300 transition-colors">
+                                                            <span className="text-gray-800 text-xs truncate max-w-[130px] font-bold">{c.name}</span>
+                                                            <span className="text-orange-600 text-[10px] font-bold bg-orange-50 px-2 py-0.5 rounded">Sin Opinión</span>
+                                                        </div>
+                                                    ))}
+                                                    {missingDocs.missing_opinion.length > 3 && <div className="text-xs text-orange-500 font-medium">+{missingDocs.missing_opinion.length - 3} más</div>}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex-1 p-6 rounded-3xl border border-gray-50 bg-gray-50/50 opacity-40 grayscale pointer-events-none select-none">
                                 <h3 className="font-bold text-gray-400 mb-2">Diferencias IVA</h3>

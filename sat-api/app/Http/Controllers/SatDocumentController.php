@@ -36,6 +36,28 @@ class SatDocumentController extends Controller
     }
 
     /**
+     * Return businesses missing CSF and/or Opinion 32-D (authenticated).
+     */
+    public function missing()
+    {
+        $allRfcs = DB::table('businesses')
+            ->select('rfc', 'legal_name', 'common_name')
+            ->orderBy('legal_name')
+            ->get();
+
+        $hasCsf     = DB::table('sat_documents')->where('type', 'csf')->distinct()->pluck('rfc')->flip();
+        $hasOpinion = DB::table('sat_documents')->where('type', 'opinion_32d')->distinct()->pluck('rfc')->flip();
+
+        $missingCsf     = $allRfcs->filter(fn($b) => !isset($hasCsf[$b->rfc]))->values();
+        $missingOpinion = $allRfcs->filter(fn($b) => !isset($hasOpinion[$b->rfc]))->values();
+
+        return response()->json([
+            'missing_csf'     => $missingCsf->map(fn($b) => ['rfc' => $b->rfc, 'name' => $b->common_name ?: $b->legal_name]),
+            'missing_opinion' => $missingOpinion->map(fn($b) => ['rfc' => $b->rfc, 'name' => $b->common_name ?: $b->legal_name]),
+        ]);
+    }
+
+    /**
      * Serve the PDF file for download (authenticated).
      */
     public function download($id)
