@@ -239,7 +239,7 @@ class WhatsAppController extends Controller
         $query = $this->buildCfdiQuery($rfc, $direction, $period);
 
         $count = (clone $query)->count();
-        $total = (clone $query)->where('cancelado', 0)->sum('total');
+        $total = (clone $query)->where('es_cancelado', 0)->sum('total');
 
         if ($count === 0) {
             $this->whatsapp->sendText($from, "No hay facturas para *{$data['name']}* en el periodo indicado.");
@@ -287,13 +287,14 @@ class WhatsAppController extends Controller
         $lines = $rows->map(function ($r) use ($data) {
             $date      = Carbon::parse($r->fecha)->format('d/m');
             $amount    = '$' . number_format($r->total, 0);
-            $cancelado = ($r->cancelado ?? 0) ? ' ❌' : '';
-            // Show counterpart name
+            $cancelado = $r->es_cancelado ? ' CANC' : '';
+            $folio     = ($r->serie ?? '') . ($r->folio ?? '');
+            $folioStr  = $folio ? " [{$folio}]" : '';
             $counterpart = $data['direction'] === 'E'
                 ? ($r->name_receptor ?: $r->rfc_receptor)
                 : ($r->name_emisor   ?: $r->rfc_emisor);
-            $counterpart = mb_substr($counterpart, 0, 25);
-            return "• {$date} {$counterpart} {$amount}{$cancelado}";
+            $counterpart = mb_substr($counterpart, 0, 22);
+            return "• {$date}{$folioStr} {$counterpart} {$amount}{$cancelado}";
         })->implode("\n");
 
         $showing = $offset + $rows->count();
