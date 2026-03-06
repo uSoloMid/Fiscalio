@@ -134,5 +134,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/sat-documents/{id}/download', [\App\Http\Controllers\SatDocumentController::class, 'download']);
     });
 
+// WhatsApp Business webhook (public — no auth)
+Route::get('/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'verify']);
+Route::post('/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'webhook']);
+
 require __DIR__ . '/debug_routes.php';
 require __DIR__ . '/debug_cwd.php';
