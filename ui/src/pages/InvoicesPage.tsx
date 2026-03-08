@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel, createManualRequest } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel, createManualRequest, suggestCfdis } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import { BankStatementPage } from './BankStatementPage';
@@ -15,6 +15,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [cfdiTipo, setCfdiTipo] = useState<'I' | 'E' | 'N' | 'P' | 'T' | ''>('I');
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [suggestionHighlight, setSuggestionHighlight] = useState(-1);
+    const searchRef = useRef<HTMLDivElement>(null);
     const [availablePeriods, setAvailablePeriods] = useState<string[]>([]);
 
     const [activeClientName, setActiveClientName] = useState('');
@@ -248,6 +252,28 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         const timer = setTimeout(() => setDebouncedSearch(search), 400);
         return () => clearTimeout(timer);
     }, [search]);
+
+    // Fetch suggestions with 300ms debounce
+    useEffect(() => {
+        if (search.length < 2) { setSuggestions([]); return; }
+        const timer = setTimeout(async () => {
+            const results = await suggestCfdis(search, activeRfc);
+            setSuggestions(results);
+            setSuggestionHighlight(-1);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search, activeRfc]);
+
+    // Close suggestions on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     // Reset page when filters change
     useEffect(() => {
@@ -842,15 +868,100 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                             </span>
                         </div>
                         <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
-                            <div className="relative min-w-[240px]">
-                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">search</span>
+                            {/* Smart search with suggestions */}
+                            <div ref={searchRef} className="relative min-w-[300px]">
+                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg z-10">search</span>
                                 <input
-                                    className="w-full pl-9 pr-3 py-1.5 text-sm border-gray-300 rounded-md focus:border-[var(--primary)] focus:ring-[var(--primary)] shadow-sm"
-                                    placeholder="Buscar UUID, RFC, concepto..."
+                                    className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-md focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100 shadow-sm"
+                                    placeholder="RFC, razón social, UUID, monto, fecha..."
                                     type="text"
                                     value={search}
-                                    onChange={e => setSearch(e.target.value)}
+                                    onChange={e => { setSearch(e.target.value); setShowSuggestions(true); }}
+                                    onFocus={() => { if (search.length >= 2) setShowSuggestions(true); }}
+                                    onKeyDown={e => {
+                                        if (!showSuggestions || suggestions.length === 0) return;
+                                        if (e.key === 'ArrowDown') { e.preventDefault(); setSuggestionHighlight(h => Math.min(h + 1, suggestions.length - 1)); }
+                                        else if (e.key === 'ArrowUp') { e.preventDefault(); setSuggestionHighlight(h => Math.max(h - 1, 0)); }
+                                        else if (e.key === 'Enter' && suggestionHighlight >= 0) {
+                                            e.preventDefault();
+                                            const s = suggestions[suggestionHighlight];
+                                            const val = s._fill;
+                                            setSearch(val); setDebouncedSearch(val); setShowSuggestions(false);
+                                        }
+                                        else if (e.key === 'Escape') setShowSuggestions(false);
+                                    }}
                                 />
+                                {search.length > 0 && (
+                                    <button
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
+                                        onMouseDown={e => { e.preventDefault(); setSearch(''); setDebouncedSearch(''); setSuggestions([]); setShowSuggestions(false); }}
+                                    >
+                                        <span className="material-symbols-outlined text-base">close</span>
+                                    </button>
+                                )}
+                                {/* Suggestions dropdown */}
+                                {showSuggestions && suggestions.length > 0 && (() => {
+                                    // Build deduplicated suggestion list with category detection
+                                    const ql = search.toLowerCase();
+                                    const seen = new Set<string>();
+                                    const items: { key: string; type: string; icon: string; color: string; primary: string; secondary: string; _fill: string }[] = [];
+
+                                    suggestions.forEach(cfdi => {
+                                        const otherRfc = cfdi.rfc_emisor === activeRfc ? cfdi.rfc_receptor : cfdi.rfc_emisor;
+                                        const otherName = cfdi.rfc_emisor === activeRfc ? cfdi.name_receptor : cfdi.name_emisor;
+
+                                        const push = (type: string, icon: string, color: string, primary: string, secondary: string, fill: string) => {
+                                            const key = `${type}:${fill}`;
+                                            if (!seen.has(key) && items.length < 10) { seen.add(key); items.push({ key, type, icon, color, primary, secondary, _fill: fill }); }
+                                        };
+
+                                        if (otherRfc?.toLowerCase().includes(ql)) push('RFC', 'badge', 'text-blue-600 bg-blue-50', otherRfc, otherName || '', otherRfc);
+                                        if (otherName?.toLowerCase().includes(ql)) push('Razón Social', 'business', 'text-violet-600 bg-violet-50', otherName, otherRfc || '', otherName);
+                                        if (cfdi.uuid?.toLowerCase().includes(ql)) push('UUID', 'fingerprint', 'text-gray-600 bg-gray-100', cfdi.uuid, '', cfdi.uuid);
+                                        if (cfdi.concepto?.toLowerCase().includes(ql)) push('Concepto', 'description', 'text-emerald-600 bg-emerald-50', cfdi.concepto.substring(0, 60), '', cfdi.concepto);
+                                        if (String(cfdi.total).includes(search)) push('Monto', 'payments', 'text-orange-600 bg-orange-50', `$${Number(cfdi.total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`, '', String(cfdi.total));
+                                        if (cfdi.fecha_fiscal?.includes(search)) push('Fecha', 'calendar_today', 'text-teal-600 bg-teal-50', cfdi.fecha_fiscal?.substring(0, 10) || '', '', cfdi.fecha_fiscal?.substring(0, 10) || '');
+                                    });
+
+                                    if (items.length === 0) return null;
+                                    return (
+                                        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                                            <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between">
+                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sugerencias</span>
+                                                <span className="text-[10px] text-gray-300">{items.length} resultado{items.length !== 1 ? 's' : ''}</span>
+                                            </div>
+                                            {items.map((item, idx) => (
+                                                <div
+                                                    key={item.key}
+                                                    className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${suggestionHighlight === idx ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                                                    onMouseEnter={() => setSuggestionHighlight(idx)}
+                                                    onMouseDown={e => {
+                                                        e.preventDefault();
+                                                        setSearch(item._fill);
+                                                        setDebouncedSearch(item._fill);
+                                                        setShowSuggestions(false);
+                                                    }}
+                                                >
+                                                    <span className={`flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center ${item.color}`}>
+                                                        <span className="material-symbols-outlined text-[14px]">{item.icon}</span>
+                                                    </span>
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className="text-xs font-semibold text-gray-800 truncate block">{item.primary}</span>
+                                                        {item.secondary && <span className="text-[10px] text-gray-400 truncate block">{item.secondary}</span>}
+                                                    </div>
+                                                    <span className={`flex-shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-md ${item.color}`}>{item.type}</span>
+                                                </div>
+                                            ))}
+                                            <div
+                                                className="px-3 py-2 border-t border-gray-100 flex items-center gap-2 cursor-pointer hover:bg-gray-50 transition-colors"
+                                                onMouseDown={e => { e.preventDefault(); setShowSuggestions(false); setDebouncedSearch(search); }}
+                                            >
+                                                <span className="material-symbols-outlined text-gray-400 text-base">search</span>
+                                                <span className="text-xs text-gray-500">Buscar <span className="font-semibold text-gray-700">"{search}"</span> en todos los campos</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                             <div className="h-6 w-px bg-gray-200 mx-2 flex-shrink-0"></div>
                             <div className="flex items-center gap-2">

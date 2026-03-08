@@ -50,7 +50,12 @@ class InvoiceController extends Controller
             $query->where(function ($sub) use ($q) {
                 $sub->where('uuid', 'like', "%$q%")
                     ->orWhere('rfc_emisor', 'like', "%$q%")
-                    ->orWhere('rfc_receptor', 'like', "%$q%");
+                    ->orWhere('rfc_receptor', 'like', "%$q%")
+                    ->orWhere('name_emisor', 'like', "%$q%")
+                    ->orWhere('name_receptor', 'like', "%$q%")
+                    ->orWhere('concepto', 'like', "%$q%")
+                    ->orWhere('total', 'like', "%$q%")
+                    ->orWhere('fecha_fiscal', 'like', "%$q%");
             });
         }
 
@@ -71,6 +76,32 @@ class InvoiceController extends Controller
         $query->orderBy('fecha_fiscal', 'desc');
         $pageSize = min((int) $request->input('pageSize', 50), 200);
         return response()->json($query->paginate($pageSize));
+    }
+
+    public function suggest(Request $request)
+    {
+        $q = trim($request->input('q', ''));
+        $rfcUser = trim(strtoupper($request->input('rfc_user', '')));
+
+        if (strlen($q) < 2 || !$rfcUser) return response()->json([]);
+
+        $base = Cfdi::where(function ($query) use ($rfcUser) {
+            $query->where('rfc_emisor', $rfcUser)->orWhere('rfc_receptor', $rfcUser);
+        })->where(function ($sub) use ($q) {
+            $sub->where('uuid', 'like', "%$q%")
+                ->orWhere('rfc_emisor', 'like', "%$q%")
+                ->orWhere('rfc_receptor', 'like', "%$q%")
+                ->orWhere('name_emisor', 'like', "%$q%")
+                ->orWhere('name_receptor', 'like', "%$q%")
+                ->orWhere('concepto', 'like', "%$q%")
+                ->orWhere('total', 'like', "%$q%")
+                ->orWhere('fecha_fiscal', 'like', "%$q%");
+        })->select('uuid', 'rfc_emisor', 'rfc_receptor', 'name_emisor', 'name_receptor', 'concepto', 'total', 'fecha_fiscal', 'tipo')
+          ->orderBy('fecha_fiscal', 'desc')
+          ->limit(12)
+          ->get();
+
+        return response()->json($base);
     }
 
     public function getPeriods(Request $request)

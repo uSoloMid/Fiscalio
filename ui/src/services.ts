@@ -64,6 +64,14 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
     return response.json();
 }
 
+export async function suggestCfdis(q: string, rfcUser: string): Promise<any[]> {
+    if (q.length < 2) return [];
+    const params = new URLSearchParams({ q, rfc_user: rfcUser });
+    const response = await authFetch(`${API_BASE_URL}/api/cfdis/suggest?${params}`);
+    if (!response.ok) return [];
+    return response.json();
+}
+
 export async function getCfdi(uuid: string): Promise<{ metadata: Cfdi, xml_url: string, sat_response?: any }> {
     const response = await authFetch(`${API_BASE_URL}/api/cfdis/${uuid}`);
     if (!response.ok) {

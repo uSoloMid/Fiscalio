@@ -36,6 +36,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/cfdis/upload', [\App\Http\Controllers\UploadController::class , 'uploadManual']);
     Route::get('/cfdis/periods', [InvoiceController::class , 'getPeriods']);
     Route::get('/cfdis/export', [InvoiceController::class , 'exportExcel']);
+    Route::get('/cfdis/suggest', [InvoiceController::class , 'suggest']);
     Route::get('/cfdis', [InvoiceController::class , 'indexCfdis']);
     Route::get('/cfdis/{uuid}', [InvoiceController::class , 'showCfdi']);
     Route::post('/cfdis/{uuid}/refresh-status', [InvoiceController::class , 'refreshCfdiStatus']);
