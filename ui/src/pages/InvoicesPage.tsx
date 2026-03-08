@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel, createManualRequest } from '../services';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
@@ -37,6 +37,68 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation' | 'sat-docs'>('invoices');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [contabilidadOpen, setContabilidadOpen] = useState(true);
+
+    // --- Column sort (not persisted) ---
+    const [sortField, setSortField] = useState<string | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+    const handleSort = useCallback((field: string) => {
+        setSortField(prev => {
+            if (prev === field) {
+                setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+                return field;
+            }
+            setSortDir('asc');
+            return field;
+        });
+    }, []);
+
+    // --- Column widths (persisted) ---
+    const defaultColWidths: Record<string, number> = {
+        status: 40, fecha: 96, serieFolio: 80, rfcNombre: 160,
+        concepto: 256, total: 96, iva: 80, ret: 80,
+        tipo: 64, met: 64, estatusSat: 128, uuid: 120, actions: 32,
+    };
+    const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
+        try {
+            const saved = localStorage.getItem('invoices_col_widths');
+            return saved ? { ...defaultColWidths, ...JSON.parse(saved) } : defaultColWidths;
+        } catch { return defaultColWidths; }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('invoices_col_widths', JSON.stringify(colWidths));
+    }, [colWidths]);
+
+    const resizingRef = useRef<{ colId: string; startX: number; startWidth: number } | null>(null);
+
+    const startColResize = useCallback((colId: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        resizingRef.current = { colId, startX: e.clientX, startWidth: colWidths[colId] };
+        document.body.style.cursor = 'col-resize';
+    }, [colWidths]);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!resizingRef.current) return;
+            const { colId, startX, startWidth } = resizingRef.current;
+            const newWidth = Math.max(40, startWidth + (e.clientX - startX));
+            setColWidths(prev => ({ ...prev, [colId]: newWidth }));
+        };
+        const handleMouseUp = () => {
+            if (resizingRef.current) {
+                resizingRef.current = null;
+                document.body.style.cursor = 'default';
+            }
+        };
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
 
     const [showCancelled, setShowCancelled] = useState(false);
     const [showDownloadXmlModal, setShowDownloadXmlModal] = useState(false);
@@ -240,6 +302,20 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
 
     const hasSerieFolio = data.some(c => c.serie || c.folio);
     const hasRetenciones = data.some(c => c.retenciones && Number(c.retenciones) > 0);
+
+    const sortedData = useMemo(() => {
+        if (!sortField) return data;
+        return [...data].sort((a: any, b: any) => {
+            let av = a[sortField];
+            let bv = b[sortField];
+            if (['total', 'iva', 'retenciones', 'subtotal'].includes(sortField)) {
+                return sortDir === 'asc' ? (Number(av) || 0) - (Number(bv) || 0) : (Number(bv) || 0) - (Number(av) || 0);
+            }
+            av = String(av ?? '').toLowerCase();
+            bv = String(bv ?? '').toLowerCase();
+            return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        });
+    }, [data, sortField, sortDir]);
 
     const loadCfdiDetail = async (uuid: string) => {
         setDrawerLoading(true);
@@ -978,25 +1054,50 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50 sticky top-0 z-20">
                                         <tr>
-                                            <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
-                                                <span className="material-symbols-outlined text-base" title="Estado">info</span>
-                                            </th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Fecha</th>
-                                            {hasSerieFolio && (
-                                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">S/F</th>
-                                            )}
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">RFC / Nombre</th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-64">Concepto</th>
-                                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Total</th>
-                                            <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">IVA</th>
-                                            {hasRetenciones && (
-                                                <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Ret</th>
-                                            )}
-                                            <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Tipo</th>
-                                            <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-16">Met</th>
-                                            <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Estatus SAT</th>
-                                            <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">UUID</th>
-                                            <th className="w-8 px-1"></th>
+                                            {/* Helper: ResizableTh renders a header cell with sort+resize */}
+                                            {(() => {
+                                                const ResizableTh = ({ colId, label, sortable = false, align = 'left', children }: { colId: string; label?: string; sortable?: boolean; align?: string; children?: React.ReactNode }) => (
+                                                    <th
+                                                        style={{ width: colWidths[colId], minWidth: colWidths[colId], position: 'relative', userSelect: 'none' }}
+                                                        className={`px-3 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider text-${align} ${sortable ? 'cursor-pointer hover:bg-gray-100 group' : ''}`}
+                                                        onClick={sortable ? () => handleSort(colId) : undefined}
+                                                    >
+                                                        <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : ''}`}>
+                                                            {children ?? label}
+                                                            {sortable && (
+                                                                <span className={`material-symbols-outlined text-[13px] transition-all flex-shrink-0 ${sortField === colId ? 'text-blue-500 opacity-100' : 'opacity-0 group-hover:opacity-40 text-gray-400'}`}>
+                                                                    {sortField === colId ? (sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward') : 'unfold_more'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {/* Resize handle */}
+                                                        <div
+                                                            className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize hover:bg-blue-400/50 transition-colors z-10"
+                                                            onMouseDown={(e) => startColResize(colId, e)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    </th>
+                                                );
+                                                return (
+                                                    <>
+                                                        <ResizableTh colId="status" align="center">
+                                                            <span className="material-symbols-outlined text-base" title="Estado">info</span>
+                                                        </ResizableTh>
+                                                        <ResizableTh colId="fecha" label="Fecha" sortable align="left" />
+                                                        {hasSerieFolio && <ResizableTh colId="serieFolio" label="S/F" align="left" />}
+                                                        <ResizableTh colId="rfcNombre" label="RFC / Nombre" align="left" />
+                                                        <ResizableTh colId="concepto" label="Concepto" align="left" />
+                                                        <ResizableTh colId="total" label="Total" sortable align="right" />
+                                                        <ResizableTh colId="iva" label="IVA" sortable align="right" />
+                                                        {hasRetenciones && <ResizableTh colId="ret" label="Ret" sortable align="right" />}
+                                                        <ResizableTh colId="tipo" label="Tipo" sortable align="center" />
+                                                        <ResizableTh colId="met" label="Met" sortable align="center" />
+                                                        <ResizableTh colId="estatusSat" label="Estatus SAT" sortable align="center" />
+                                                        <ResizableTh colId="uuid" label="UUID" align="left" />
+                                                        <th style={{ width: colWidths.actions, minWidth: colWidths.actions }} className="px-1"></th>
+                                                    </>
+                                                );
+                                            })()}
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -1015,63 +1116,63 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                 </td>
                                             </tr>
                                         )}
-                                        {data.map(cfdi => (
+                                        {sortedData.map(cfdi => (
                                             <tr
                                                 key={cfdi.uuid}
                                                 onClick={() => setSelectedUuid(cfdi.uuid)}
                                                 className={`table-row-hover hover:bg-gray-50 cursor-pointer transition-colors ${selectedUuid === cfdi.uuid ? 'bg-emerald-50' : ''}`}
                                             >
-                                                <td className="px-3 py-3 whitespace-nowrap text-center">
+                                                <td style={{ width: colWidths.status }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
                                                     {cfdi.es_cancelado ? (
                                                         <span className="material-symbols-outlined text-red-500 text-lg">cancel</span>
                                                     ) : (
                                                         <span className="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
                                                     )}
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-900">
+                                                <td style={{ width: colWidths.fecha }} className="px-3 py-3 whitespace-nowrap text-xs text-gray-900 overflow-hidden">
                                                     {cfdi.fecha ? cfdi.fecha.substring(0, 10) : '-'}
                                                 </td>
                                                 {hasSerieFolio && (
-                                                    <td className="px-3 py-3 whitespace-nowrap text-[10px] text-gray-500 font-mono">
+                                                    <td style={{ width: colWidths.serieFolio }} className="px-3 py-3 whitespace-nowrap text-[10px] text-gray-500 font-mono overflow-hidden">
                                                         {cfdi.serie || ''}{cfdi.folio || ''}
                                                     </td>
                                                 )}
-                                                <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium">
+                                                <td style={{ width: colWidths.rfcNombre }} className="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium overflow-hidden">
                                                     {(() => {
                                                         const isEmitted = cfdi.rfc_emisor === activeRfc;
                                                         const otherName = isEmitted ? cfdi.name_receptor : cfdi.name_emisor;
                                                         const otherRfc = isEmitted ? cfdi.rfc_receptor : cfdi.rfc_emisor;
                                                         return (
                                                             <div className="flex flex-col">
-                                                                <span className="font-bold truncate max-w-[150px]" title={otherName || ''}>{otherName || otherRfc}</span>
+                                                                <span className="font-bold truncate" style={{ maxWidth: colWidths.rfcNombre - 24 }} title={otherName || ''}>{otherName || otherRfc}</span>
                                                                 {otherName && <span className="text-gray-500 font-normal text-[10px]">{otherRfc}</span>}
                                                             </div>
                                                         );
                                                     })()}
                                                 </td>
-                                                <td className="px-3 py-3 text-xs text-gray-600 truncate max-w-[200px]" title={cfdi.concepto || ''}>
+                                                <td style={{ width: colWidths.concepto, maxWidth: colWidths.concepto }} className="px-3 py-3 text-xs text-gray-600 truncate overflow-hidden" title={cfdi.concepto || ''}>
                                                     {cfdi.concepto || '-'}
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900">
+                                                <td style={{ width: colWidths.total }} className="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900 overflow-hidden">
                                                     ${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.total)}
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-600">
+                                                <td style={{ width: colWidths.iva }} className="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-600 overflow-hidden">
                                                     {cfdi.iva ? `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.iva)}` : '-'}
                                                 </td>
                                                 {hasRetenciones && (
-                                                    <td className="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-600">
+                                                    <td style={{ width: colWidths.ret }} className="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-600 overflow-hidden">
                                                         {cfdi.retenciones && Number(cfdi.retenciones) > 0 ? `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.retenciones)}` : '-'}
                                                     </td>
                                                 )}
-                                                <td className="px-3 py-3 whitespace-nowrap text-center">
+                                                <td style={{ width: colWidths.tipo }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
                                                     <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">{cfdi.tipo}</span>
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap text-center">
+                                                <td style={{ width: colWidths.met }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-black ${cfdi.metodo_pago === 'PUE' ? 'bg-blue-50 text-blue-600' : cfdi.metodo_pago === 'PPD' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500'}`}>
                                                         {cfdi.metodo_pago || '-'}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap text-center">
+                                                <td style={{ width: colWidths.estatusSat }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${cfdi.estado_sat === 'Vigente' ? 'bg-emerald-100 text-emerald-700' :
                                                         cfdi.estado_sat === 'Cancelado' ? 'bg-red-100 text-red-700' :
                                                             cfdi.estado_sat === 'No Encontrado' ? 'bg-amber-100 text-amber-700' :
@@ -1080,10 +1181,10 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                         {cfdi.estado_sat || 'Sin verificar'}
                                                     </span>
                                                 </td>
-                                                <td className="px-3 py-3 whitespace-nowrap text-xs text-gray-400 font-mono">
+                                                <td style={{ width: colWidths.uuid }} className="px-3 py-3 whitespace-nowrap text-xs text-gray-400 font-mono overflow-hidden">
                                                     {cfdi.uuid}
                                                 </td>
-                                                <td className="px-1 py-3 whitespace-nowrap text-right">
+                                                <td style={{ width: colWidths.actions }} className="px-1 py-3 whitespace-nowrap text-right overflow-hidden">
                                                     <span className="material-symbols-outlined text-lg text-gray-400">chevron_right</span>
                                                 </td>
                                             </tr>
