@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { listBankStatements, getReconciliationSuggestions, reconcileMovement } from '../services';
 import { MovementReconcileRow } from '../components/MovementReconcileRow';
+import { ReconciliationSidebar } from '../components/ReconciliationSidebar';
 import type { BankStatement, BankMovement, ReconciliationStats } from '../models';
 
 interface Props {
@@ -12,6 +13,24 @@ interface Props {
 const fmt = (n: number) =>
     n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2 });
 
+const BANK_COLORS: Record<string, string> = {
+    bbva:       'bg-blue-600',
+    banamex:    'bg-red-600',
+    santander:  'bg-red-500',
+    hsbc:       'bg-red-800',
+    banorte:    'bg-orange-600',
+    inbursa:    'bg-blue-800',
+    banbajío:   'bg-emerald-700',
+    scotiabank: 'bg-yellow-600',
+};
+const getBankColor = (name: string) => {
+    const lower = name.toLowerCase();
+    for (const [key, color] of Object.entries(BANK_COLORS)) {
+        if (lower.includes(key)) return color;
+    }
+    return 'bg-gray-500';
+};
+
 export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const [statements, setStatements] = useState<BankStatement[]>([]);
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -19,6 +38,8 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const [isLoadingStatements, setIsLoadingStatements] = useState(true);
     const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
     const [isBulkConfirming, setIsBulkConfirming] = useState(false);
+    const [isSelectorOpen, setIsSelectorOpen] = useState(true);
+    const [selectedMovement, setSelectedMovement] = useState<BankMovement | null>(null);
 
     useEffect(() => {
         loadStatements();
@@ -35,9 +56,11 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     };
 
     const handleSelectStatement = async (id: number) => {
-        if (selectedId === id) return;
+        if (selectedId === id) { setIsSelectorOpen(false); return; }
         setSelectedId(id);
+        setSelectedMovement(null);
         setReconciliationData(null);
+        setIsSelectorOpen(false);
         setIsLoadingSuggestions(true);
         try {
             const data = await getReconciliationSuggestions(id, activeRfc);
@@ -59,6 +82,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     };
 
     const handleMovementReconciled = (updated: BankMovement) => {
+        setSelectedMovement(null);
         setReconciliationData(prev => {
             if (!prev) return prev;
             const wasReconciled = prev.movements.find(m => m.id === updated.id)?.cfdi_id;
@@ -81,13 +105,16 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         });
     };
 
+    const handleSelectMovement = (movement: BankMovement) => {
+        setSelectedMovement(prev => prev?.id === movement.id ? null : movement);
+    };
+
     const handleBulkConfirmGreen = async () => {
         if (!reconciliationData || !selectedId) return;
         const greenPending = reconciliationData.movements.filter(
             m => !m.cfdi_id && m.suggestions && m.suggestions.length > 0 && m.suggestions[0].confidence === 'green'
         );
         if (greenPending.length === 0) return;
-
         setIsBulkConfirming(true);
         try {
             const updatedMovements = [...reconciliationData.movements];
@@ -96,6 +123,9 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                 const res = await reconcileMovement(movement.id, top.cfdi_id, 'green');
                 const idx = updatedMovements.findIndex(m => m.id === movement.id);
                 if (idx !== -1) updatedMovements[idx] = { ...res.movement, suggestions: [] };
+            }
+            if (selectedMovement && greenPending.find(m => m.id === selectedMovement.id)) {
+                setSelectedMovement(null);
             }
             setReconciliationData({ movements: updatedMovements, stats: computeStats(updatedMovements) });
             adjustReconciledCount(greenPending.length);
@@ -126,61 +156,101 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         m => !m.cfdi_id && m.suggestions?.[0]?.confidence === 'green'
     ).length ?? 0;
 
-    return (
-        <div className="flex h-screen bg-[#F8FAFC] font-['Inter'] overflow-hidden">
-            {/* Left panel — statement inbox */}
-            <div className="w-80 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col">
-                <div className="px-6 py-5 border-b border-gray-100">
-                    <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-gray-700 transition-colors mb-4">
-                        <span className="material-symbols-outlined text-lg">arrow_back</span>
-                        <span className="text-xs font-black uppercase tracking-widest">Volver</span>
-                    </button>
-                    <h1 className="text-base font-black text-gray-900 uppercase tracking-tight">Conciliación</h1>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{clientName}</p>
-                </div>
+    // Bank card status
+    const getStatementStatus = (s: BankStatement) => {
+        const total = (s as any).movements_count ?? 0;
+        const reconciled = (s as any).reconciled_count ?? 0;
+        const pct = total > 0 ? Math.round((reconciled / total) * 100) : 0;
+        if (pct >= 80) return { label: 'Conciliado', color: 'text-emerald-700 bg-emerald-50', dot: 'bg-emerald-500' };
+        if (pct > 0)   return { label: 'Pendiente',  color: 'text-yellow-700 bg-yellow-50',  dot: 'bg-yellow-400' };
+        return           { label: 'Sin Iniciar', color: 'text-gray-400 bg-gray-50',       dot: 'bg-gray-300' };
+    };
 
-                <div className="flex-1 overflow-y-auto">
+    return (
+        <div className="flex flex-col h-screen bg-[#F8FAFC] font-['Inter'] overflow-hidden">
+
+            {/* ── Bank selector ── */}
+            {isSelectorOpen ? (
+                /* Expanded */
+                <div className="bg-white border-b border-gray-100 px-8 py-6 flex-shrink-0">
+                    <div className="flex items-start justify-between mb-6">
+                        <div>
+                            <button
+                                onClick={onBack}
+                                className="flex items-center gap-2 text-gray-400 hover:text-gray-700 transition-colors mb-3"
+                            >
+                                <span className="material-symbols-outlined text-lg">arrow_back</span>
+                                <span className="text-xs font-black uppercase tracking-widest">Volver</span>
+                            </button>
+                            <h1 className="text-xl font-black text-gray-900">Conciliación Bancaria</h1>
+                            <p className="text-xs font-bold text-gray-400 mt-0.5 uppercase tracking-widest">{clientName}</p>
+                        </div>
+                    </div>
+
                     {isLoadingStatements ? (
-                        <div className="flex items-center justify-center py-20">
-                            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="flex items-center gap-3 py-6">
+                            <div className="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Cargando estados…</span>
                         </div>
                     ) : statements.length === 0 ? (
-                        <div className="px-6 py-12 text-center">
-                            <span className="material-symbols-outlined text-4xl text-gray-200 block mb-3">account_balance</span>
+                        <div className="py-8 text-center">
+                            <span className="material-symbols-outlined text-4xl text-gray-200 block mb-2">account_balance</span>
                             <p className="text-xs font-black text-gray-300 uppercase tracking-widest">Sin estados de cuenta</p>
+                            <p className="text-xs text-gray-400 mt-1">Importa un PDF bancario para comenzar</p>
                         </div>
                     ) : (
-                        <div className="p-3 space-y-1">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                             {statements.map(s => {
-                                const isSelected = s.id === selectedId;
                                 const total = (s as any).movements_count ?? 0;
                                 const reconciled = (s as any).reconciled_count ?? 0;
                                 const pct = total > 0 ? Math.round((reconciled / total) * 100) : 0;
+                                const status = getStatementStatus(s);
+                                const bankColor = getBankColor(s.bank_name);
+                                const bankInitial = s.bank_name.charAt(0).toUpperCase();
+                                const lastFour = s.account_number ? s.account_number.slice(-4) : '—';
+
                                 return (
                                     <button
                                         key={s.id}
                                         onClick={() => handleSelectStatement(s.id)}
-                                        className={`w-full text-left px-4 py-3 rounded-2xl transition-all ${isSelected ? 'bg-gray-900 text-white' : 'hover:bg-gray-50 text-gray-700'}`}
+                                        className={`text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md ${
+                                            s.id === selectedId
+                                                ? 'border-emerald-500 shadow-sm shadow-emerald-100'
+                                                : 'border-gray-100 hover:border-gray-200 bg-white'
+                                        }`}
                                     >
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <span className={`text-[10px] font-black uppercase tracking-widest ${isSelected ? 'text-white' : 'text-gray-900'}`}>
-                                                {s.bank_name}
-                                            </span>
-                                            <span className={`text-[9px] font-black uppercase ${isSelected ? 'text-gray-300' : 'text-gray-400'}`}>
-                                                {s.period}
-                                            </span>
+                                        {/* Bank avatar + name */}
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <div className={`w-9 h-9 rounded-xl ${bankColor} flex items-center justify-center text-white text-sm font-black flex-shrink-0`}>
+                                                {bankInitial}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-black text-gray-900 truncate">{s.bank_name}</p>
+                                                <p className="text-[10px] font-medium text-gray-400">CTA *{lastFour}</p>
+                                            </div>
+                                            {s.id === selectedId && (
+                                                <span className="material-symbols-outlined text-emerald-500 text-base ml-auto flex-shrink-0">check_circle</span>
+                                            )}
                                         </div>
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <span className={`text-[9px] font-medium ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>
-                                                {total} mov.
+
+                                        {/* Period */}
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{s.period}</p>
+
+                                        {/* Balance */}
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Saldo Final</p>
+                                        <p className="text-base font-black text-gray-900 mt-0.5">{fmt(parseFloat(s.final_balance as any))}</p>
+
+                                        {/* Status + progress */}
+                                        <div className="flex items-center justify-between mt-3">
+                                            <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${status.color}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                                {status.label}
                                             </span>
-                                            <span className={`text-[9px] font-black ${isSelected ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                                                {pct}% conciliado
-                                            </span>
+                                            <span className="text-[10px] font-black text-gray-400">{pct}%</span>
                                         </div>
-                                        <div className={`w-full h-1 rounded-full ${isSelected ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                        <div className="w-full h-1 rounded-full bg-gray-100 mt-1.5">
                                             <div
-                                                className={`h-1 rounded-full transition-all ${isSelected ? 'bg-emerald-400' : 'bg-emerald-500'}`}
+                                                className="h-1 rounded-full bg-emerald-500 transition-all"
                                                 style={{ width: `${pct}%` }}
                                             />
                                         </div>
@@ -190,100 +260,144 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            ) : (
+                /* Compact bar */
+                <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center gap-4 flex-shrink-0">
+                    <button
+                        onClick={onBack}
+                        className="flex items-center gap-1.5 text-gray-400 hover:text-gray-700 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-base">arrow_back</span>
+                    </button>
 
-            {/* Right panel — movements + suggestions */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-                {!selectedId ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                        <span className="material-symbols-outlined text-6xl text-gray-200">balance</span>
-                        <p className="text-sm font-black text-gray-300 uppercase tracking-[0.3em]">Selecciona un estado de cuenta</p>
-                    </div>
-                ) : (
-                    <>
-                        {/* Header */}
-                        <div className="bg-white border-b border-gray-100 px-8 py-5 flex items-center justify-between flex-shrink-0">
-                            <div>
-                                <h2 className="text-base font-black text-gray-900 uppercase tracking-tight">
-                                    {selectedStatement?.bank_name} — {selectedStatement?.period}
-                                </h2>
-                                <div className="flex items-center gap-4 mt-1">
-                                    {reconciliationData && [
-                                        { key: 'green', label: 'Auto', color: 'text-emerald-600' },
-                                        { key: 'yellow', label: 'Revisar', color: 'text-yellow-600' },
-                                        { key: 'red', label: 'Manual', color: 'text-red-500' },
-                                        { key: 'unmatched', label: 'Pendiente', color: 'text-gray-400' },
-                                    ].map(({ key, label, color }) => (
-                                        <span key={key} className={`text-[9px] font-black uppercase tracking-widest ${color}`}>
-                                            {(reconciliationData.stats as any)[key]} {label}
-                                        </span>
-                                    ))}
-                                </div>
+                    <div className="w-px h-5 bg-gray-200 flex-shrink-0" />
+
+                    {selectedStatement && (
+                        <>
+                            <div className={`w-7 h-7 rounded-lg ${getBankColor(selectedStatement.bank_name)} flex items-center justify-center text-white text-xs font-black flex-shrink-0`}>
+                                {selectedStatement.bank_name.charAt(0).toUpperCase()}
                             </div>
-                            {greenPendingCount > 0 && (
-                                <button
-                                    onClick={handleBulkConfirmGreen}
-                                    disabled={isBulkConfirming}
-                                    className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-2xl font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-60 shadow-lg shadow-emerald-100"
-                                >
-                                    {isBulkConfirming
-                                        ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        : <span className="material-symbols-outlined text-base">auto_awesome</span>
-                                    }
-                                    Conciliar {greenPendingCount} automáticos
-                                </button>
-                            )}
-                        </div>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-sm font-black text-gray-900 truncate">{selectedStatement.bank_name}</span>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">—</span>
+                                <span className="text-xs font-bold text-gray-500">{selectedStatement.period}</span>
+                            </div>
+                        </>
+                    )}
 
-                        {/* Movements list */}
-                        <div className="flex-1 overflow-y-auto bg-white">
-                            {isLoadingSuggestions ? (
-                                <div className="flex flex-col items-center justify-center py-24 gap-4">
-                                    <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Analizando coincidencias…</p>
-                                </div>
-                            ) : reconciliationData ? (
-                                <>
-                                    {/* Column headers */}
-                                    <div className="grid grid-cols-[130px_1fr_140px_140px_140px_200px] gap-2 px-8 py-3 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
-                                        {['FECHA', 'DESCRIPCIÓN', 'CARGOS (-)', 'ABONOS (+)', 'ESTADO', 'CFDI'].map(h => (
-                                            <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
-                                        ))}
+                    <button
+                        onClick={() => setIsSelectorOpen(true)}
+                        className="ml-2 px-3 py-1.5 rounded-xl border border-gray-200 text-[11px] font-black text-gray-500 hover:bg-gray-50 transition-all uppercase tracking-widest flex-shrink-0"
+                    >
+                        Cambiar
+                    </button>
+
+                    <div className="flex-1" />
+
+                    {/* Stats chips */}
+                    {reconciliationData && (
+                        <div className="flex items-center gap-3">
+                            {[
+                                { key: 'green',    label: 'Auto',     color: 'text-emerald-600' },
+                                { key: 'yellow',   label: 'Revisar',  color: 'text-yellow-600' },
+                                { key: 'red',      label: 'Manual',   color: 'text-red-500' },
+                                { key: 'unmatched',label: 'Pendiente',color: 'text-gray-400' },
+                            ].map(({ key, label, color }) => (
+                                <span key={key} className={`text-[9px] font-black uppercase tracking-widest ${color}`}>
+                                    {(reconciliationData.stats as any)[key]} {label}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {greenPendingCount > 0 && (
+                        <button
+                            onClick={handleBulkConfirmGreen}
+                            disabled={isBulkConfirming}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-emerald-600 active:scale-95 transition-all disabled:opacity-60 shadow-sm shadow-emerald-100 flex-shrink-0"
+                        >
+                            {isBulkConfirming
+                                ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                            }
+                            Conciliar {greenPendingCount} automáticos
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* ── Main content: table + sidebar ── */}
+            <div className="flex flex-1 overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    {isSelectorOpen || !selectedId ? (
+                        !isSelectorOpen && (
+                            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                                <span className="material-symbols-outlined text-6xl text-gray-200">balance</span>
+                                <p className="text-sm font-black text-gray-300 uppercase tracking-[0.3em]">Selecciona un estado de cuenta</p>
+                            </div>
+                        )
+                    ) : (
+                        <>
+                            {/* Movements list */}
+                            <div className="flex-1 overflow-y-auto bg-white">
+                                {isLoadingSuggestions ? (
+                                    <div className="flex flex-col items-center justify-center py-24 gap-4">
+                                        <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Analizando coincidencias…</p>
                                     </div>
-                                    {reconciliationData.movements.map(m => (
-                                        <MovementReconcileRow
-                                            key={m.id}
-                                            movement={m}
-                                            onReconciled={handleMovementReconciled}
-                                            onUnreconciled={handleMovementUnreconciled}
-                                        />
-                                    ))}
-                                </>
-                            ) : null}
-                        </div>
-
-                        {/* Footer summary */}
-                        {selectedStatement && (
-                            <div className="bg-white border-t border-gray-100 px-8 py-3 flex items-center gap-8 flex-shrink-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Inicial</span>
-                                    <span className="text-xs font-black text-gray-700">{fmt(parseFloat(selectedStatement.initial_balance as any))}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black text-red-400 uppercase tracking-widest">Cargos</span>
-                                    <span className="text-xs font-black text-red-500">-{fmt(parseFloat(selectedStatement.total_cargos as any))}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Abonos</span>
-                                    <span className="text-xs font-black text-emerald-600">+{fmt(parseFloat(selectedStatement.total_abonos as any))}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Final</span>
-                                    <span className="text-xs font-black text-gray-900">{fmt(parseFloat(selectedStatement.final_balance as any))}</span>
-                                </div>
+                                ) : reconciliationData ? (
+                                    <>
+                                        {/* Column headers */}
+                                        <div className="grid grid-cols-[90px_1fr_130px_110px_110px_130px_36px] gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+                                            {['FECHA', 'DESCRIPCIÓN', 'REFERENCIA', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
+                                                <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
+                                            ))}
+                                        </div>
+                                        {reconciliationData.movements.map(m => (
+                                            <MovementReconcileRow
+                                                key={m.id}
+                                                movement={m}
+                                                isSelected={selectedMovement?.id === m.id}
+                                                onSelect={handleSelectMovement}
+                                                onUnreconciled={handleMovementUnreconciled}
+                                            />
+                                        ))}
+                                    </>
+                                ) : null}
                             </div>
-                        )}
-                    </>
+
+                            {/* Footer summary */}
+                            {selectedStatement && (
+                                <div className="bg-white border-t border-gray-100 px-6 py-3 flex items-center gap-8 flex-shrink-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Inicial</span>
+                                        <span className="text-xs font-black text-gray-700">{fmt(parseFloat(selectedStatement.initial_balance as any))}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-red-400 uppercase tracking-widest">Cargos</span>
+                                        <span className="text-xs font-black text-red-500">-{fmt(parseFloat(selectedStatement.total_cargos as any))}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Abonos</span>
+                                        <span className="text-xs font-black text-emerald-600">+{fmt(parseFloat(selectedStatement.total_abonos as any))}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Final</span>
+                                        <span className="text-xs font-black text-gray-900">{fmt(parseFloat(selectedStatement.final_balance as any))}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Sidebar */}
+                {selectedMovement && !isSelectorOpen && (
+                    <ReconciliationSidebar
+                        movement={selectedMovement}
+                        onClose={() => setSelectedMovement(null)}
+                        onReconciled={handleMovementReconciled}
+                    />
                 )}
             </div>
         </div>
