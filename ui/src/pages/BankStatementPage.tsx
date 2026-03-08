@@ -525,8 +525,8 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                 <div className="flex overflow-hidden">
                                     <div className="flex-1 divide-y divide-gray-50 overflow-y-auto">
                                         {/* Header */}
-                                        <div className="grid grid-cols-[90px_1fr_130px_110px_110px_130px_36px] gap-2 px-6 py-3 bg-gray-50/50 sticky top-0 z-10">
-                                            {['FECHA', 'DESCRIPCIÓN', 'REFERENCIA', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
+                                        <div className="grid grid-cols-[90px_2fr_1fr_1fr_1fr_48px] gap-3 px-6 py-3 bg-gray-50/50 sticky top-0 z-10">
+                                            {['FECHA', 'DESCRIPCIÓN', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
                                                 <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
                                             ))}
                                         </div>

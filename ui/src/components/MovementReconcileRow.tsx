@@ -87,7 +87,7 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
     return (
         <div className={`border-b border-gray-50 last:border-0 border-l-4 transition-colors ${borderColor} ${rowBg}`}>
             <div
-                className={`grid grid-cols-[90px_1fr_120px_120px_120px_150px_48px] gap-3 items-center px-6 py-4 transition-colors ${
+                className={`grid grid-cols-[90px_2fr_1fr_1fr_1fr_48px] gap-3 items-center px-6 py-4 transition-colors ${
                     !isReconciled ? 'cursor-pointer hover:bg-gray-50/60' : 'cursor-default'
                 }`}
                 onClick={() => !isReconciled && onSelect(movement)}
@@ -105,9 +105,6 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                         <p className="text-[10px] font-medium text-gray-400 mt-0.5 truncate">{movement.reference}</p>
                     )}
                 </div>
-
-                {/* Referencia (extra column — kept for accounting context) */}
-                <div className="hidden" />
 
                 {/* Cargo */}
                 <div className="text-right">

@@ -407,7 +407,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                                 ) : reconciliationData ? (
                                     <>
                                         {/* Column headers */}
-                                        <div className="grid grid-cols-[90px_1fr_120px_120px_120px_150px_48px] gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+                                        <div className="grid grid-cols-[90px_2fr_1fr_1fr_1fr_48px] gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
                                             {['FECHA', 'DESCRIPCIÓN', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
                                                 <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
                                             ))}
