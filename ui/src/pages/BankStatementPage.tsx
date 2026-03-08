@@ -19,6 +19,30 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const [reconciliationData, setReconciliationData] = useState<{ movements: BankMovement[]; stats: ReconciliationStats } | null>(null);
     const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
     const [selectedMovement, setSelectedMovement] = useState<BankMovement | null>(null);
+    const [colWidths, setColWidths] = useState([90, 340, 150, 150, 180, 48]);
+
+    const gridTemplate = colWidths.map(w => `${w}px`).join(' ');
+
+    const startResize = (colIdx: number, e: React.MouseEvent) => {
+        e.preventDefault();
+        const startX = e.clientX;
+        const startW = colWidths[colIdx];
+        const onMove = (ev: MouseEvent) => {
+            setColWidths(prev => {
+                const next = [...prev];
+                next[colIdx] = Math.max(60, startW + (ev.clientX - startX));
+                return next;
+            });
+        };
+        const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+    };
+
+    const COL_HEADERS = ['FECHA', 'DESCRIPCIÓN', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''];
 
     useEffect(() => {
         loadStatements();
@@ -524,10 +548,23 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                             {reconciliationMode && reconciliationData ? (
                                 <div className="flex overflow-hidden">
                                     <div className="flex-1 divide-y divide-gray-50 overflow-y-auto">
-                                        {/* Header */}
-                                        <div className="grid grid-cols-[90px_2fr_1fr_1fr_1fr_48px] gap-3 px-6 py-3 bg-gray-50/50 sticky top-0 z-10">
-                                            {['FECHA', 'DESCRIPCIÓN', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
-                                                <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
+                                        {/* Header — resizable */}
+                                        <div
+                                            style={{ gridTemplateColumns: gridTemplate }}
+                                            className="grid gap-0 bg-gray-50/80 border-b border-gray-100 sticky top-0 z-10 select-none"
+                                        >
+                                            {COL_HEADERS.map((h, i) => (
+                                                <div key={`${h}-${i}`} className="relative flex items-center px-4 py-3 border-r border-gray-200 last:border-r-0">
+                                                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
+                                                    {i < COL_HEADERS.length - 1 && (
+                                                        <div
+                                                            className="absolute right-0 top-0 bottom-0 w-4 cursor-col-resize z-20 flex items-center justify-center group"
+                                                            onMouseDown={(e) => startResize(i, e)}
+                                                        >
+                                                            <div className="w-0.5 h-4 rounded-full bg-gray-300 opacity-0 group-hover:opacity-100 group-hover:bg-blue-400 transition-all" />
+                                                        </div>
+                                                    )}
+                                                </div>
                                             ))}
                                         </div>
                                         {reconciliationData.movements.map((m: BankMovement) => (
@@ -537,6 +574,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                                 isSelected={selectedMovement?.id === m.id}
                                                 onSelect={handleSelectMovement}
                                                 onUnreconciled={handleMovementUnreconciled}
+                                                gridTemplate={gridTemplate}
                                             />
                                         ))}
                                     </div>

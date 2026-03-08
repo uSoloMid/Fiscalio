@@ -7,6 +7,7 @@ interface Props {
     isSelected: boolean;
     onSelect: (movement: BankMovement) => void;
     onUnreconciled: (movementId: number) => void;
+    gridTemplate?: string;
 }
 
 const fmt = (n: number) =>
@@ -22,7 +23,7 @@ const getDateParts = (dateStr: string) => {
     };
 };
 
-export function MovementReconcileRow({ movement, isSelected, onSelect, onUnreconciled }: Props) {
+export function MovementReconcileRow({ movement, isSelected, onSelect, onUnreconciled, gridTemplate }: Props) {
     const [loadingUnlink, setLoadingUnlink] = useState(false);
 
     const isReconciled = !!movement.cfdi_id;
@@ -87,19 +88,20 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
     return (
         <div className={`border-b border-gray-50 last:border-0 border-l-4 transition-colors ${borderColor} ${rowBg}`}>
             <div
-                className={`grid grid-cols-[90px_2fr_1fr_1fr_1fr_48px] gap-3 items-center px-6 py-4 transition-colors ${
+                style={{ gridTemplateColumns: gridTemplate ?? '90px 2fr 1fr 1fr 1fr 48px' }}
+                className={`grid gap-0 items-stretch transition-colors ${
                     !isReconciled ? 'cursor-pointer hover:bg-gray-50/60' : 'cursor-default'
                 }`}
                 onClick={() => !isReconciled && onSelect(movement)}
             >
                 {/* Date */}
-                <div>
+                <div className="px-4 py-4 border-r border-gray-50">
                     <p className="text-sm font-black text-gray-800">{day} {month}</p>
                     <p className="text-[10px] font-medium text-gray-400">{year}</p>
                 </div>
 
                 {/* Description + reference */}
-                <div title={movement.description} className="min-w-0">
+                <div title={movement.description} className="px-3 py-4 border-r border-gray-50 min-w-0 flex flex-col justify-center">
                     <p className="text-xs font-bold text-gray-800 leading-tight truncate uppercase">{desc}</p>
                     {movement.reference && (
                         <p className="text-[10px] font-medium text-gray-400 mt-0.5 truncate">{movement.reference}</p>
@@ -107,7 +109,7 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                 </div>
 
                 {/* Cargo */}
-                <div className="text-right">
+                <div className="px-3 py-4 border-r border-gray-50 flex items-center justify-end">
                     {movement.cargo > 0 ? (
                         <span className="text-base font-black text-red-500 tabular-nums">
                             -{fmt(movement.cargo)}
@@ -118,7 +120,7 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                 </div>
 
                 {/* Abono */}
-                <div className="text-right">
+                <div className="px-3 py-4 border-r border-gray-50 flex items-center justify-end">
                     {movement.abono > 0 ? (
                         <span className="text-base font-black text-emerald-600 tabular-nums">
                             +{fmt(movement.abono)}
@@ -129,12 +131,12 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                 </div>
 
                 {/* Estado */}
-                <div className="flex justify-start">
+                <div className="px-3 py-4 border-r border-gray-50 flex items-center justify-start">
                     {estadoBadge}
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                <div className="px-2 py-4 flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isReconciled ? (
                         <>
                             {movement.cfdi?.uuid && (
