@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { parseCertificate, createClient, logout, getRunnerStatus } from '../services';
+import { parseCertificate, createClient, logout, getRunnerStatus, getMissingDocs } from '../services';
 import { listGroups, createGroup, updateGroup, deleteGroup } from '../api/groups';
 import { listTags, createTag, updateTag, deleteTag } from '../api/tags';
 import { listClients, updateClientGroup, updateClientTags, updateClientInfo, deleteClient, updateClientFiel } from '../api/clients';
@@ -25,7 +25,7 @@ export const DashboardPage = ({
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
     const [totalSystemClients, setTotalSystemClients] = useState(0);
-    const [missingDocs, setMissingDocs] = useState<{ missing_csf: any[], missing_opinion: any[] }>({ missing_csf: [], missing_opinion: [] });
+    const [missingDocs, setMissingDocs] = useState<{ missing_csf: any[], missing_opinion: any[], negative_opinions: any[] }>({ missing_csf: [], missing_opinion: [], negative_opinions: [] });
 
     // UI states
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -116,12 +116,16 @@ export const DashboardPage = ({
         try {
             const [gRes, tRes, totalRes, missingRes] = await Promise.all([
                 listGroups(), listTags(), listClients({ pageSize: 1 }),
-                fetch('/api/sat-documents/missing', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } }).then(r => r.json()).catch(() => ({ missing_csf: [], missing_opinion: [] }))
+                getMissingDocs(),
             ]);
             setGroups(gRes);
             setTags(tRes);
             setTotalSystemClients(totalRes.total || 0);
-            setMissingDocs({ missing_csf: missingRes?.missing_csf ?? [], missing_opinion: missingRes?.missing_opinion ?? [] });
+            setMissingDocs({
+                missing_csf: missingRes?.missing_csf ?? [],
+                missing_opinion: missingRes?.missing_opinion ?? [],
+                negative_opinions: missingRes?.negative_opinions ?? [],
+            });
 
             // Limpiar filtros obsoletos de localStorage que ya no existen en la BD
             const validTagIds = selectedTagIds.filter(id => tRes.some((t: any) => t.id === id));
@@ -646,6 +650,44 @@ export const DashboardPage = ({
                                                     ))}
                                                     {missingDocs.missing_opinion.length > 3 && <div className="text-xs text-orange-500 font-medium">+{missingDocs.missing_opinion.length - 3} más</div>}
                                                 </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            {/* Opiniones Negativas */}
+                            <div className={`flex-1 p-6 rounded-3xl border ${missingDocs.negative_opinions.length > 0 ? 'border-red-200 bg-red-50' : 'border-gray-50 bg-gray-50/50'}`}>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <h3 className={`font-bold ${missingDocs.negative_opinions.length > 0 ? 'text-red-700' : 'text-gray-400'}`}>Opinión 32-D</h3>
+                                    {missingDocs.negative_opinions.length > 0 && (
+                                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-black rounded-full uppercase">
+                                            {missingDocs.negative_opinions.length} Negativa{missingDocs.negative_opinions.length !== 1 ? 's' : ''}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-sm font-medium space-y-2">
+                                    {missingDocs.negative_opinions.length === 0 ? (
+                                        <div className="text-gray-500">Sin opiniones negativas.</div>
+                                    ) : (
+                                        <>
+                                            {missingDocs.negative_opinions.slice(0, 5).map((c: any) => (
+                                                <div
+                                                    key={c.rfc}
+                                                    onClick={() => onSelectClient(c.rfc, c.name, '', '')}
+                                                    className="flex items-center justify-between bg-white p-2 rounded-xl border border-red-100 shadow-sm cursor-pointer hover:border-red-300 transition-colors"
+                                                >
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-gray-800 text-xs truncate max-w-[130px] font-bold">{c.name}</span>
+                                                        <span className="text-gray-400 text-[10px] font-mono">{c.rfc}</span>
+                                                    </div>
+                                                    <span className="flex items-center gap-1 text-red-700 text-[10px] font-black bg-red-50 px-2 py-0.5 rounded-lg flex-shrink-0">
+                                                        <span className="material-symbols-outlined text-[11px]">gpp_bad</span>
+                                                        NEGATIVO
+                                                    </span>
+                                                </div>
+                                            ))}
+                                            {missingDocs.negative_opinions.length > 5 && (
+                                                <div className="text-xs text-red-500 font-medium">+{missingDocs.negative_opinions.length - 5} más</div>
                                             )}
                                         </>
                                     )}

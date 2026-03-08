@@ -26,17 +26,18 @@ class SatDocumentController extends Controller
             ->orderBy('requested_at', 'desc')
             ->get()
             ->map(fn($d) => [
-                'id'           => $d->id,
-                'type'         => $d->type,
-                'file_size'    => $d->file_size,
-                'requested_at' => $d->requested_at?->toISOString(),
+                'id'             => $d->id,
+                'type'           => $d->type,
+                'file_size'      => $d->file_size,
+                'opinion_result' => $d->opinion_result,
+                'requested_at'   => $d->requested_at?->toISOString(),
             ]);
 
         return response()->json($docs);
     }
 
     /**
-     * Return businesses missing CSF and/or Opinion 32-D (authenticated).
+     * Return businesses missing CSF/Opinion32D and those with a NEGATIVE latest opinion.
      */
     public function missing()
     {
@@ -51,16 +52,37 @@ class SatDocumentController extends Controller
         $missingCsf     = $allRfcs->filter(fn($b) => !isset($hasCsf[$b->rfc]))->values();
         $missingOpinion = $allRfcs->filter(fn($b) => !isset($hasOpinion[$b->rfc]))->values();
 
+        // Businesses whose latest opinion_32d is NEGATIVE
+        $negativeOpinions = DB::table('sat_documents as d1')
+            ->join('businesses', 'd1.rfc', '=', 'businesses.rfc')
+            ->where('d1.type', 'opinion_32d')
+            ->where('d1.opinion_result', 'negative')
+            ->whereNotExists(function ($q) {
+                $q->from('sat_documents as d2')
+                    ->whereColumn('d2.rfc', 'd1.rfc')
+                    ->where('d2.type', 'opinion_32d')
+                    ->whereColumn('d2.requested_at', '>', 'd1.requested_at');
+            })
+            ->select('d1.rfc', 'businesses.legal_name', 'businesses.common_name', 'd1.requested_at')
+            ->get()
+            ->map(fn($b) => [
+                'rfc'          => $b->rfc,
+                'name'         => $b->common_name ?: $b->legal_name,
+                'requested_at' => $b->requested_at,
+            ]);
+
         return response()->json([
-            'missing_csf'     => $missingCsf->map(fn($b) => ['rfc' => $b->rfc, 'name' => $b->common_name ?: $b->legal_name]),
-            'missing_opinion' => $missingOpinion->map(fn($b) => ['rfc' => $b->rfc, 'name' => $b->common_name ?: $b->legal_name]),
+            'missing_csf'       => $missingCsf->map(fn($b) => ['rfc' => $b->rfc, 'name' => $b->common_name ?: $b->legal_name]),
+            'missing_opinion'   => $missingOpinion->map(fn($b) => ['rfc' => $b->rfc, 'name' => $b->common_name ?: $b->legal_name]),
+            'negative_opinions' => $negativeOpinions->values(),
         ]);
     }
 
     /**
-     * Serve the PDF file for download (authenticated).
+     * Serve the PDF for download or inline view.
+     * ?inline=1 → Content-Disposition: inline (browser preview)
      */
-    public function download($id)
+    public function download(Request $request, $id)
     {
         $doc = SatDocument::findOrFail($id);
 
@@ -72,9 +94,17 @@ class SatDocumentController extends Controller
             ? 'Constancia_Situacion_Fiscal_' . $doc->rfc . '_' . Carbon::parse($doc->requested_at)->format('Y-m-d') . '.pdf'
             : 'Opinion_Cumplimiento_32D_' . $doc->rfc . '_' . Carbon::parse($doc->requested_at)->format('Y-m-d') . '.pdf';
 
-        return Storage::download($doc->file_path, $filename, [
-            'Content-Type' => 'application/pdf',
-        ]);
+        $inline = $request->boolean('inline', false);
+        $headers = ['Content-Type' => 'application/pdf'];
+
+        if ($inline) {
+            $content = Storage::get($doc->file_path);
+            return response($content, 200, array_merge($headers, [
+                'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            ]));
+        }
+
+        return Storage::download($doc->file_path, $filename, $headers);
     }
 
     /**
@@ -99,18 +129,48 @@ class SatDocumentController extends Controller
         $filename  = "{$type}_{$timestamp}.pdf";
         $path      = $file->storeAs($dir, $filename);
 
+        $opinionResult = null;
+        if ($type === 'opinion_32d') {
+            $opinionResult = $this->parseOpinionResult($path);
+        }
+
         $doc = SatDocument::create([
-            'rfc'          => $rfc,
-            'type'         => $type,
-            'file_path'    => $path,
-            'file_size'    => $file->getSize(),
-            'requested_at' => now(),
+            'rfc'            => $rfc,
+            'type'           => $type,
+            'file_path'      => $path,
+            'file_size'      => $file->getSize(),
+            'opinion_result' => $opinionResult,
+            'requested_at'   => now(),
         ]);
 
         // Deliver to pending WhatsApp requests
         $this->dispatchWhatsAppPending($doc);
 
-        return response()->json(['success' => true, 'path' => $path]);
+        return response()->json(['success' => true, 'path' => $path, 'opinion_result' => $opinionResult]);
+    }
+
+    /**
+     * Parse opinion result from the raw PDF binary.
+     * SAT opinion PDFs are text-based; "POSITIVO"/"NEGATIVO" appear as readable text.
+     */
+    private function parseOpinionResult(string $filePath): ?string
+    {
+        try {
+            $content = Storage::get($filePath);
+            if (!$content) return null;
+
+            // Extract readable text segments from the PDF binary
+            $upper = strtoupper($content);
+
+            // Look for the key words (they appear as plain text in SAT PDFs)
+            if (strpos($upper, 'POSITIVO') !== false) return 'positive';
+            if (strpos($upper, 'NEGATIVO') !== false) return 'negative';
+
+            return null;
+        } catch (\Exception $e) {
+            Log::warning('Could not parse opinion result', ['path' => $filePath, 'error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     private function dispatchWhatsAppPending(SatDocument $doc): void

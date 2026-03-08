@@ -11,6 +11,7 @@ class SatDocument extends Model
         'type',
         'file_path',
         'file_size',
+        'opinion_result',
         'requested_at',
     ];
 

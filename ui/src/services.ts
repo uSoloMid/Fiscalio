@@ -514,6 +514,12 @@ export async function listSatDocuments(rfc: string): Promise<any[]> {
     return response.json();
 }
 
+export async function getMissingDocs(): Promise<{ missing_csf: any[], missing_opinion: any[], negative_opinions: any[] }> {
+    const response = await authFetch(`${API_BASE_URL}/api/sat-documents/missing`);
+    if (!response.ok) return { missing_csf: [], missing_opinion: [], negative_opinions: [] };
+    return response.json();
+}
+
 export async function downloadSatDocument(id: number, filename: string): Promise<void> {
     const response = await authFetch(`${API_BASE_URL}/api/sat-documents/${id}/download`);
     if (!response.ok) throw new Error('Error descargando documento');
