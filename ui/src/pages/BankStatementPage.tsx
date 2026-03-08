@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { processBankStatement, confirmBankStatement, listBankStatements, getBankStatement, deleteBankStatement, getReconciliationSuggestions } from '../services';
 import { MovementReconcileRow } from '../components/MovementReconcileRow';
+import { ReconciliationSidebar } from '../components/ReconciliationSidebar';
 import type { BankMovement, ReconciliationStats } from '../models';
 
 export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc: string, clientName: string, onBack: () => void }) => {
@@ -17,6 +18,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const [reconciliationMode, setReconciliationMode] = useState(false);
     const [reconciliationData, setReconciliationData] = useState<{ movements: BankMovement[]; stats: ReconciliationStats } | null>(null);
     const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+    const [selectedMovement, setSelectedMovement] = useState<BankMovement | null>(null);
 
     useEffect(() => {
         loadStatements();
@@ -84,12 +86,17 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     };
 
     const handleMovementReconciled = (updated: BankMovement) => {
+        setSelectedMovement(null);
         setReconciliationData(prev => {
             if (!prev) return prev;
             const movements = prev.movements.map(m => m.id === updated.id ? { ...updated, suggestions: [] } : m);
             const stats = computeStats(movements);
             return { ...prev, movements, stats };
         });
+    };
+
+    const handleSelectMovement = (movement: BankMovement) => {
+        setSelectedMovement(prev => prev?.id === movement.id ? null : movement);
     };
 
     const handleMovementUnreconciled = (movementId: number) => {
@@ -515,21 +522,31 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                             </div>
 
                             {reconciliationMode && reconciliationData ? (
-                                <div className="divide-y divide-gray-50">
-                                    {/* Header */}
-                                    <div className="grid grid-cols-[130px_1fr_140px_140px_140px_200px] gap-2 px-8 py-3 bg-gray-50/50">
-                                        {['FECHA', 'DESCRIPCIÓN', 'CARGOS (-)', 'ABONOS (+)', 'ESTADO', 'CFDI'].map(h => (
-                                            <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest last:text-right">{h}</span>
+                                <div className="flex overflow-hidden">
+                                    <div className="flex-1 divide-y divide-gray-50 overflow-y-auto">
+                                        {/* Header */}
+                                        <div className="grid grid-cols-[90px_1fr_130px_110px_110px_130px_36px] gap-2 px-6 py-3 bg-gray-50/50 sticky top-0 z-10">
+                                            {['FECHA', 'DESCRIPCIÓN', 'REFERENCIA', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
+                                                <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
+                                            ))}
+                                        </div>
+                                        {reconciliationData.movements.map((m: BankMovement) => (
+                                            <MovementReconcileRow
+                                                key={m.id}
+                                                movement={m}
+                                                isSelected={selectedMovement?.id === m.id}
+                                                onSelect={handleSelectMovement}
+                                                onUnreconciled={handleMovementUnreconciled}
+                                            />
                                         ))}
                                     </div>
-                                    {reconciliationData.movements.map((m: BankMovement) => (
-                                        <MovementReconcileRow
-                                            key={m.id}
-                                            movement={m}
+                                    {selectedMovement && (
+                                        <ReconciliationSidebar
+                                            movement={selectedMovement}
+                                            onClose={() => setSelectedMovement(null)}
                                             onReconciled={handleMovementReconciled}
-                                            onUnreconciled={handleMovementUnreconciled}
                                         />
-                                    ))}
+                                    )}
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
