@@ -28,13 +28,24 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
     const isReconciled = !!movement.cfdi_id;
     const suggestions = movement.suggestions ?? [];
     const previewConfidence = movement._confidence_preview ?? suggestions[0]?.confidence;
+    const hasSuggestions = suggestions.length > 0;
 
+    // Left border color by confidence
     const borderColor = isReconciled
         ? 'border-l-emerald-400'
         : previewConfidence === 'green'  ? 'border-l-emerald-400'
-        : previewConfidence === 'yellow' ? 'border-l-yellow-400'
+        : previewConfidence === 'yellow' ? 'border-l-amber-400'
         : previewConfidence === 'red'    ? 'border-l-red-400'
         : 'border-l-transparent';
+
+    // Row background
+    const rowBg = isSelected
+        ? 'bg-emerald-50/40'
+        : isReconciled
+        ? 'bg-emerald-50/20'
+        : !hasSuggestions
+        ? 'bg-red-50/10'
+        : '';
 
     const handleUnlink = async () => {
         setLoadingUnlink(true);
@@ -50,61 +61,75 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
 
     const { day, month, year } = getDateParts(movement.date);
 
-    // Estado badge
+    // Truncate description
+    const desc = movement.description.length > 40
+        ? movement.description.slice(0, 40).trimEnd() + '…'
+        : movement.description;
+
+    // Estado badge — prominent with icon
     const estadoBadge = isReconciled ? (
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+        <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-xl whitespace-nowrap">
+            <span className="material-symbols-outlined text-[13px]">check_circle</span>
             Conciliado
         </span>
-    ) : suggestions.length > 0 ? (
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-yellow-700 bg-yellow-50 px-2.5 py-1 rounded-full whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 flex-shrink-0" />
+    ) : hasSuggestions ? (
+        <span className="inline-flex items-center gap-1.5 text-xs font-black text-amber-700 bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-xl whitespace-nowrap">
+            <span className="material-symbols-outlined text-[13px]">pending</span>
             Pendiente
         </span>
     ) : (
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-gray-300 flex-shrink-0" />
+        <span className="inline-flex items-center gap-1.5 text-xs font-black text-red-600 bg-red-100 border border-red-200 px-3 py-1.5 rounded-xl whitespace-nowrap">
+            <span className="material-symbols-outlined text-[13px]">warning</span>
             Sin Match
         </span>
     );
 
     return (
-        <div className={`border-b border-gray-50 last:border-0 border-l-4 transition-colors ${borderColor} ${
-            isSelected ? 'bg-emerald-50/30' : isReconciled ? 'bg-emerald-50/10' : ''
-        }`}>
+        <div className={`border-b border-gray-50 last:border-0 border-l-4 transition-colors ${borderColor} ${rowBg}`}>
             <div
-                className={`grid grid-cols-[90px_1fr_130px_110px_110px_130px_36px] gap-2 items-center px-6 py-3.5 transition-colors ${
-                    !isReconciled ? 'cursor-pointer hover:bg-gray-50/80' : 'cursor-default'
+                className={`grid grid-cols-[90px_1fr_120px_120px_120px_150px_48px] gap-3 items-center px-6 py-4 transition-colors ${
+                    !isReconciled ? 'cursor-pointer hover:bg-gray-50/60' : 'cursor-default'
                 }`}
                 onClick={() => !isReconciled && onSelect(movement)}
             >
                 {/* Date */}
                 <div>
-                    <p className="text-xs font-bold text-gray-800">{day} {month}</p>
+                    <p className="text-sm font-black text-gray-800">{day} {month}</p>
                     <p className="text-[10px] font-medium text-gray-400">{year}</p>
                 </div>
 
-                {/* Description */}
-                <div title={movement.description}>
-                    <p className="text-xs font-bold text-gray-900 leading-tight truncate uppercase">
-                        {movement.description}
-                    </p>
+                {/* Description + reference */}
+                <div title={movement.description} className="min-w-0">
+                    <p className="text-xs font-bold text-gray-800 leading-tight truncate uppercase">{desc}</p>
+                    {movement.reference && (
+                        <p className="text-[10px] font-medium text-gray-400 mt-0.5 truncate">{movement.reference}</p>
+                    )}
                 </div>
 
-                {/* Reference */}
-                <span className="text-[11px] font-medium text-gray-400 truncate">
-                    {movement.reference || '—'}
-                </span>
+                {/* Referencia (extra column — kept for accounting context) */}
+                <div className="hidden" />
 
                 {/* Cargo */}
-                <span className={`text-sm font-bold text-right tabular-nums ${movement.cargo > 0 ? 'text-red-500' : 'text-gray-300'}`}>
-                    {movement.cargo > 0 ? `-${fmt(movement.cargo)}` : '$0.00'}
-                </span>
+                <div className="text-right">
+                    {movement.cargo > 0 ? (
+                        <span className="text-base font-black text-red-500 tabular-nums">
+                            -{fmt(movement.cargo)}
+                        </span>
+                    ) : (
+                        <span className="text-sm font-medium text-gray-200">—</span>
+                    )}
+                </div>
 
                 {/* Abono */}
-                <span className={`text-sm font-bold text-right tabular-nums ${movement.abono > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
-                    {movement.abono > 0 ? `+${fmt(movement.abono)}` : '$0.00'}
-                </span>
+                <div className="text-right">
+                    {movement.abono > 0 ? (
+                        <span className="text-base font-black text-emerald-600 tabular-nums">
+                            +{fmt(movement.abono)}
+                        </span>
+                    ) : (
+                        <span className="text-sm font-medium text-gray-200">—</span>
+                    )}
+                </div>
 
                 {/* Estado */}
                 <div className="flex justify-start">
@@ -112,9 +137,9 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center justify-center" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isReconciled ? (
-                        <div className="flex items-center gap-1">
+                        <>
                             {movement.cfdi?.uuid && (
                                 <button
                                     onClick={() => exportCfdiPdf(movement.cfdi!.uuid!)}
@@ -135,8 +160,8 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                                     : <span className="material-symbols-outlined text-base">link_off</span>
                                 }
                             </button>
-                        </div>
-                    ) : suggestions.length > 0 ? (
+                        </>
+                    ) : hasSuggestions ? (
                         <span className="material-symbols-outlined text-base text-gray-300">chevron_right</span>
                     ) : null}
                 </div>

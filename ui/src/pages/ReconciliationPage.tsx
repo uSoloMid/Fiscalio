@@ -40,6 +40,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const [isBulkConfirming, setIsBulkConfirming] = useState(false);
     const [isSelectorOpen, setIsSelectorOpen] = useState(true);
     const [selectedMovement, setSelectedMovement] = useState<BankMovement | null>(null);
+    const [filter, setFilter] = useState<'all' | 'pending' | 'reconciled'>('all');
 
     useEffect(() => {
         loadStatements();
@@ -155,6 +156,18 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const greenPendingCount = reconciliationData?.movements.filter(
         m => !m.cfdi_id && m.suggestions?.[0]?.confidence === 'green'
     ).length ?? 0;
+
+    const allMovements = reconciliationData?.movements ?? [];
+    const totalCount = allMovements.length;
+    const reconciledCount = allMovements.filter(m => !!m.cfdi_id).length;
+    const pendingCount = totalCount - reconciledCount;
+    const progressPct = totalCount > 0 ? Math.round((reconciledCount / totalCount) * 100) : 0;
+
+    const filteredMovements = allMovements.filter(m => {
+        if (filter === 'pending')    return !m.cfdi_id;
+        if (filter === 'reconciled') return !!m.cfdi_id;
+        return true;
+    });
 
     // Bank card status
     const getStatementStatus = (s: BankStatement) => {
@@ -338,6 +351,52 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                         )
                     ) : (
                         <>
+                            {/* Progress bar */}
+                            {reconciliationData && (
+                                <div className="bg-white border-b border-gray-100 px-6 py-3 flex items-center gap-4 flex-shrink-0">
+                                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-2 bg-emerald-500 rounded-full transition-all duration-500"
+                                            style={{ width: `${progressPct}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs font-black text-gray-500 whitespace-nowrap tabular-nums">
+                                        {reconciledCount} / {totalCount}
+                                    </span>
+                                    <span className={`text-xs font-black whitespace-nowrap ${progressPct >= 80 ? 'text-emerald-600' : progressPct > 0 ? 'text-amber-600' : 'text-gray-400'}`}>
+                                        {progressPct}% conciliado
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Filter tabs */}
+                            {reconciliationData && (
+                                <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-1 flex-shrink-0">
+                                    {([
+                                        { key: 'all'        as const, label: 'Todas',       count: totalCount },
+                                        { key: 'pending'    as const, label: 'Pendientes',  count: pendingCount },
+                                        { key: 'reconciled' as const, label: 'Conciliadas', count: reconciledCount },
+                                    ]).map(({ key, label, count }) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => setFilter(key)}
+                                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
+                                                filter === key
+                                                    ? 'bg-gray-900 text-white'
+                                                    : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            {label}
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                                filter === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                                            }`}>
+                                                {count}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
                             {/* Movements list */}
                             <div className="flex-1 overflow-y-auto bg-white">
                                 {isLoadingSuggestions ? (
@@ -348,12 +407,17 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                                 ) : reconciliationData ? (
                                     <>
                                         {/* Column headers */}
-                                        <div className="grid grid-cols-[90px_1fr_130px_110px_110px_130px_36px] gap-2 px-6 py-3 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
-                                            {['FECHA', 'DESCRIPCIÓN', 'REFERENCIA', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
+                                        <div className="grid grid-cols-[90px_1fr_120px_120px_120px_150px_48px] gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100 sticky top-0 z-10">
+                                            {['FECHA', 'DESCRIPCIÓN', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''].map(h => (
                                                 <span key={h} className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</span>
                                             ))}
                                         </div>
-                                        {reconciliationData.movements.map(m => (
+                                        {filteredMovements.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-16 gap-3">
+                                                <span className="material-symbols-outlined text-4xl text-gray-200">inbox</span>
+                                                <p className="text-xs font-black text-gray-300 uppercase tracking-widest">Sin movimientos en este filtro</p>
+                                            </div>
+                                        ) : filteredMovements.map(m => (
                                             <MovementReconcileRow
                                                 key={m.id}
                                                 movement={m}
