@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-03-08 — UX Conciliación: jerarquía visual, progreso y filtros
+
+**Commit estable:** `909f65e`
+
+- Montos `text-base font-black` — el monto es lo primero que ve el ojo; ceros muestran "—"
+- Badges de estado grandes con icono: `check_circle` verde · `pending` ámbar · `warning` rojo — distintos sin leer
+- Fondos de fila: verde suave (conciliado), rojo suave (sin match)
+- Descripción truncada a 40 chars con referencia como segunda línea
+- Barra de progreso: franja verde + `X / Y` + porcentaje con color semáforo
+- Filtros: Todas / Pendientes / Conciliadas con contador en cada tab
+- Empty state cuando el filtro activo no tiene movimientos
+
+---
+
+## 2026-03-08 — Rediseño UX módulo Conciliación Bancaria
+
+**Commit estable:** `21377e0`
+
+- Selector de bancos: tarjetas expandidas al entrar (banco, CTA, saldo final, barra progreso, estado badge), colapsa a compact bar tras seleccionar con botón "Cambiar"
+- `MovementReconcileRow`: eliminada expansión inline de sugerencias; nueva columna ESTADO con badge dot (Conciliado / Pendiente / Sin Match); unlink y PDF en acciones de fila
+- Nuevo `ReconciliationSidebar`: panel lateral 384px que calca el diseño de referencia — info box azul con movimiento seleccionado, buscador, chips de filtro (Mismo monto activo, Fecha próxima, RFC frecuente), cards de sugerencias con "MEJOR COINCIDENCIA" badge + botón sólido/outline, footer "Subir XML manualmente"
+- Columnas tabla: FECHA · DESCRIPCIÓN · REFERENCIA · CARGO(-) · ABONO(+) · ESTADO · acciones (CARGO y ABONO se mantienen separadas — sistema contable)
+
+---
+
 ## 2026-03-06 — Bot WhatsApp Business para solicitar CSF/Opinión 32-D
 
 **Commits estables:** `bd4223d` (integración inicial), `43baa29` (fix número mexicano)
