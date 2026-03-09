@@ -25,9 +25,13 @@ def extract_inbursa(pdf_path):
             first_page = pdf.pages[0]
             page_text = first_page.extract_text() or ""
             
-            # 1. Detectar CLABE (como número de cuenta)
+            # 1. Detectar Cuenta y CLABE
+            cuenta_match = re.search(r"CUENTA\s+([\d-]+)", page_text)
+            if cuenta_match:
+                summary["account_number"] = cuenta_match.group(1)
+            
             clabe_match = re.search(r"CLABE\s+(\d+)", page_text)
-            if clabe_match:
+            if clabe_match and summary["account_number"] == "PREDETERMINADA":
                 summary["account_number"] = clabe_match.group(1)
             
             # 2. Detectar Periodo y Año
@@ -60,23 +64,29 @@ def extract_inbursa(pdf_path):
                         break
                 if not found_y: lines_first[y] = [w]
 
+            found_summary = set()
             for y_coord in sorted(lines_first.keys()):
                 line_words = sorted(lines_first[y_coord], key=lambda x: x['x0'])
                 line_txt = " ".join([lw['text'].upper() for lw in line_words])
                 for pattern, key in targets:
+                    if key in found_summary: continue
                     if re.search(pattern, line_txt):
                         # Buscamos el valor numérico a la derecha de la etiqueta
                         for cand in reversed(line_words):
                             clean = cand['text'].replace("$", "").replace(",", "")
+                            # Aceptar solo números válidos y descartar porcentajes o fechas
                             if re.match(r"^-?[\d,]+\.\d{2}$", clean) or clean in ["0", "0.00"]:
                                 summary[key] = float(clean)
+                                found_summary.add(key)
                                 break
 
             # --- PARTE 2: EXTRAER MOVIMIENTOS ---
-            in_details = False
+            state = "SEARCHING" # SEARCHING, EXTRACTING, FINISHED
             current_tx = None
             
             for page in pdf.pages:
+                if state == "FINISHED": break
+                
                 words = page.extract_words(x_tolerance=2, y_tolerance=3)
                 if not words: continue
 
@@ -84,7 +94,6 @@ def extract_inbursa(pdf_path):
                 lines = []
                 words.sort(key=lambda w: (w['top'], w['x0']))
                 
-                if not words: continue
                 current_line = [words[0]]
                 for w in words[1:]:
                     if abs(w['top'] - current_line[-1]['top']) < 3:
@@ -94,22 +103,23 @@ def extract_inbursa(pdf_path):
                         current_line = [w]
                 if current_line: lines.append(current_line)
 
-                # Detección de cabecera de tabla en cada página
+                # Detección de cabecera y pie
                 start_y = 0
                 cutoff_y = page.height
                 
                 for line_words in lines:
                     text_line = " ".join([w['text'] for w in line_words]).upper()
-                    if "DETALLE DE MOVIMIENTOS" in text_line:
-                        in_details = True
+                    if "DETALLE DE MOVIMIENTOS" in text_line and state != "FINISHED":
+                        state = "EXTRACTING"
                     if "FECHA" in text_line and "CONCEPTO" in text_line and "SALDO" in text_line:
-                        start_y = line_words[0]['bottom'] + 2
+                        start_y = line_words[0]['bottom'] + 1
                     
-                    if "TOTAL DE MOVIMIENTOS" in text_line or "SI DESEA RECIBIR PAGOS" in text_line:
-                        cutoff_y = line_words[0]['top'] - 5
+                    if "SI DESEA RECIBIR PAGOS" in text_line:
+                        cutoff_y = line_words[0]['top'] - 2
+                        state = "FINISHED"
                         break
 
-                if not in_details: continue
+                if state == "SEARCHING": continue
 
                 for line_words in lines:
                     top = line_words[0]['top']
@@ -160,12 +170,12 @@ def extract_inbursa(pdf_path):
                             
                             if is_money:
                                 val = float(clean)
-                                # Coordenadas estimadas para columnas de montos
-                                if 400 < x1 < 505: 
+                                # Coordenadas ajustadas para evitar traslapes entre ABONO y SALDO
+                                if 400 < x1 < 490: 
                                     current_tx["cargo"] = val
-                                elif 505 <= x1 < 585: 
+                                elif 490 <= x1 < 560: 
                                     current_tx["abono"] = val
-                                elif x1 >= 585: 
+                                elif x1 >= 560: 
                                     current_tx["saldo"] = val
                             else:
                                 if 150 <= x0 < 420:
