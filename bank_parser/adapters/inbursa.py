@@ -170,15 +170,15 @@ def extract_inbursa(pdf_path):
                             
                             if is_money:
                                 val = float(clean)
-                                # Coordenadas ajustadas para evitar traslapes entre ABONO y SALDO
-                                if 400 < x1 < 490: 
+                                # Coordenadas ajustadas: Desplazadas a la derecha según feedback
+                                if 400 < x1 < 580: 
                                     current_tx["cargo"] = val
-                                elif 490 <= x1 < 560: 
+                                elif 580 <= x1 < 720: 
                                     current_tx["abono"] = val
-                                elif x1 >= 560: 
+                                elif x1 >= 720: 
                                     current_tx["saldo"] = val
                             else:
-                                if 150 <= x0 < 420:
+                                if 150 <= x0 < 450:
                                     if "BALANCE INICIAL" in txt.upper(): continue
                                     desc_parts.append(txt)
                         
