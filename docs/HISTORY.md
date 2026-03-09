@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-03-09 — Implementación del Parser de Estados de Cuenta Inbursa
+
+**Commit estable:** `a8a424e`
+
+- Clasificador de bancos actualizado para detectar PDFs de Inbursa (incluyendo texto ofuscado).
+- Nuevo adaptador `inbursa.py` con extracción de CLABE, periodo, saldos y movimientos.
+- Soporte para conceptos multilínea y detección geométrica de columnas de montos.
+- Integración en el flujo principal para generación automática de Excel.
+
+---
+
 ## 2026-03-08 — UX Conciliación: jerarquía visual, progreso y filtros
 
 **Commit estable:** `909f65e`
