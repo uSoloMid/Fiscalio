@@ -156,9 +156,7 @@ export function SatDocumentsPage({ activeRfc, clientName, onBack }: Props) {
         const date = new Date(doc.requested_at).toISOString().split('T')[0];
         const filename = `${label}_${activeRfc}_${date}.pdf`;
         try {
-            const response = await fetch(`${API_BASE_URL}/api/sat-documents/${doc.id}/download`, {
-                headers: { Authorization: `Bearer ${getToken()}` }
-            });
+            const response = await authFetch(`${API_BASE_URL}/api/sat-documents/${doc.id}/download`);
             if (!response.ok) throw new Error('Error en descarga');
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
