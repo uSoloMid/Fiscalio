@@ -6,6 +6,7 @@ from bank_classifier import identify_bank
 
 from adapters.bbva import extract_bbva
 from adapters.banamex import extract_banamex
+from adapters.inbursa import extract_inbursa
 
 def safe_float(val, default=0.0):
     try:
@@ -50,6 +51,8 @@ def main():
                 result_data = extract_bbva(pdf_path)
             elif banco == "banamex":
                 result_data = extract_banamex(pdf_path)
+            elif banco == "inbursa":
+                result_data = extract_inbursa(pdf_path)
             else:
                 # Intento ciego si se forzó o algo
                 result_data = {"movements": [], "summary": {}}

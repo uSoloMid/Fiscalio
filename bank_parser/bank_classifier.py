@@ -33,18 +33,21 @@ def identify_bank(pdf_path: str) -> str:
         if "BBVA" in first_page_text[:1000] or "BANCOMER" in first_page_text[:1000]:
             return "bbva"
             
+        if "INBURSA" in first_page_text[:2000] or "RESUMEN DE SALDOS" in first_page_text[:2000] or "ÓÄÖÓÕ" in first_page_text:
+            return "inbursa"
+
         # Si PyMuPDF no extrae texto, es probable que sea BBVA escaneado o Inbursa ofuscado
         if len(first_page_text.strip()) < 50:
             # Podríamos pasar a tesseract aquí para estar seguros, pero por 
             # ahora podemos tratar de adivinar por nombre de archivo si estamos probando o mandar "bbva"
+            if "INBURSA" in pdf_path.upper():
+                return "inbursa"
             if "BBVA" in pdf_path.upper():
                 return "bbva"
-            elif "INBURSA" in pdf_path.upper():
-                return "inbursa"
                 
-            return "bbva" # Asumir bbva por defecto si está escaseado sin texto (o Inbursa)
+            return "bbva" 
             
-        return "banamex" # Fallback temporal si no se detecta (Banamex no siempre dice "Banamex" literal, a veces dice "ESTADO DE CUENTA AL")
+        return "banamex"
     except Exception as e:
         sys.stderr.write(f"Error clasificando: {e}\n")
         return None
