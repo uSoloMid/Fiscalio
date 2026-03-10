@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class AnalyzeCoverageCommand extends Command
 {
-    protected $signature   = 'sat:analyze-coverage {--rfc= : Analizar solo este RFC} {--clear : Limpiar notas anteriores antes de analizar}';
+    protected $signature = 'sat:analyze-coverage {--rfc= : Analizar solo este RFC} {--clear : Limpiar notas anteriores antes de analizar}';
     protected $description = 'Detecta clientes con problemas reales de descarga SAT y genera notas en Riesgos Fiscales';
 
     /**
@@ -20,22 +20,22 @@ class AnalyzeCoverageCommand extends Command
      */
     private const CRITICAL_PATTERNS = [
         'wrong_passphrase' => [
-            'title'    => 'Contraseña de llave privada incorrecta',
+            'title' => 'Contraseña de llave privada incorrecta',
             'body_tpl' => 'La llave privada no puede abrirse con la contraseña registrada. Error: %s — Solución: actualizar la FIEL con la contraseña correcta desde el perfil del cliente.',
             'keywords' => ['bad decrypt', 'pkcs12 cipherfinal', 'bad password', 'cannot open private key'],
         ],
         'certificate_invalid' => [
-            'title'    => 'Certificado SAT revocado, vencido o inválido',
+            'title' => 'Certificado SAT revocado, vencido o inválido',
             'body_tpl' => 'El SAT rechazó el certificado FIEL. Error: %s — Solución: renovar la e.firma ante el SAT y actualizar la FIEL del cliente.',
             'keywords' => ['certificado revocado', 'caduco', 'certificado inv', 'certificate revoked', 'revocado o caduco', 'certificado inválido', 'certificado invalido'],
         ],
         'duplicate_request' => [
-            'title'    => 'Solicitud duplicada enviada al SAT (colisión de runners)',
+            'title' => 'Solicitud duplicada enviada al SAT (colisión de runners)',
             'body_tpl' => 'El SAT rechazó la solicitud porque llegaron dos peticiones idénticas casi simultáneamente (error de sincronización entre runners). Error: %s — El runner ya tiene un lock optimista para prevenir esto. Las solicitudes afectadas serán reencoladas.',
             'keywords' => ['solicitudes de por vida', 'agotado'],
         ],
         'server_error' => [
-            'title'    => 'Error de servidor al procesar descarga',
+            'title' => 'Error de servidor al procesar descarga',
             'body_tpl' => 'Fallo en el servidor al guardar o extraer el ZIP descargado del SAT. Error: %s — El administrador debe revisar los permisos de almacenamiento.',
             'keywords' => ['permission denied', 'failed to open stream', 'ziparchive', 'extractto'],
         ],
@@ -69,7 +69,8 @@ class AnalyzeCoverageCommand extends Command
             $issues = $this->analyzeBusiness($business);
             if ($issues > 0) {
                 $stats['issues']++;
-            } else {
+            }
+            else {
                 $stats['ok']++;
             }
         }
@@ -82,8 +83,8 @@ class AnalyzeCoverageCommand extends Command
 
     private function analyzeBusiness(Business $business): int
     {
-        $rfc    = $business->rfc;
-        $name   = $business->common_name ?: $business->legal_name;
+        $rfc = $business->rfc;
+        $name = $business->common_name ?: $business->legal_name;
         $issues = 0;
 
         // ── 1. FIEL expirada ────────────────────────────────────────────
@@ -107,7 +108,7 @@ class AnalyzeCoverageCommand extends Command
         if ($failedRequests->isEmpty()) {
             // No failures — check that at least one completed request exists
             $hasCompleted = SatRequest::where('rfc', $rfc)->where('state', 'completed')->exists();
-            $hasAny       = SatRequest::where('rfc', $rfc)->exists();
+            $hasAny = SatRequest::where('rfc', $rfc)->exists();
 
             if (!$hasAny) {
                 $this->createNote($rfc, 'info', null,
@@ -116,7 +117,8 @@ class AnalyzeCoverageCommand extends Command
                 );
                 $this->line("   ℹ  {$rfc} ({$name}): pendiente primera sync");
                 $issues++;
-            } else {
+            }
+            else {
                 $this->info("   ✓  {$rfc} ({$name}): sin errores");
             }
             return $issues;
@@ -128,12 +130,13 @@ class AnalyzeCoverageCommand extends Command
         foreach ($failedRequests as $req) {
             $err = strtolower($req->last_error ?? '');
             foreach (self::CRITICAL_PATTERNS as $type => $config) {
-                if (in_array($type, $detectedTypes)) continue; // already noted
+                if (in_array($type, $detectedTypes))
+                    continue; // already noted
 
                 foreach ($config['keywords'] as $kw) {
                     if (str_contains($err, strtolower($kw))) {
-                        $sample  = rtrim(substr($req->last_error, 0, 300));
-                        $body    = sprintf($config['body_tpl'], $sample);
+                        $sample = rtrim(substr($req->last_error, 0, 300));
+                        $body = sprintf($config['body_tpl'], $sample);
                         $typeStr = $req->type === 'issued' ? 'Emitidas' : 'Recibidas';
 
                         $this->createNote($rfc, $type, null,
@@ -152,8 +155,8 @@ class AnalyzeCoverageCommand extends Command
 
         // If failed requests exist but no critical pattern matched → transient SAT error (runner retries)
         if (empty($detectedTypes)) {
-            $recentError    = $failedRequests->first()->last_error;
-            $maxAttempts    = $failedRequests->max('attempts');
+            $recentError = $failedRequests->first()->last_error;
+            $maxAttempts = $failedRequests->max('attempts');
             $this->line("   ~  {$rfc} ({$name}): error transitorio SAT (runner reintenta) — " . substr($recentError, 0, 80));
 
             // Only create a note if attempts are exhausted (>= 5) with no recent completed requests
@@ -166,7 +169,8 @@ class AnalyzeCoverageCommand extends Command
                 $this->createNote($rfc, 'sat_error', null,
                     'Solicitudes SAT agotaron reintentos',
                     "Una o más solicitudes fallaron {$maxAttempts} veces con error del SAT: \"{$recentError}\". " .
-                    "El SAT puede estar rechazando rangos de fechas muy grandes. El sistema creará nuevas solicitudes en el próximo ciclo."
+                    "Esto suele indicar saturación o fallas internas del portal SAT (Error 5005). " .
+                    "El sistema intentará re-sincronizar con una solicitud fresca en el próximo ciclo automático."
                 );
                 $this->warn("   △  {$rfc} ({$name}): intentos agotados, se reencolarán");
                 $issues++;
@@ -187,11 +191,11 @@ class AnalyzeCoverageCommand extends Command
 
         if (!$exists) {
             BusinessNote::create([
-                'rfc'          => $rfc,
-                'type'         => $type,
+                'rfc' => $rfc,
+                'type' => $type,
                 'invoice_type' => $invoiceType,
-                'title'        => $title,
-                'body'         => $body,
+                'title' => $title,
+                'body' => $body,
             ]);
         }
     }

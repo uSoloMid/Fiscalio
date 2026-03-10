@@ -82,9 +82,17 @@ export function RequestDetailsModal({ request, isOpen, onClose }: Props) {
                                 </span>
                                 <div>
                                     <h4 className={`text-sm font-black uppercase tracking-tight ${isSystemError(request.last_error) ? 'text-red-900' : 'text-orange-900'}`}>
-                                        {isSystemError(request.last_error) ? 'Error del Sistema (Acción Requerida)' : 'Aviso del SAT / Temporal'}
+                                        {isSystemError(request.last_error)
+                                            ? 'Error del Sistema (Acción Requerida)'
+                                            : request.last_error?.includes('Error no controlado')
+                                                ? 'Saturación o Error Interno del SAT'
+                                                : 'Aviso del SAT / Temporal'}
                                     </h4>
-                                    <p className="text-[10px] font-medium text-gray-500">Origen del problema detectado automáticamente</p>
+                                    <p className="text-[10px] font-medium text-gray-500">
+                                        {request.last_error?.includes('Error no controlado')
+                                            ? 'El servicio de descarga masiva del SAT está fallando internamente o por saturación.'
+                                            : 'Origen del problema detectado automáticamente'}
+                                    </p>
                                 </div>
                             </div>
                             <div className="bg-white/50 rounded-xl p-4 font-mono text-xs text-gray-700 border border-current/10 break-words leading-relaxed">
@@ -96,6 +104,14 @@ export function RequestDetailsModal({ request, isOpen, onClose }: Props) {
                                     <span className="material-symbols-outlined text-sm">info</span>
                                     <span className="text-[10px] font-black uppercase tracking-wide">
                                         Sugerencia: Revisar permisos de archivos o configuración SSL en el servidor.
+                                    </span>
+                                </div>
+                            )}
+                            {!isSystemError(request.last_error) && request.last_error?.includes('Error no controlado') && (
+                                <div className="mt-4 flex items-center gap-2 text-orange-700">
+                                    <span className="material-symbols-outlined text-sm">info</span>
+                                    <span className="text-[10px] font-black uppercase tracking-wide">
+                                        Sugerencia: El sistema reintentará automáticamente con nuevas solicitudes. Si persiste, el SAT puede estar en mantenimiento.
                                     </span>
                                 </div>
                             )}

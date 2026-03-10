@@ -140,12 +140,22 @@ class SatRunnerCommand extends Command
                 $this->info("Marcando Request {$req->id} como completado (Sin información/Rechazada/Vencida por SAT).");
             }
             // "Solicitudes de por vida" es colisión de solicitudes duplicadas, no un límite real.
-            // Resetear request_id y reintentar después de 5 minutos para que el SAT lo procese limpio.
-            elseif (str_contains($msg, 'solicitudes de por vida') || str_contains($msg, 'agotado')) {
+            // O "Error no controlado" persistente: resetear request_id y reintentar con ID fresco.
+            elseif (str_contains($msg, 'solicitudes de por vida') || str_contains($msg, 'agotado') || (str_contains($msg, 'Error no controlado') && $req->attempts >= 3)) {
                 $req->state = 'created';
                 $req->request_id = null;
-                $req->next_retry_at = now()->addMinutes(5);
-                $this->warn("Colisión de solicitudes duplicadas para {$req->id} — se reencola en 5 min.");
+                $req->next_retry_at = now()->addMinutes(10);
+
+                // Si el error NO CONTROLADO persiste tras 10 intentos totales (incluyendo reintentos con IDs frescos),
+                // entonces el RFC o el periodo probablemente tienen un bloqueo real en el portal SAT.
+                if ($req->attempts >= 10 && str_contains($msg, 'Error no controlado')) {
+                    $req->state = 'failed';
+                    $req->last_error = "SAT persiste en Error no controlado tras múltiples gestiones: " . $msg;
+                    $this->error("Máximo de intentos con SAT 5005 alcanzado para {$req->id}.");
+                }
+                else {
+                    $this->warn("Error persistente (SAT 5005 o colisión) para {$req->id} — reintentando con ID fresco en 10 min.");
+                }
             }
             else {
                 // Si ya van muchos intentos, marcar como fallida para que no estorbe en la cola
