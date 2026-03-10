@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-03-10 — Mitigación de "Error no controlado" (SAT Code 5005)
+
+**Commit estable:** `(pendiente de hash tras push)`
+
+- Implementado mecanismo de "Fresh Start" en `SatRunnerCommand.php`: si una solicitud falla 3 veces con error 5005, se limpia el `request_id` para forzar una nueva solicitud al SAT.
+- Mejora en la UI (`RequestDetailsModal.tsx`): clasificación del error 5005 como "Saturación o Error Interno del SAT" con sugerencias específicas de reintento automático.
+- `AnalyzeCoverageCommand.php` actualizado para reflejar la causa probable de los fallos de reintento en el diagnóstico de riesgos fiscales.
+- Límite de 10 intentos totales antes de marcar como fallo permanente para evitar bucles infinitos en solicitudes problemáticas.
+
+---
+
 ## 2026-03-09 — Implementación del Parser de Estados de Cuenta Inbursa
 
 **Commit estable:** `a8a424e`
