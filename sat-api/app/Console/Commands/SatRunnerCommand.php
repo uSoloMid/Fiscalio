@@ -217,9 +217,8 @@ class SatRunnerCommand extends Command
         }
         else {
             $satStatus = $status->getValue();
-            $req->last_error = "Fallo al verificar: {$satStatus}";
-            $req->state = 'failed';
-            $req->save();
+            $satMsg = method_exists($status, 'getMessage') ? $status->getMessage() : '';
+            throw new Exception("Fallo al verificar: {$satStatus} {$satMsg}");
         }
     }
 
