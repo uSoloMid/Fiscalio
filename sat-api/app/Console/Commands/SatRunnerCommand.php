@@ -141,20 +141,21 @@ class SatRunnerCommand extends Command
             }
             // "Solicitudes de por vida" es colisión de solicitudes duplicadas, no un límite real.
             // O "Error no controlado" persistente: resetear request_id y reintentar con ID fresco.
-            elseif (str_contains($msg, 'solicitudes de por vida') || str_contains($msg, 'agotado') || (str_contains($msg, 'Error no controlado') && $req->attempts >= 3)) {
-                $req->state = 'created';
-                $req->request_id = null;
-                $req->next_retry_at = now()->addMinutes(10);
+            elseif (str_contains($msg, 'solicitudes de por vida') || str_contains($msg, 'agotado') || (str_contains($msg, 'Error no controlado') && $req->attempts >= 1)) {
 
-                // Si el error NO CONTROLADO persiste tras 10 intentos totales (incluyendo reintentos con IDs frescos),
+                // Si el error NO CONTROLADO persiste tras 15 intentos totales (incluyendo reintentos con IDs frescos),
                 // entonces el RFC o el periodo probablemente tienen un bloqueo real en el portal SAT.
-                if ($req->attempts >= 10 && str_contains($msg, 'Error no controlado')) {
+                if ($req->attempts >= 15 && str_contains($msg, 'Error no controlado')) {
                     $req->state = 'failed';
-                    $req->last_error = "SAT persiste en Error no controlado tras múltiples gestiones: " . $msg;
+                    $req->last_error = "SAT persiste en Error no controlado (5005) tras múltiples gestiones: " . $msg;
                     $this->error("Máximo de intentos con SAT 5005 alcanzado para {$req->id}.");
                 }
                 else {
-                    $this->warn("Error persistente (SAT 5005 o colisión) para {$req->id} — reintentando con ID fresco en 10 min.");
+                    $req->state = 'created';
+                    $req->request_id = null;
+                    $req->last_error = null; // Limpiamos para que el usuario no vea el error "luego luego"
+                    $req->next_retry_at = now()->addMinutes(5);
+                    $this->warn("Error persistente (SAT 5005 o colisión) para {$req->id} — reintentando con ID fresco en 5 min.");
                 }
             }
             else {
