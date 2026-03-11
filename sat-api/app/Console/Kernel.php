@@ -15,8 +15,8 @@ class Kernel extends ConsoleKernel
      * @var array<string>
      */
     protected $commands = [
-        Commands\ScraperManualBulk::class,
-        Commands\ScraperManualRunner::class,
+        \App\Console\Commands\ScraperManualBulk::class,
+        \App\Console\Commands\ScraperManualRunner::class,
     ];
 
     protected function schedule($schedule)
