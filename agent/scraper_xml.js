@@ -34,23 +34,30 @@ async function main() {
     }
     const browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
 
     try {
         const client = await page.target().createCDPSession();
         await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: RFC_DOWNLOAD_DIR });
 
-        await page.goto('https://portalcfdi.facturaelectronica.sat.gob.mx/', { waitUntil: 'networkidle2' });
+        await page.goto('https://portalcfdi.facturaelectronica.sat.gob.mx/', { waitUntil: 'domcontentloaded' });
         await new Promise(r => setTimeout(r, 5000));
         await page.screenshot({ path: 'step1_login.png' });
 
         let loginFrame = page;
-        let efirmaBtn = null;
-        for (const frame of page.frames()) {
-            efirmaBtn = await frame.$('#buttonFiel');
-            if (efirmaBtn) { loginFrame = frame; break; }
+        let efirmaBtn = await page.$('#buttonFiel');
+        
+        if (!efirmaBtn) {
+            for (const frame of page.frames()) {
+                efirmaBtn = await frame.$('#buttonFiel');
+                if (efirmaBtn) { loginFrame = frame; break; }
+            }
         }
-        if (efirmaBtn) await efirmaBtn.click();
-        await new Promise(r => setTimeout(r, 2000));
+
+        if (efirmaBtn) {
+            await efirmaBtn.click();
+            await new Promise(r => setTimeout(r, 2000));
+        }
         await page.screenshot({ path: 'step2_fiel.png' });
 
         const cerPath = path.join(FIEL_DIR, rfc, `${rfc}.cer`);
