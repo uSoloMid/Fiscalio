@@ -249,6 +249,8 @@ def extract_inbursa(pdf_path):
 
                     # ── Procesar palabras de esta línea ──────────────────────
                     desc_parts = []
+                    money_on_line = []  # [(x1, val), ...]
+
                     for w in line_words:
                         txt = w['text']
                         x0 = w['x0']
@@ -260,14 +262,26 @@ def extract_inbursa(pdf_path):
 
                         if _is_money(txt):
                             val = float(txt.replace(',', ''))
-                            col = _nearest_col(x1, col_positions)
-                            # Solo asignar si es mayor o si aún es 0 (evita sobreescribir con 0.01 de IVA)
                             if val > 0:
-                                current_tx[col] = val
+                                money_on_line.append((x1, val))
                         else:
                             # Solo agregar al concepto si está en la zona de descripción
                             if x0 < col_positions.get('cargo', 420) - 10:
                                 desc_parts.append(txt)
+
+                    # Asignar importes: el más a la derecha = SALDO (siempre).
+                    # Para el resto: frontera exacta en el punto medio cargo/abono.
+                    if money_on_line:
+                        money_on_line.sort(key=lambda t: t[0])
+                        # Saldo = rightmost
+                        current_tx['saldo'] = money_on_line[-1][1]
+                        # Punto medio entre columnas cargo y abono
+                        mid = (col_positions['cargo'] + col_positions['abono']) / 2
+                        for x1_val, val in money_on_line[:-1]:
+                            if x1_val <= mid:
+                                current_tx['cargo'] = val
+                            else:
+                                current_tx['abono'] = val
 
                     inc = " ".join(desc_parts).strip()
                     if inc:
