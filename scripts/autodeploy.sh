@@ -10,10 +10,13 @@ MAX_LOG_LINES=500
 
 cd "$REPO_DIR"
 
-git fetch origin main --quiet
+# Detect current branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+git fetch origin "$CURRENT_BRANCH" --quiet
 
 LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse origin/main)
+REMOTE=$(git rev-parse "origin/$CURRENT_BRANCH")
 
 if [ "$LOCAL" = "$REMOTE" ]; then
     exit 0
@@ -25,7 +28,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Nuevo commit detectado: $LOCAL -> $REMOTE" 
 docker exec sat-api-app chown -R 1000:1000 /var/www/storage /var/www/bootstrap/cache >> "$LOG_FILE" 2>&1 || true
 
 # 2. Pull
-git reset --hard origin/main >> "$LOG_FILE" 2>&1
+git reset --hard "origin/$CURRENT_BRANCH" >> "$LOG_FILE" 2>&1
 
 # Restaurar permisos de ejecución (git reset --hard los quita)
 chmod +x "$REPO_DIR/scripts/autodeploy.sh"
