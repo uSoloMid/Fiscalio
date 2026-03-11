@@ -1,6 +1,8 @@
 import pdfplumber
 import re
 import sys
+import os
+import tempfile
 
 
 def _group_lines(words, y_tolerance=4):
@@ -87,7 +89,33 @@ def _is_spei_detail_line(text_upper):
     return False
 
 
+def _repair_pdf_if_needed(pdf_path):
+    """
+    Algunos PDFs de Inbursa tienen xref corruptos que pdfplumber/pdfminer
+    no puede leer (error 'cannot find object in xref').
+    PyMuPDF (fitz) los abre con warnings y puede guardar una versión reparada.
+    Retorna la ruta al PDF a usar (original o reparado temporal).
+    """
+    try:
+        import fitz
+        doc = fitz.open(pdf_path)
+        # Intentar extraer texto de la primera página
+        test_text = doc[0].get_text() if len(doc) > 0 else ""
+        # Si fitz puede leerlo, guardar versión limpia para pdfplumber
+        repaired_path = pdf_path + "_repaired.pdf"
+        doc.save(repaired_path, garbage=4, deflate=True)
+        doc.close()
+        sys.stderr.write(f"[INBURSA-DEBUG] PDF reparado guardado en {repaired_path}\n")
+        return repaired_path
+    except Exception as e:
+        sys.stderr.write(f"[INBURSA-DEBUG] No se pudo reparar PDF: {e} — usando original\n")
+        return pdf_path
+
+
 def extract_inbursa(pdf_path):
+    # Reparar xref si es necesario (PDFs Inbursa con estructura no estándar)
+    working_path = _repair_pdf_if_needed(pdf_path)
+
     transacciones = []
     summary = {
         "initial_balance": None,
@@ -105,7 +133,7 @@ def extract_inbursa(pdf_path):
     }
 
     try:
-        with pdfplumber.open(pdf_path) as pdf:
+        with pdfplumber.open(working_path) as pdf:
             year_str = str(__import__('datetime').date.today().year)
 
             # ─── PARTE 1: CARÁTULA (página 1) ────────────────────────────────
@@ -324,3 +352,11 @@ def extract_inbursa(pdf_path):
         import traceback
         sys.stderr.write(f"Error procesando INBURSA: {e}\n{traceback.format_exc()}\n")
         return {"movements": [], "summary": summary}
+
+    finally:
+        # Limpiar PDF reparado temporal si se creó
+        if working_path != pdf_path and os.path.exists(working_path):
+            try:
+                os.remove(working_path)
+            except Exception:
+                pass
