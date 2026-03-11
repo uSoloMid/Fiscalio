@@ -168,7 +168,10 @@ def extract_inbursa(pdf_path):
 
             # Fallback si no se detectaron (proporciones típicas de página Inbursa ~595pt)
             if not col_positions:
+                sys.stderr.write("[INBURSA-DEBUG] col_positions no detectado — usando fallback\n")
                 col_positions = {'cargo': 440.0, 'abono': 510.0, 'saldo': 570.0}
+            else:
+                sys.stderr.write(f"[INBURSA-DEBUG] col_positions={col_positions}\n")
 
             # ─── PARTE 2: EXTRAER MOVIMIENTOS ────────────────────────────────
             # Estado: SEARCHING → EXTRACTING → FINISHED
@@ -225,6 +228,7 @@ def extract_inbursa(pdf_path):
                     if date_match:
                         if current_tx:
                             transacciones.append(current_tx)
+                        sys.stderr.write(f"[INBURSA-DEBUG] nueva tx fecha={date_match.group(0).strip()}\n")
 
                         mes_abbr = date_match.group(1).replace('.', '')
                         dia = date_match.group(2)
@@ -277,6 +281,11 @@ def extract_inbursa(pdf_path):
                             # Solo agregar al concepto si está en la zona de descripción
                             if x0 < col_positions.get('cargo', 420) - 10:
                                 desc_parts.append(txt)
+
+                    if date_match and not money_on_line:
+                        # Loguear las palabras crudas de esta línea para diagnóstico
+                        raw_words = [(w['text'], round(w['x0']), round(w['x1'])) for w in line_words]
+                        sys.stderr.write(f"[INBURSA-DEBUG] tx sin importes, palabras={raw_words}\n")
 
                     # Asignar importes: el más a la derecha = SALDO (siempre).
                     # Para el resto: frontera exacta en el punto medio cargo/abono.
