@@ -41,6 +41,7 @@ async function main() {
 
         await page.goto('https://portalcfdi.facturaelectronica.sat.gob.mx/', { waitUntil: 'networkidle2' });
         await new Promise(r => setTimeout(r, 5000));
+        await page.screenshot({ path: 'step1_login.png' });
 
         let loginFrame = page;
         let efirmaBtn = null;
@@ -50,6 +51,7 @@ async function main() {
         }
         if (efirmaBtn) await efirmaBtn.click();
         await new Promise(r => setTimeout(r, 2000));
+        await page.screenshot({ path: 'step2_fiel.png' });
 
         const cerPath = path.join(FIEL_DIR, rfc, `${rfc}.cer`);
         const keyPath = path.join(FIEL_DIR, rfc, `${rfc}.key`);
@@ -67,6 +69,7 @@ async function main() {
         await loginFrame.click('#submit');
 
         await page.waitForNavigation({ waitUntil: 'networkidle2' });
+        await page.screenshot({ path: 'step3_after_login.png' });
 
         if (tipo === 'recibidas') {
             await page.goto('https://portalcfdi.facturaelectronica.sat.gob.mx/ConsultaReceptor.aspx');
@@ -75,14 +78,16 @@ async function main() {
             await page.select('#ctl00_MainContent_CodelistMes', parseInt(month).toString());
             // Si el dia no es '00' o 'all', seleccionamos dia
             if (day !== '00' && day !== 'all') {
-                await page.click('#ctl00_MainContent_RbtnDesde');
+                await page.evaluate(() => { document.getElementById('ctl00_MainContent_RbtnDesde').click(); });
+                await new Promise(r => setTimeout(r, 1000));
                 await page.evaluate((d) => { document.getElementById('ctl00_MainContent_CodelistDia').value = d; }, day);
             }
         } else {
             await page.goto('https://portalcfdi.facturaelectronica.sat.gob.mx/ConsultaEmisor.aspx');
             await page.waitForSelector('#ctl00_MainContent_RbtnFechas');
+            await page.screenshot({ path: 'step4_emisor.png' });
             await page.click('#ctl00_MainContent_RbtnFechas');
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 2000));
             
             const startDate = `${day.padStart(2,'0')}/${month.padStart(2,'0')}/${year} 00:00:00`;
             const endDate = day === '00' || day === 'all' 
@@ -93,8 +98,10 @@ async function main() {
             await page.evaluate((e) => { document.getElementById('ctl00_MainContent_TxtFechaFin').value = e; }, endDate);
         }
 
+        await page.screenshot({ path: 'step5_ready_to_search.png' });
         await page.click('#ctl00_MainContent_BtnBusqueda');
         await new Promise(r => setTimeout(r, 10000));
+        await page.screenshot({ path: 'step6_results.png' });
 
         const downloads = await page.$$('span[id="BtnDescarga"]');
         console.log(`Descargando ${downloads.length} XMLs...`);
