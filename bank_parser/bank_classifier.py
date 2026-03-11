@@ -11,42 +11,45 @@ def identify_bank(pdf_path: str) -> str:
         if len(doc) == 0:
             return None
             
+        # Concatenar texto de las primeras 3 páginas para mayor cobertura
+        pages_to_scan = min(3, len(doc))
+        full_text = ""
+        for i in range(pages_to_scan):
+            full_text += doc[i].get_text().upper()
+
         first_page_text = doc[0].get_text().upper()
-        
-        # Primero buscamos identificadores exclusivos o los que puedan 
-        # estar en el encabezado. 
-        # IMPORTANTE: No usar simplemente "BBVA" porque puede aparecer en movimientos como SPEI.
-        # Mejor buscar "ESTADO DE CUENTA" junto al banco o buscar patrones fuertes.
-        
-        # Para Banamex suele traer "SUC." o cosas como "CITIBANAMEX" o la estructura clásica
-        # Al ver el texto de Banamex: trae "CUENTA DE CHEQUES MONEDA NACIONAL"
-        if "CITIBANAMEX" in first_page_text or "BANAMEX" in first_page_text[:1000]: # Solo en los primeros 1000 chars
-            # Para evitar que coincida con SPEI, aseguramos que Banamex gane si está arriba
+
+        # IMPORTANTE: No usar simplemente "BBVA" porque puede aparecer en movimientos SPEI.
+        # Buscar identificadores exclusivos o fuertes por banco.
+
+        if "CITIBANAMEX" in first_page_text or "BANAMEX" in first_page_text[:1000]:
             return "banamex"
-            
-        if "BANBAJIO" in first_page_text or "BANCO DEL BAJIO" in first_page_text:
+
+        if "BANBAJIO" in full_text or "BANCO DEL BAJIO" in full_text:
             return "banbajio"
-            
+
         if "HSBC" in first_page_text[:1000]:
             return "hsbc"
-        
-        if "BBVA" in first_page_text[:1000] or "BANCOMER" in first_page_text[:1000]:
-            return "bbva"
-            
-        if "INBURSA" in first_page_text[:2000] or "RESUMEN DE SALDOS" in first_page_text[:2000] or "ÓÄÖÓÕ" in first_page_text:
+
+        # Inbursa ANTES de BBVA — Inbursa puede mencionar BBVA en sus movimientos SPEI
+        if ("INBURSA" in full_text
+                or "CLIENTE INBURSA" in full_text
+                or "BANCO INBURSA" in full_text
+                or "RESUMEN DE SALDOS" in first_page_text[:3000]
+                or "ÓÄÖÓÕ" in full_text):
             return "inbursa"
 
-        # Si PyMuPDF no extrae texto, es probable que sea BBVA escaneado o Inbursa ofuscado
+        if "BBVA" in first_page_text[:1000] or "BANCOMER" in first_page_text[:1000]:
+            return "bbva"
+
+        # Si PyMuPDF no extrae texto (PDF escaneado/ofuscado)
         if len(first_page_text.strip()) < 50:
-            # Podríamos pasar a tesseract aquí para estar seguros, pero por 
-            # ahora podemos tratar de adivinar por nombre de archivo si estamos probando o mandar "bbva"
             if "INBURSA" in pdf_path.upper():
                 return "inbursa"
             if "BBVA" in pdf_path.upper():
                 return "bbva"
-                
-            return "bbva" 
-            
+            return "bbva"
+
         return "banamex"
     except Exception as e:
         sys.stderr.write(f"Error clasificando: {e}\n")
