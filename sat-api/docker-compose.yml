@@ -18,6 +18,7 @@ services:
       - ../Base_datos:/var/www/Base_datos
       - ./secrets:/var/www/secrets
       - ../bank_parser:/var/www/bank_parser
+      - ../agent:/var/www/agent_folder
 
     networks:
       fiscalio_fiscalio-network:

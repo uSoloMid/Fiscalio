@@ -531,3 +531,28 @@ export async function downloadSatDocument(id: number, filename: string): Promise
     a.click();
     URL.revokeObjectURL(url);
 }
+
+// Manual Scraper (Node Scraper)
+export async function listScraperManual(): Promise<any[]> {
+    const response = await authFetch(`${API_BASE_URL}/api/scraper-manual`);
+    if (!response.ok) throw new Error('Error cargando historial del scraper');
+    return response.json();
+}
+
+export async function getScraperStats(): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/scraper-manual/stats`);
+    if (!response.ok) throw new Error('Error cargando estadísticas del scraper');
+    return response.json();
+}
+
+export async function bulkQueueScraper(): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/scraper-manual/bulk`, { method: 'POST' });
+    if (!response.ok) throw new Error('Error al iniciar cola masiva');
+    return response.json();
+}
+
+export async function resetScraperQueue(): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/scraper-manual/reset`, { method: 'POST' });
+    if (!response.ok) throw new Error('Error al reiniciar cola');
+    return response.json();
+}

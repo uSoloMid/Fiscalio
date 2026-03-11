@@ -124,6 +124,75 @@ class XmlProcessorService
         Log::info("Procesamiento completado para Request $requestId. XMLs: $xmlsProcesados");
     }
 
+    public function processScraperResult(string $sourcePath, string $rfcCliente, string $requestId)
+    {
+        $rfcCliente = strtoupper($rfcCliente);
+        
+        if (!is_dir($sourcePath)) {
+            Log::error("Directorio de resultados no encontrado: $sourcePath");
+            return 0;
+        }
+
+        $files = scandir($sourcePath);
+        $xmlsProcesados = 0;
+        $batchSize = 20;
+        $currentBatch = [];
+
+        foreach ($files as $file) {
+            if (!str_ends_with(strtolower($file), '.xml')) {
+                continue;
+            }
+
+            $filePath = $sourcePath . DIRECTORY_SEPARATOR . $file;
+            try {
+                $content = file_get_contents($filePath);
+                $data = $this->parseCfdi($content);
+
+                if (!$data) {
+                    continue;
+                }
+
+                // Clasificar
+                $tipo = 'otros';
+                if (strtoupper($data['rfc_emisor']) === $rfcCliente) {
+                    $tipo = 'emitidas';
+                }
+                elseif (strtoupper($data['rfc_receptor']) === $rfcCliente) {
+                    $tipo = 'recibidas';
+                }
+
+                // Mover archivo final
+                $year = $data['fecha']->format('Y');
+                $month = $data['fecha']->format('m');
+                $finalPath = "sat/xml/$rfcCliente/$year/$tipo/$month/" . $data['uuid'] . ".xml";
+
+                Storage::put($finalPath, $content);
+
+                // Guardar para procesar en bloque
+                $currentBatch[] = [
+                    'data' => $data,
+                    'path' => $finalPath
+                ];
+
+                if (count($currentBatch) >= $batchSize) {
+                    $this->saveBatch($currentBatch, $requestId);
+                    $xmlsProcesados += count($currentBatch);
+                    $currentBatch = [];
+                }
+            }
+            catch (Exception $e) {
+                Log::error("Error procesando XML raspado $file: " . $e->getMessage());
+            }
+        }
+
+        if (count($currentBatch) > 0) {
+            $this->saveBatch($currentBatch, $requestId);
+            $xmlsProcesados += count($currentBatch);
+        }
+
+        return $xmlsProcesados;
+    }
+
     protected function saveBatch(array $batch, string $requestId)
     {
         DB::beginTransaction();

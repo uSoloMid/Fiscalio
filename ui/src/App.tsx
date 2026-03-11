@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { InvoicesPage } from './pages/InvoicesPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SatRequestsHistoryPage } from './pages/SatRequestsHistoryPage'
+import { ScraperManualPage } from './pages/ScraperManualPage'
 import { LoginPage } from './pages/LoginPage'
 import { ErrorBoundary } from './ErrorBoundary'
 import { getToken } from './services'
@@ -13,6 +14,7 @@ function App() {
   const [activeLastSync, setActiveLastSync] = useState(localStorage.getItem('active_last_sync') || '');
   const [activeValidUntil, setActiveValidUntil] = useState(localStorage.getItem('active_valid_until') || '');
   const [showHistory, setShowHistory] = useState(false);
+  const [showScraper, setShowScraper] = useState(false);
 
   useEffect(() => {
     const handleAuthExpired = () => {
@@ -69,10 +71,13 @@ function App() {
         />
       ) : showHistory ? (
         <SatRequestsHistoryPage onBack={() => setShowHistory(false)} />
+      ) : showScraper ? (
+        <ScraperManualPage onBack={() => setShowScraper(false)} />
       ) : (
         <DashboardPage
           onSelectClient={handleSelectClient}
           onViewHistory={() => setShowHistory(true)}
+          onViewScraper={() => setShowScraper(true)}
         />
       )}
     </ErrorBoundary>

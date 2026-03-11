@@ -134,6 +134,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/sat-documents/missing', [\App\Http\Controllers\SatDocumentController::class, 'missing']);
         Route::get('/sat-documents', [\App\Http\Controllers\SatDocumentController::class, 'index']);
         Route::get('/sat-documents/{id}/download', [\App\Http\Controllers\SatDocumentController::class, 'download']);
+
+        // Manual Scraper (XML Scraper)
+        Route::get('/scraper-manual', [Api\ScraperManualController::class, 'index']);
+        Route::get('/scraper-manual/stats', [Api\ScraperManualController::class, 'stats']);
+        Route::post('/scraper-manual/bulk', [Api\ScraperManualController::class, 'bulkQueue']);
+        Route::post('/scraper-manual/reset', [Api\ScraperManualController::class, 'resetQueue']);
     });
 
 // WhatsApp Business webhook (public — no auth)

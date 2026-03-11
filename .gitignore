@@ -1,5 +1,5 @@
 # Root Gitignore
-/agent
+# /agent
 /desktop
 /vault
 /legacy
@@ -23,8 +23,8 @@ Base_datos/
 # Scripts de debug temporales (NO subir al repo)
 
 /scripts_mantenimiento/
-/*.py
-/*.sh
+# /*.py
+# /*.sh
 /*.bak
 /*.b64
 /*.txt
