@@ -36,7 +36,8 @@ def _detect_col_positions(pages):
         lines = _group_lines(words)
         for line_words in lines:
             text_upper = " ".join(w['text'].upper() for w in line_words)
-            if 'CARGOS' in text_upper and 'ABONOS' in text_upper and 'SALDO' in text_upper:
+            if ('FECHA' in text_upper and 'CARGOS' in text_upper
+                    and 'ABONOS' in text_upper and 'SALDO' in text_upper):
                 cols = {}
                 for w in line_words:
                     t = w['text'].upper()
@@ -57,8 +58,15 @@ def _nearest_col(x1_money, col_positions):
 
 
 def _is_money(text):
-    """True si el texto parece un importe tipo 4,166.00 o 480.00 o 2.14"""
-    return bool(re.match(r'^\d{1,3}(?:,\d{3})*\.\d{2}$', text))
+    """
+    True si el texto parece un importe monetario.
+    Acepta: 4,166.00 | 4166.00 | 480.00 | 2.14
+    También normaliza separadores alternativos de miles (espacio, punto en algunos PDFs).
+    """
+    normalized = re.sub(r'[\s,]', '', text)          # quita espacios y comas de miles
+    normalized = normalized.replace('\u202f', '')     # non-breaking thin space
+    normalized = normalized.replace('\xa0', '')       # non-breaking space
+    return bool(re.match(r'^\d+\.\d{2}$', normalized) and float(normalized) >= 0)
 
 
 def _is_spei_detail_line(text_upper):
@@ -173,7 +181,7 @@ def extract_inbursa(pdf_path):
                 if state == "FINISHED":
                     break
 
-                words = page.extract_words(x_tolerance=2, y_tolerance=3)
+                words = page.extract_words(x_tolerance=3, y_tolerance=3)
                 if not words:
                     continue
 
@@ -261,7 +269,8 @@ def extract_inbursa(pdf_path):
                             continue
 
                         if _is_money(txt):
-                            val = float(txt.replace(',', ''))
+                            normalized = re.sub(r'[\s,\u202f\xa0]', '', txt)
+                            val = float(normalized)
                             if val > 0:
                                 money_on_line.append((x1, val))
                         else:
