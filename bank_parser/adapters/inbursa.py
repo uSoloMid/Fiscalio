@@ -25,8 +25,9 @@ def _detect_col_positions(pages):
     """
     Busca la fila de cabecera de la tabla de movimientos:
     FECHA | REFERENCIA | CONCEPTO | CARGOS | ABONOS | SALDO
-    y devuelve el x-centro de cada columna de importe.
-    Retorna dict {'cargo': x, 'abono': x, 'saldo': x} o None.
+    y devuelve el x1 (borde derecho) de cada columna de importe.
+    Las columnas son right-aligned, así que x1 del header ≈ x1 de los números.
+    Retorna dict {'cargo': x1, 'abono': x1, 'saldo': x1} o None.
     """
     for page in pages:
         words = page.extract_words(x_tolerance=3, y_tolerance=3)
@@ -39,21 +40,20 @@ def _detect_col_positions(pages):
                 cols = {}
                 for w in line_words:
                     t = w['text'].upper()
-                    xcenter = (w['x0'] + w['x1']) / 2
                     if t == 'CARGOS':
-                        cols['cargo'] = xcenter
+                        cols['cargo'] = w['x1']
                     elif t == 'ABONOS':
-                        cols['abono'] = xcenter
+                        cols['abono'] = w['x1']
                     elif t == 'SALDO':
-                        cols['saldo'] = xcenter
+                        cols['saldo'] = w['x1']
                 if 'cargo' in cols and 'abono' in cols and 'saldo' in cols:
                     return cols
     return None
 
 
-def _nearest_col(xcenter, col_positions):
-    """Devuelve el nombre de la columna más cercana al x-centro dado."""
-    return min(col_positions, key=lambda k: abs(xcenter - col_positions[k]))
+def _nearest_col(x1_money, col_positions):
+    """Devuelve la columna más cercana comparando x1 del número vs x1 de cada cabecera."""
+    return min(col_positions, key=lambda k: abs(x1_money - col_positions[k]))
 
 
 def _is_money(text):
@@ -241,9 +241,10 @@ def extract_inbursa(pdf_path):
                     if not current_tx:
                         continue
 
-                    # ── Líneas de detalle SPEI: solo tomar texto descriptivo ──
-                    # Nunca tomar líneas con cuentas bancarias largas / folios SAT / RFC
-                    if _is_spei_detail_line(text_upper):
+                    # ── Líneas de detalle SPEI: filtrar SOLO continuaciones (sin fecha) ──
+                    # No filtrar la línea principal (que ya pasó el date_match arriba).
+                    # Las referencias Inbursa tienen 10 dígitos y dispararían el filtro.
+                    if not date_match and _is_spei_detail_line(text_upper):
                         continue
 
                     # ── Procesar palabras de esta línea ──────────────────────
@@ -252,7 +253,6 @@ def extract_inbursa(pdf_path):
                         txt = w['text']
                         x0 = w['x0']
                         x1 = w['x1']
-                        xcenter = (x0 + x1) / 2
 
                         # Saltar columnas de fecha y referencia
                         if x1 < 150:
@@ -260,7 +260,7 @@ def extract_inbursa(pdf_path):
 
                         if _is_money(txt):
                             val = float(txt.replace(',', ''))
-                            col = _nearest_col(xcenter, col_positions)
+                            col = _nearest_col(x1, col_positions)
                             # Solo asignar si es mayor o si aún es 0 (evita sobreescribir con 0.01 de IVA)
                             if val > 0:
                                 current_tx[col] = val
