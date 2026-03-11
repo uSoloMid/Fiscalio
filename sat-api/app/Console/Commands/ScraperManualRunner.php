@@ -12,7 +12,7 @@ use Carbon\Carbon;
 
 class ScraperManualRunner extends Command
 {
-    protected $signature = 'scraper:manual-run {--step=all}';
+    protected $signature = 'scraper:manual-run {--step=}';
     protected $description = 'Process the manual scraper queue';
 
     public function handle(XmlProcessorService $xmlProcessor)
@@ -27,7 +27,7 @@ class ScraperManualRunner extends Command
         $business = Business::where('rfc', $request->rfc)->first();
         if (!$business) return;
 
-        if ($step === 'prepare' || $step === 'all') {
+        if ($step === 'prepare') {
             $request->update(['status' => 'processing']);
             $rfc = $business->rfc;
             $agentFielDir = "/var/www/agent_folder/fiel/$rfc";
@@ -37,9 +37,10 @@ class ScraperManualRunner extends Command
             
             // Output for host runner
             $this->line("READY|{$business->rfc}|{$business->passphrase}|{$request->type}|{$request->start_date}|{$request->end_date}");
+            return;
         }
 
-        if ($step === 'import' || $step === 'all') {
+        if ($step === 'import') {
             $rfc = $business->rfc;
             $resultDir = "/var/www/agent_folder/downloads/$rfc";
             $xmlCount = $xmlProcessor->processScraperResult($resultDir, $rfc, "SCRAPER-" . $request->id);
@@ -50,6 +51,7 @@ class ScraperManualRunner extends Command
                 'error' => null
             ]);
             $this->info("Imported $xmlCount XMLs for $rfc");
+            return;
         }
     }
 }
