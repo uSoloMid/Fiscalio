@@ -30,11 +30,11 @@ docker exec sat-api-app chown -R 1000:1000 /var/www/storage /var/www/bootstrap/c
 # 2. Pull
 git reset --hard "origin/$CURRENT_BRANCH" >> "$LOG_FILE" 2>&1
 
-# Restaurar permisos de ejecución (git reset --hard los quita)
-chmod +x "$REPO_DIR/scripts/autodeploy.sh"
-
-# 3. Restaurar ownership a www-data para que PHP-FPM pueda escribir logs/cache
+# 3. Restaurar ownership a www-data SIEMPRE (incluso si algo falla después)
 docker exec sat-api-app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache >> "$LOG_FILE" 2>&1 || true
+
+# Restaurar permisos de ejecución (git reset --hard los quita) — no-fatal
+chmod +x "$REPO_DIR/scripts/autodeploy.sh" >> "$LOG_FILE" 2>&1 || true
 
 # 4. Recargar nginx (aplica cambios de render.conf sin downtime)
 docker exec sat-api-app nginx -s reload >> "$LOG_FILE" 2>&1 || true
