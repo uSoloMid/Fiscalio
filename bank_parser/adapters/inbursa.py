@@ -50,8 +50,12 @@ def _detect_col_positions(pages_words):
                 cols = {}
                 for w in line_words:
                     t = w['text'].upper()
-                    if t == 'CARGOS':
-                        cols['cargo'] = w['x1']
+                    if t in ('REFERENCIA', 'DESCRIPCION', 'CONCEPTO', 'REF.'):
+                        # Concepto empieza justo después de REFERENCIA
+                        cols['concepto_x0'] = w['x1'] + 1
+                    elif t == 'CARGOS':
+                        cols['cargo']      = w['x1']   # borde derecho CARGOS
+                        cols['cargo_x0']   = w['x0']   # borde izquierdo CARGOS
                     elif t == 'ABONOS':
                         cols['abono'] = w['x1']
                     elif t == 'SALDO':
@@ -452,11 +456,14 @@ def extract_inbursa(pdf_path):
             else:
                 sys.stderr.write(f"[INBURSA-DEBUG] col: cargo={col_positions['cargo']:.1f} abono={col_positions['abono']:.1f} saldo={col_positions['saldo']:.1f}\n")
 
-            cargo_x  = col_positions['cargo']
-            abono_x  = col_positions['abono']
-            saldo_x  = col_positions['saldo']
-            mid_ca   = (cargo_x + abono_x) / 2
-            mid_as   = (abono_x + saldo_x) / 2
+            cargo_x      = col_positions['cargo']
+            abono_x      = col_positions['abono']
+            saldo_x      = col_positions['saldo']
+            # Límites exactos de la columna CONCEPTO
+            concepto_x0  = col_positions.get('concepto_x0', 85)
+            concepto_x1  = col_positions.get('cargo_x0', cargo_x - 5)
+            mid_ca       = (cargo_x + abono_x) / 2
+            mid_as       = (abono_x + saldo_x) / 2
 
             MESES_SET = set(meses_str.keys())
             in_extraction = False
@@ -551,11 +558,10 @@ def extract_inbursa(pdf_path):
                     if saldo_val is None:
                         continue  # fila sin saldo → no es movimiento
 
-                    # Concepto: x0 en [85, cargo_x-35), excluir montos y detalles SPEI
-                    concept_x_max = cargo_x - 35
+                    # Concepto: entre borde derecho de REFERENCIA y borde izquierdo de CARGOS
                     cw_list = []
                     for w in row_words:
-                        if (w['x0'] >= 85 and w['x0'] < concept_x_max
+                        if (w['x0'] >= concepto_x0 and w['x0'] < concepto_x1
                                 and not _is_money(w['text'])
                                 and not _is_spei_detail_line(w['text'].upper())):
                             cw_list.append((w['top'], w['x0'], w['text']))
