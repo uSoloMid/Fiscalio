@@ -440,9 +440,9 @@ def extract_inbursa(pdf_path):
 
         else:
             # ─── EXTRACCIÓN NORMAL (texto legible) ───────────────────
-            # Estrategia: anclar cada fila por su valor de SALDO (columna más confiable).
-            # El agrupamiento por Y falla porque "NOV." y el día "03" están ~11px separados
-            # en Y, igual que la distancia entre filas consecutivas.
+            # Estrategia: cada fila empieza en la Y del mes (NOV, DIC…)
+            # y termina justo antes de donde empieza el siguiente mes.
+            # El último movimiento termina en "SI DESEA RECIBIR PAGOS".
             all_pages_words = [_fitz_words(doc[i]) for i in range(len(doc))]
             col_positions = _detect_col_positions(all_pages_words)
 
@@ -452,11 +452,11 @@ def extract_inbursa(pdf_path):
             else:
                 sys.stderr.write(f"[INBURSA-DEBUG] col: cargo={col_positions['cargo']:.1f} abono={col_positions['abono']:.1f} saldo={col_positions['saldo']:.1f}\n")
 
-            cargo_x  = col_positions['cargo']   # borde derecho de columna CARGOS
-            abono_x  = col_positions['abono']   # borde derecho de columna ABONOS
-            saldo_x  = col_positions['saldo']   # borde derecho de columna SALDO
-            mid_ca   = (cargo_x + abono_x) / 2  # frontera cargo/abono
-            mid_as   = (abono_x + saldo_x) / 2  # frontera abono/saldo
+            cargo_x  = col_positions['cargo']
+            abono_x  = col_positions['abono']
+            saldo_x  = col_positions['saldo']
+            mid_ca   = (cargo_x + abono_x) / 2
+            mid_as   = (abono_x + saldo_x) / 2
 
             MESES_SET = set(meses_str.keys())
             in_extraction = False
@@ -470,7 +470,7 @@ def extract_inbursa(pdf_path):
                 if not words:
                     continue
 
-                # ── 1. Determinar y_inicio y y_fin en esta página ──────
+                # ── 1. Límites del área de movimientos en esta página ──
                 page_start_y = 0
                 page_end_y   = page.rect.height
                 lines_4 = _group_lines(words, y_tolerance=4)
@@ -489,72 +489,73 @@ def extract_inbursa(pdf_path):
                 if not in_extraction:
                     continue
 
-                # ── 2. Palabras activas (dentro del área de movimientos) ──
                 active = [w for w in words
                           if page_start_y <= w['top'] <= page_end_y]
 
-                # ── 3. Identificar filas por saldo (ancla) ────────────
-                # Saldo: borde derecho x1 ≈ saldo_x; x0 en [saldo_x-65, saldo_x+5]
-                saldo_min_x = saldo_x - 65
-                saldo_rows = []
+                # ── 2. Anclas de fila: cada mes en columna de fecha (x0 < 40) ──
+                month_anchors = []
                 for w in active:
-                    if w['x0'] >= saldo_min_x and _is_money(w['text']):
-                        val = float(re.sub(r'[\s,\u202f\xa0]', '', w['text']))
-                        if val >= 1.0:    # descartar porcentajes
-                            saldo_rows.append((w['top'], val))
-                saldo_rows.sort(key=lambda x: x[0])
+                    if w['x0'] < 40:
+                        t = w['text'].upper().rstrip('.')
+                        if t in MESES_SET:
+                            month_anchors.append(w)
+                month_anchors.sort(key=lambda w: w['top'])
 
-                # ── 4. Para cada saldo, extraer fecha/ref/montos/concepto ──
-                for row_y, saldo_val in saldo_rows:
-                    ry_min = row_y - 5
-                    ry_max = row_y + 20   # captura el día que está ~11px abajo
+                if not month_anchors:
+                    continue
 
-                    # Fecha: mes (x0<40) y día (x0<40) en ventana de la fila
-                    month = None
-                    day   = None
-                    for w in active:
-                        if w['x0'] < 40 and ry_min <= w['top'] <= ry_max:
-                            t = w['text'].upper().rstrip('.')
-                            if t in MESES_SET:
-                                month = t
-                            elif re.match(r'^\d{1,2}$', w['text']) and 1 <= int(w['text']) <= 31:
-                                day = int(w['text'])
-                    if not month:
-                        continue   # sin mes → no es fila de transacción
-                    day  = day or 1
-                    mes  = meses_str.get(month, "01")
+                # ── 3. Para cada fila [anchor.top, next_anchor.top) ────
+                for i, anchor in enumerate(month_anchors):
+                    row_top = anchor['top']
+                    row_bot = (month_anchors[i + 1]['top'] - 1
+                               if i + 1 < len(month_anchors)
+                               else page_end_y)
+
+                    row_words = [w for w in active
+                                 if row_top <= w['top'] < row_bot]
+
+                    # Fecha
+                    month = anchor['text'].upper().rstrip('.')
+                    day = 1
+                    for w in row_words:
+                        if (w['x0'] < 40 and w is not anchor
+                                and re.match(r'^\d{1,2}$', w['text'])
+                                and 1 <= int(w['text']) <= 31):
+                            day = int(w['text'])
+                            break
+                    mes   = meses_str.get(month, "01")
                     fecha = f"{year_str}-{mes}-{day:02d}"
 
-                    # Referencia: número largo (x0 en 35–200) en ventana de fila
+                    # Referencia
                     ref = ""
-                    for w in sorted(active, key=lambda x: x['top']):
-                        if (35 <= w['x0'] <= 200 and ry_min <= w['top'] <= ry_max
-                                and re.match(r'^\d{6,}$', w['text'])):
+                    for w in sorted(row_words, key=lambda x: x['top']):
+                        if 35 <= w['x0'] <= 200 and re.match(r'^\d{6,}$', w['text']):
                             ref = w['text']
                             break
 
-                    # Cargo / abono: usar borde derecho (x1) vs midpoints
-                    cargo = 0.0
-                    abono = 0.0
-                    for w in active:
-                        if ry_min <= w['top'] <= ry_max and _is_money(w['text']):
+                    # Cargo / abono / saldo
+                    cargo     = 0.0
+                    abono     = 0.0
+                    saldo_val = None
+                    for w in row_words:
+                        if _is_money(w['text']):
                             val = float(re.sub(r'[\s,\u202f\xa0]', '', w['text']))
                             x1  = w['x1']
                             if x1 > mid_as:
-                                pass           # es el saldo, ignorar aquí
+                                saldo_val = val
                             elif x1 > mid_ca:
                                 abono = val
                             else:
                                 cargo = val
 
-                    # Concepto: palabras en columna concepto (x0 ≥ 85, x0 < cargo_x-30)
-                    # Incluir hasta ~40px abajo (líneas de continuación)
-                    concept_y_max  = row_y + 42
-                    concept_x_max  = cargo_x - 35
+                    if saldo_val is None:
+                        continue  # fila sin saldo → no es movimiento
+
+                    # Concepto: x0 en [85, cargo_x-35), excluir montos y detalles SPEI
+                    concept_x_max = cargo_x - 35
                     cw_list = []
-                    for w in active:
+                    for w in row_words:
                         if (w['x0'] >= 85 and w['x0'] < concept_x_max
-                                and ry_min <= w['top'] <= concept_y_max
                                 and not _is_money(w['text'])
                                 and not _is_spei_detail_line(w['text'].upper())):
                             cw_list.append((w['top'], w['x0'], w['text']))
@@ -585,7 +586,6 @@ def extract_inbursa(pdf_path):
                         "abono":      round(abono, 2),
                         "saldo":      round(saldo_val, 2),
                     })
-                    sys.stderr.write(f"[INBURSA-DEBUG] tx {fecha} c={cargo} a={abono} s={saldo_val}\n")
 
         doc.close()
 
