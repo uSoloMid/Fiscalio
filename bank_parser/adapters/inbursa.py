@@ -1,6 +1,8 @@
 import re
 import sys
 import os
+import subprocess
+import tempfile
 
 
 def _group_lines(words, y_tolerance=4):
@@ -22,11 +24,7 @@ def _group_lines(words, y_tolerance=4):
 
 
 def _fitz_words(page):
-    """
-    Extrae palabras de una página fitz y las convierte al formato
-    dict compatible con el resto del parser (como pdfplumber).
-    """
-    raw = page.get_text("words")   # (x0, y0, x1, y1, text, block, line, idx)
+    raw = page.get_text("words")
     return [
         {'x0': w[0], 'top': w[1], 'x1': w[2], 'bottom': w[3], 'text': w[4]}
         for w in raw
@@ -35,11 +33,6 @@ def _fitz_words(page):
 
 
 def _detect_col_positions(pages_words):
-    """
-    Busca la fila de cabecera FECHA | REFERENCIA | CONCEPTO | CARGOS | ABONOS | SALDO
-    y devuelve el x1 (borde derecho) de cada columna de importe.
-    pages_words: lista de listas de words (una por página).
-    """
     for words in pages_words:
         lines = _group_lines(words)
         for line_words in lines:
@@ -61,20 +54,11 @@ def _detect_col_positions(pages_words):
 
 
 def _is_money(text):
-    """
-    True si el texto parece un importe monetario.
-    Acepta: 4,166.00 | 4166.00 | 480.00 | 2.14
-    Normaliza separadores de miles alternativos.
-    """
     normalized = re.sub(r'[\s,\u202f\xa0]', '', text)
     return bool(re.match(r'^\d+\.\d{2}$', normalized))
 
 
 def _is_spei_detail_line(text_upper):
-    """
-    True si la línea es de detalle SPEI (no incluir en concepto, no parsear importes).
-    Solo se aplica a líneas de CONTINUACIÓN (sin fecha).
-    """
     if 'RFC NO DISPONIBLE' in text_upper:
         return True
     if re.search(r'\b[A-Z0-9]{15,}\b', text_upper) and re.search(r'\d{8,}', text_upper):
@@ -82,6 +66,178 @@ def _is_spei_detail_line(text_upper):
     if re.search(r'\b\d{10,}\b', text_upper):
         return True
     return False
+
+
+def _is_obfuscated_pdf(doc):
+    """
+    Detecta si el PDF de Inbursa usa el font AllAndNone ofuscado.
+    En ese caso la extracción de texto normal falla.
+    """
+    try:
+        # Leer rawdict de la primera página con movimientos (pag 2 normalmente)
+        page_idx = min(1, len(doc) - 1)
+        page = doc[page_idx]
+        d = page.get_text('rawdict')
+        for block in d.get('blocks', []):
+            if block.get('type') != 0:
+                continue
+            for line in block.get('lines', []):
+                for span in line.get('spans', []):
+                    font_name = span.get('font', '')
+                    if 'AllAndNone' in font_name or 'allAndNone' in font_name:
+                        return True
+        # Fallback: si col_positions no se puede detectar y hay chars Latin Extended
+        text = page.get_text()
+        if text:
+            non_ascii = sum(1 for c in text if ord(c) > 200)
+            ratio = non_ascii / max(len(text), 1)
+            if ratio > 0.15:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _ocr_page_text(page, dpi=150):
+    """
+    Renderiza la página como imagen y devuelve texto OCR via tesseract.
+    Retorna string con el texto OCR, o '' si falla.
+    """
+    try:
+        import fitz
+        mat = fitz.Matrix(dpi / 72.0, dpi / 72.0)
+        pix = page.get_pixmap(matrix=mat)
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as f:
+            png_path = f.name
+        pix.save(png_path)
+        result = subprocess.run(
+            ['tesseract', png_path, 'stdout', '-l', 'spa', '--psm', '6', '--oem', '3'],
+            capture_output=True, text=True, timeout=30
+        )
+        os.unlink(png_path)
+        return result.stdout
+    except FileNotFoundError:
+        sys.stderr.write("[INBURSA-OCR] tesseract no encontrado\n")
+        return ''
+    except Exception as e:
+        sys.stderr.write(f"[INBURSA-OCR] error: {e}\n")
+        return ''
+
+
+def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=None):
+    """
+    Parsea el texto OCR de todas las páginas de movimientos de Inbursa.
+    Estrategia robusta: detectar líneas que comienzan con mes, extraer todos
+    los montos del final de la línea, usar saldo chain para determinar cargo/abono.
+    """
+    MESES_PAT = re.compile(
+        r'^(' + '|'.join(meses_str.keys()) + r')\.?\s+(\d{6,12})\s+(.+)$',
+        re.IGNORECASE
+    )
+    MONEY_PAT = re.compile(r'(\d{1,3}(?:,\d{3})*\.\d{2})')
+
+    def _to_float(s):
+        return float(s.replace(',', ''))
+
+    def _finalize_tx(tx, prev_sal):
+        if tx is None:
+            return prev_sal
+        sal = tx['saldo']
+        if prev_sal is None:
+            return sal
+        diff = round(sal - prev_sal, 2)
+        if diff > 0:
+            tx['abono'] = round(abs(diff), 2)
+            tx['cargo'] = 0.0
+        else:
+            tx['cargo'] = round(abs(diff), 2)
+            tx['abono'] = 0.0
+        return sal
+
+    lines = all_ocr_text.split('\n')
+    transactions = []
+    current_tx = None
+    prev_saldo = initial_balance  # usar saldo inicial como baseline
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if 'SI DESEA RECIBIR PAGOS' in line.upper():
+            break
+
+        m = MESES_PAT.match(line)
+        if m:
+            # Finalizar transacción anterior
+            if current_tx:
+                prev_saldo = _finalize_tx(current_tx, prev_saldo)
+                transactions.append(current_tx)
+
+            mes_abbr = m.group(1).upper()[:3]
+            ref = m.group(2)
+            rest = m.group(3)
+
+            # Extraer todos los montos del final de la línea
+            amounts = MONEY_PAT.findall(rest)
+            if not amounts:
+                continue
+
+            # El último monto es siempre el saldo
+            saldo = _to_float(amounts[-1])
+
+            # El concepto es todo lo que queda antes del primer monto
+            first_amount_idx = rest.rfind(amounts[-1])
+            # Buscar el monto más a la izquierda como boundary del concepto
+            concepto = rest
+            for amt in amounts:
+                idx = concepto.find(amt)
+                if idx >= 0:
+                    concepto = concepto[:idx].strip()
+                    break
+            # Limpiar artifacts del OCR: ¡, |, caracteres repetidos al inicio
+            concepto = re.sub(r'^[¡!\|IÍÎÏ]+', '', concepto).strip()
+            concepto = re.sub(r'[\|\!¡]', ' ', concepto).strip()
+            concepto = re.sub(r'\s+', ' ', concepto)
+
+            current_tx = {
+                'banco': 'INBURSA',
+                'fecha': f'{year_str}-{meses_str.get(mes_abbr, "01")}-01',
+                'concepto': concepto,
+                'referencia': ref,
+                'cargo': 0.0,
+                'abono': 0.0,
+                'saldo': saldo,
+            }
+            continue
+
+        # Línea de continuación — buscar el día al inicio
+        if current_tx and current_tx['fecha'].endswith('-01'):
+            # El día aparece como número 01-31 al inicio de la línea
+            # OCR puede agregar 1-2 chars de artifact antes
+            dm = re.match(r'^[\D]{0,3}(\d{1,2})\b', line)
+            if dm:
+                day_candidate = int(dm.group(1))
+                if 1 <= day_candidate <= 31:
+                    day = str(day_candidate).zfill(2)
+                    mes_part = current_tx['fecha'][:8]  # YYYY-MM-
+                    current_tx['fecha'] = mes_part + day
+                    # Resto de la línea después del día puede ser concepto
+                    rest_after_day = line[dm.end():].strip()
+                    if rest_after_day and not MONEY_PAT.search(rest_after_day):
+                        current_tx['concepto'] = (current_tx['concepto'] + ' ' + rest_after_day).strip()
+        elif current_tx:
+            # Línea de continuación pura (sin día, sin nueva tx) — agregar al concepto
+            if not MONEY_PAT.search(line) and len(line) < 120:
+                # Excluir líneas de detalles SPEI (CLABE, RFC, etc.)
+                if not re.search(r'\b\d{10,}\b', line) and 'RFC NO DISPONIBLE' not in line.upper():
+                    current_tx['concepto'] = (current_tx['concepto'] + ' ' + line).strip()
+
+    if current_tx:
+        prev_saldo = _finalize_tx(current_tx, prev_saldo)
+        transactions.append(current_tx)
+
+    return transactions
 
 
 def extract_inbursa(pdf_path):
@@ -110,10 +266,9 @@ def extract_inbursa(pdf_path):
 
         year_str = str(__import__('datetime').date.today().year)
 
-        # ─── PARTE 1: CARÁTULA (página 1) ────────────────────────────────
+        # ─── CARÁTULA (página 1) ──────────────────────────────────────
         first_page_text = doc[0].get_text() or ""
 
-        # Número de cuenta
         cuenta_match = re.search(r'(?:CUENTA|CTA)[:\s]+([\d\-]+)', first_page_text)
         if cuenta_match:
             summary["account_number"] = cuenta_match.group(1).strip()
@@ -137,7 +292,7 @@ def extract_inbursa(pdf_path):
         if period_full:
             summary["period"] = f"{period_full.group(1).strip()} - {period_full.group(2).strip()}"
 
-        # Saldos del resumen en carátula
+        # Saldos de carátula
         words_first = _fitz_words(doc[0])
         lines_first = _group_lines(words_first)
         found_summary = set()
@@ -160,142 +315,181 @@ def extract_inbursa(pdf_path):
                             found_summary.add(key)
                             break
 
-        # ─── PARTE 1.5: DETECTAR POSICIONES DINÁMICAS DE COLUMNAS ────────
-        all_pages_words = [_fitz_words(doc[i]) for i in range(len(doc))]
-        col_positions = _detect_col_positions(all_pages_words)
+        # ─── DETECTAR SI PDF ESTÁ OFUSCADO ───────────────────────────
+        obfuscated = _is_obfuscated_pdf(doc)
 
-        if not col_positions:
-            sys.stderr.write("[INBURSA-DEBUG] col_positions no detectado — usando fallback\n")
-            col_positions = {'cargo': 440.0, 'abono': 510.0, 'saldo': 570.0}
+        if obfuscated:
+            sys.stderr.write("[INBURSA] PDF ofuscado detectado — usando OCR\n")
+            # Encontrar cuenta desde OCR de carátula si no se encontró
+            ocr_cover = _ocr_page_text(doc[0])
+            if summary["account_number"] == "PREDETERMINADA":
+                cl_ocr = re.search(r'Cliente\s+Inbursa[:\s]+(\d+)', ocr_cover, re.IGNORECASE)
+                if cl_ocr:
+                    summary["account_number"] = cl_ocr.group(1)
+            if not summary.get("period"):
+                per_ocr = re.search(
+                    r'Del\s+([\d\w\s]+?)\s+al\s+([\d\w\s]+?)(?:\n|\r|$)',
+                    ocr_cover, re.IGNORECASE
+                )
+                if per_ocr:
+                    summary["period"] = f"{per_ocr.group(1).strip()} - {per_ocr.group(2).strip()}"
+            # Saldos desde OCR carátula si no se encontraron
+            if 'initial_balance' not in found_summary:
+                m = re.search(r'SALDO\s+ANTERIOR\s+([\d,]+\.\d{2})', ocr_cover, re.IGNORECASE)
+                if m:
+                    summary["initial_balance"] = float(m.group(1).replace(',', ''))
+            if 'final_balance' not in found_summary:
+                m = re.search(r'SALDO\s+ACTUAL\s+([\d,]+\.\d{2})', ocr_cover, re.IGNORECASE)
+                if m:
+                    summary["final_balance"] = float(m.group(1).replace(',', ''))
+
+            # OCR de todas las páginas de movimientos
+            all_ocr = ""
+            in_movements = False
+            for page_idx, page in enumerate(doc):
+                page_ocr = _ocr_page_text(page)
+                if not in_movements:
+                    if 'DETALLE DE MOVIMIENTOS' in page_ocr.upper():
+                        in_movements = True
+                    # También arrancar si encontramos transacciones directamente
+                    if re.search(r'^(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|OCT|NOV|DIC)\.',
+                                 page_ocr, re.MULTILINE | re.IGNORECASE):
+                        in_movements = True
+                if in_movements:
+                    all_ocr += page_ocr + "\n"
+                    if 'SI DESEA RECIBIR PAGOS' in page_ocr.upper():
+                        break
+
+            sys.stderr.write(f"[INBURSA-OCR] texto OCR total: {len(all_ocr)} chars\n")
+            transacciones = _parse_ocr_transactions(all_ocr, year_str, meses_str, summary.get("initial_balance"))
+            sys.stderr.write(f"[INBURSA-OCR] transacciones extraídas: {len(transacciones)}\n")
+
         else:
-            sys.stderr.write(f"[INBURSA-DEBUG] col_positions={col_positions}\n")
+            # ─── EXTRACCIÓN NORMAL (texto legible) ───────────────────
+            all_pages_words = [_fitz_words(doc[i]) for i in range(len(doc))]
+            col_positions = _detect_col_positions(all_pages_words)
 
-        # ─── PARTE 2: EXTRAER MOVIMIENTOS ────────────────────────────────
-        state = "SEARCHING"
-        current_tx = None
+            if not col_positions:
+                sys.stderr.write("[INBURSA-DEBUG] col_positions no detectado — usando fallback\n")
+                col_positions = {'cargo': 440.0, 'abono': 510.0, 'saldo': 570.0}
+            else:
+                sys.stderr.write(f"[INBURSA-DEBUG] col_positions={col_positions}\n")
 
-        for page_idx, page in enumerate(doc):
-            if state == "FINISHED":
-                break
+            state = "SEARCHING"
+            current_tx = None
 
-            words = all_pages_words[page_idx]
-            if not words:
-                continue
-
-            lines = _group_lines(words)
-            page_height = page.rect.height
-
-            start_y = 0
-            cutoff_y = page_height
-
-            # Primera pasada: detectar límites y estado
-            for line_words in lines:
-                text_upper = " ".join(w['text'].upper() for w in line_words)
-
-                if "DETALLE DE MOVIMIENTOS" in text_upper and state != "FINISHED":
-                    state = "EXTRACTING"
-
-                if ("FECHA" in text_upper and "CONCEPTO" in text_upper
-                        and "SALDO" in text_upper):
-                    start_y = line_words[0]['bottom'] + 1
-
-                if "SI DESEA RECIBIR PAGOS" in text_upper:
-                    cutoff_y = line_words[0]['top'] - 2
-                    state = "FINISHED"
+            for page_idx, page in enumerate(doc):
+                if state == "FINISHED":
                     break
 
-            if state == "SEARCHING":
-                continue
-
-            # Segunda pasada: parsear transacciones
-            for line_words in lines:
-                top = line_words[0]['top']
-                if top <= start_y or top >= cutoff_y:
+                words = all_pages_words[page_idx]
+                if not words:
                     continue
 
-                text_line = " ".join(w['text'] for w in line_words)
-                text_upper = text_line.upper()
+                lines = _group_lines(words)
+                page_height = page.rect.height
 
-                date_match = re.match(r'^([A-Z]{3})\.?\s+(\d{2})\b', text_upper)
+                start_y = 0
+                cutoff_y = page_height
 
-                if date_match:
-                    if current_tx:
-                        transacciones.append(current_tx)
-                    sys.stderr.write(f"[INBURSA-DEBUG] nueva tx fecha={date_match.group(0).strip()}\n")
+                for line_words in lines:
+                    text_upper = " ".join(w['text'].upper() for w in line_words)
 
-                    mes_abbr = date_match.group(1).replace('.', '')
-                    dia = date_match.group(2)
-                    mes = meses_str.get(mes_abbr, "01")
+                    if "DETALLE DE MOVIMIENTOS" in text_upper and state != "FINISHED":
+                        state = "EXTRACTING"
 
-                    current_tx = {
-                        "banco": "INBURSA",
-                        "fecha": f"{year_str}-{mes}-{dia}",
-                        "concepto": "",
-                        "referencia": "",
-                        "cargo": 0.0,
-                        "abono": 0.0,
-                        "saldo": 0.0,
-                    }
+                    if ("FECHA" in text_upper and "CONCEPTO" in text_upper
+                            and "SALDO" in text_upper):
+                        start_y = line_words[0]['bottom'] + 1
 
-                    for w in line_words:
-                        if 60 < w['x0'] < 200 and re.match(r'^\d{6,}$', w['text']):
-                            current_tx["referencia"] = w['text']
-                            break
+                    if "SI DESEA RECIBIR PAGOS" in text_upper and state == "EXTRACTING":
+                        cutoff_y = line_words[0]['top'] - 2
+                        state = "FINISHED"
+                        break
 
-                if not current_tx:
+                if state == "SEARCHING":
                     continue
 
-                # Filtrar líneas de detalle SPEI solo en continuaciones
-                if not date_match and _is_spei_detail_line(text_upper):
-                    continue
-
-                # Procesar palabras de la línea
-                desc_parts = []
-                money_on_line = []
-
-                for w in line_words:
-                    txt = w['text']
-                    x0 = w['x0']
-                    x1 = w['x1']
-
-                    if x1 < 150:
+                for line_words in lines:
+                    top = line_words[0]['top']
+                    if top <= start_y or top >= cutoff_y:
                         continue
 
-                    if _is_money(txt):
-                        normalized = re.sub(r'[\s,\u202f\xa0]', '', txt)
-                        val = float(normalized)
-                        if val > 0:
-                            money_on_line.append((x1, val))
-                    else:
-                        if x0 < col_positions.get('cargo', 420) - 10:
-                            desc_parts.append(txt)
+                    text_line = " ".join(w['text'] for w in line_words)
+                    text_upper = text_line.upper()
 
-                if date_match and not money_on_line:
-                    raw_words = [(w['text'], round(w['x0']), round(w['x1'])) for w in line_words]
-                    sys.stderr.write(f"[INBURSA-DEBUG] tx sin importes, palabras={raw_words}\n")
+                    date_match = re.match(r'^([A-Z]{3})\.?\s+(\d{2})\b', text_upper)
 
-                # Asignar: rightmost = SALDO, resto por punto medio cargo/abono
-                if money_on_line:
-                    money_on_line.sort(key=lambda t: t[0])
-                    current_tx['saldo'] = money_on_line[-1][1]
-                    mid = (col_positions['cargo'] + col_positions['abono']) / 2
-                    for x1_val, val in money_on_line[:-1]:
-                        if x1_val <= mid:
-                            current_tx['cargo'] = val
+                    if date_match:
+                        if current_tx:
+                            transacciones.append(current_tx)
+                        sys.stderr.write(f"[INBURSA-DEBUG] nueva tx fecha={date_match.group(0).strip()}\n")
+
+                        mes_abbr = date_match.group(1).replace('.', '')
+                        dia = date_match.group(2)
+                        mes = meses_str.get(mes_abbr, "01")
+
+                        current_tx = {
+                            "banco": "INBURSA",
+                            "fecha": f"{year_str}-{mes}-{dia}",
+                            "concepto": "",
+                            "referencia": "",
+                            "cargo": 0.0,
+                            "abono": 0.0,
+                            "saldo": 0.0,
+                        }
+
+                        for w in line_words:
+                            if 60 < w['x0'] < 200 and re.match(r'^\d{6,}$', w['text']):
+                                current_tx["referencia"] = w['text']
+                                break
+
+                    if not current_tx:
+                        continue
+
+                    if not date_match and _is_spei_detail_line(text_upper):
+                        continue
+
+                    desc_parts = []
+                    money_on_line = []
+
+                    for w in line_words:
+                        txt = w['text']
+                        x0 = w['x0']
+                        x1 = w['x1']
+
+                        if x1 < 150:
+                            continue
+
+                        if _is_money(txt):
+                            normalized = re.sub(r'[\s,\u202f\xa0]', '', txt)
+                            val = float(normalized)
+                            if val > 0:
+                                money_on_line.append((x1, val))
                         else:
-                            current_tx['abono'] = val
+                            if x0 < col_positions.get('cargo', 420) - 10:
+                                desc_parts.append(txt)
 
-                inc = " ".join(desc_parts).strip()
-                if inc:
-                    sep = " " if current_tx["concepto"] else ""
-                    current_tx["concepto"] = (current_tx["concepto"] + sep + inc).strip()
+                    if money_on_line:
+                        money_on_line.sort(key=lambda t: t[0])
+                        current_tx['saldo'] = money_on_line[-1][1]
+                        mid = (col_positions['cargo'] + col_positions['abono']) / 2
+                        for x1_val, val in money_on_line[:-1]:
+                            if x1_val <= mid:
+                                current_tx['cargo'] = val
+                            else:
+                                current_tx['abono'] = val
 
-        if current_tx:
-            transacciones.append(current_tx)
+                    inc = " ".join(desc_parts).strip()
+                    if inc:
+                        sep = " " if current_tx["concepto"] else ""
+                        current_tx["concepto"] = (current_tx["concepto"] + sep + inc).strip()
+
+            if current_tx:
+                transacciones.append(current_tx)
 
         doc.close()
 
-        # Filtrar vacíos
         transacciones = [
             t for t in transacciones
             if t["concepto"] or t["cargo"] > 0 or t["abono"] > 0

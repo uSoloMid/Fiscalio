@@ -11,6 +11,8 @@ RUN apt-get update && apt-get install -y \
     sqlite3 \
     python3 \
     python3-pip \
+    tesseract-ocr \
+    tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias de procesamiento bancario de Python
