@@ -395,8 +395,8 @@ def extract_inbursa(pdf_path):
         targets = [
             (r'SALDO\s+ANTERIOR', 'initial_balance'),
             (r'SALDO\s+ACTUAL',   'final_balance'),
-            (r'^ABONOS$',         'total_abonos'),
-            (r'^CARGOS$',         'total_cargos'),
+            (r'ABONOS',           'total_abonos'),
+            (r'CARGOS',           'total_cargos'),
         ]
         for line_words in lines_first:
             line_txt = " ".join(w['text'].upper() for w in line_words)
@@ -518,7 +518,8 @@ def extract_inbursa(pdf_path):
                             or "DETALLE DE MOVIMIENTOS" in tu):
                         page_start_y = lw[0]['bottom'] + 1
                         in_extraction = True
-                    if ("SI DESEA RECIBIR PAGOS" in tu or "CLIENTE INBURSA:" in tu or "PÁGINA:" in tu) and in_extraction:
+                    if (("SI DESEA RECIBIR PAGOS" in tu 
+                         or "RESUMEN DEL CFDI" in tu or "RESUMEN GRAFICO" in tu) and in_extraction):
                         page_end_y = lw[0]['top'] - 2
                         stop_found = True
                         break
