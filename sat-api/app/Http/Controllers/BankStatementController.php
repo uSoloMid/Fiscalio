@@ -13,7 +13,9 @@ class BankStatementController extends Controller
     public function process(Request $request)
     {
         $request->validate([
-            'file' => 'required|file|mimes:pdf',
+            // mimes:pdf,bin cubre application/pdf Y application/octet-stream
+            // (algunos PDFs de Banamex/Inbursa tienen mime detectado como octet-stream)
+            'file' => 'required|file|mimes:pdf,bin',
             'rfc' => 'required|string'
         ]);
 
