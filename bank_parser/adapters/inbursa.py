@@ -268,7 +268,7 @@ def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=N
                 mes_part = current_tx['fecha'][:8]  # YYYY-MM-
                 current_tx['fecha'] = mes_part + str(day_val).zfill(2)
                 current_tx['_day_found'] = True
-                rest_after_day = re.sub(r'^[\[\|\-¡!]+', '', line[day_end:]).strip()
+                rest_after_day = re.sub(r'^[\[\|\-¡!]+', '', line[day_end:].strip()).strip()
                 if rest_after_day and not MONEY_PAT.search(rest_after_day):
                     current_tx['concepto'] = (current_tx['concepto'] + ' ' + rest_after_day).strip()
                 continue
