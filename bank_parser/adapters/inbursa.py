@@ -454,20 +454,28 @@ def extract_inbursa(pdf_path):
             all_pages_words = [_fitz_words(doc[i]) for i in range(len(doc))]
             col_positions = _detect_col_positions(all_pages_words)
 
+            # Fallback con coordenadas exactas medidas del PDF Inbursa Nov/Dic 2025
+            # FECHA:0-46  REF:47-105  CONCEPTO:106-350  CARGOS:351-420  ABONOS:421-485  SALDO:486-570
+            FALLBACK = {
+                'cargo': 420.0, 'abono': 485.0, 'saldo': 570.0,
+                'concepto_x0': 106.0, 'cargo_x0': 351.0,
+            }
             if not col_positions:
                 sys.stderr.write("[INBURSA-DEBUG] col_positions no detectado — usando fallback\n")
-                col_positions = {'cargo': 403.0, 'abono': 471.0, 'saldo': 541.0}
+                col_positions = FALLBACK
             else:
-                sys.stderr.write(f"[INBURSA-DEBUG] col: cargo={col_positions['cargo']:.1f} abono={col_positions['abono']:.1f} saldo={col_positions['saldo']:.1f}\n")
+                # Rellenar campos que el header no detectó
+                for k, v in FALLBACK.items():
+                    col_positions.setdefault(k, v)
+                sys.stderr.write(f"[INBURSA-DEBUG] col: cargo={col_positions['cargo']:.1f} abono={col_positions['abono']:.1f} saldo={col_positions['saldo']:.1f} concepto=[{col_positions.get('concepto_x0',0):.0f},{col_positions.get('cargo_x0',0):.0f}]\n")
 
             cargo_x      = col_positions['cargo']
             abono_x      = col_positions['abono']
             saldo_x      = col_positions['saldo']
-            # Límites exactos de la columna CONCEPTO
-            concepto_x0  = col_positions.get('concepto_x0', 85)
-            concepto_x1  = col_positions.get('cargo_x0', cargo_x - 5)
-            mid_ca       = (cargo_x + abono_x) / 2
-            mid_as       = (abono_x + saldo_x) / 2
+            concepto_x0  = col_positions['concepto_x0']
+            concepto_x1  = col_positions['cargo_x0']
+            mid_ca       = (cargo_x + abono_x) / 2   # frontera cargo/abono
+            mid_as       = (abono_x + saldo_x) / 2   # frontera abono/saldo
 
             MESES_SET = set(meses_str.keys())
             in_extraction = False
