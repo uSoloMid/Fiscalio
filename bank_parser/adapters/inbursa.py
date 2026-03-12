@@ -450,7 +450,7 @@ def extract_inbursa(pdf_path):
                 sys.stderr.write("[INBURSA-DEBUG] col_positions no detectado — usando fallback\n")
                 col_positions = {'cargo': 403.0, 'abono': 471.0, 'saldo': 541.0}
             else:
-                sys.stderr.write(f"[INBURSA-DEBUG] col_positions={col_positions}\n")
+                sys.stderr.write(f"[INBURSA-DEBUG] col: cargo={col_positions['cargo']:.1f} abono={col_positions['abono']:.1f} saldo={col_positions['saldo']:.1f}\n")
 
             cargo_x  = col_positions['cargo']   # borde derecho de columna CARGOS
             abono_x  = col_positions['abono']   # borde derecho de columna ABONOS
