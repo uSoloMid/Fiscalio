@@ -14,8 +14,8 @@ class BankStatementController extends Controller
     {
         $request->validate([
             // Sin restricción de mimes: algunos PDFs tienen mime detectado como
-            // application/octet-stream u otras variantes. Si no es PDF válido,
-            // el parser Python lo detectará y devolverá un error controlado.
+            // application/octet-stream u otras variantes no estándar. Si no es
+            // un PDF válido, el parser Python retorna un error controlado (500).
             'file' => 'required|file',
             'rfc' => 'required|string'
         ]);
