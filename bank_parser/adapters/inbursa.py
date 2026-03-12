@@ -127,11 +127,17 @@ def _ocr_page_text(page, dpi=150):
 def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=None):
     """
     Parsea el texto OCR de todas las páginas de movimientos de Inbursa.
-    Estrategia robusta: detectar líneas que comienzan con mes, extraer todos
-    los montos del final de la línea, usar saldo chain para determinar cargo/abono.
+    Soporta 3 variantes de formato OCR:
+      - "ENE. REFERENCIA CONCEPTO MONTO SALDO"  (día en línea siguiente)
+      - "ENE. 02|REFERENCIA CONCEPTO MONTO SALDO"  (día inline con |)
+      - "ENE. — [REFERENCIA — |CONCEPTO MONTO SALDO"  (con guiones como separadores)
     """
+    # Grupo 1: mes | Grupo 2: día inline (opcional) | Grupo 3: referencia | Grupo 4: resto
     MESES_PAT = re.compile(
-        r'^(' + '|'.join(meses_str.keys()) + r')\.?\s+(\d{6,12})\s+(.+)$',
+        r'^(' + '|'.join(meses_str.keys()) + r')\.?\s+'
+        r'(?:(\d{1,2})[|\s]+)?'           # día inline opcional (1-2 dígitos)
+        r'[^\d]{0,6}(\d{6,12})\s+'        # prefijo no-dígito (artefacto OCR) + referencia
+        r'(.+)$',
         re.IGNORECASE
     )
     MONEY_PAT = re.compile(r'(\d{1,3}(?:,\d{3})*\.\d{2})')
@@ -139,9 +145,21 @@ def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=N
     def _to_float(s):
         return float(s.replace(',', ''))
 
+    def _clean_concepto(text):
+        # Eliminar artefactos OCR del inicio: corchetes, guiones largos, ¡, |
+        text = re.sub(r'^[¡!\|\[\u2014\u2013\-]+', '', text).strip()
+        text = re.sub(r'[\|\!¡\[\u2014\u2013]', ' ', text).strip()
+        text = re.sub(r'\s+', ' ', text)
+        # Corregir doble-C inicial (CCUOTA → CUOTA, artefacto de borde de celda)
+        if len(text) > 2 and text[0] == 'C' and text[1] == 'C' and text[2].isupper():
+            text = text[1:]
+        return text
+
     def _finalize_tx(tx, prev_sal):
         if tx is None:
             return prev_sal
+        # Limpiar flag interno antes de retornar
+        tx.pop('_day_found', None)
         sal = tx['saldo']
         if prev_sal is None:
             return sal
@@ -154,10 +172,26 @@ def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=N
             tx['abono'] = 0.0
         return sal
 
+    def _try_extract_day(line):
+        """Intenta extraer día 1-31 del inicio de la línea, normalizando confusiones OCR."""
+        # Normalizar O→0, S→5 solo si el primer token es muy corto (≤4 chars)
+        first_tok = re.match(r'^\S+', line)
+        line_norm = line
+        if first_tok and len(first_tok.group()) <= 4 and re.search(r'[OSos]', first_tok.group()):
+            tok = first_tok.group()
+            norm = tok.replace('O', '0').replace('o', '0').replace('S', '5')
+            line_norm = norm + line[len(tok):]
+        dm = re.match(r'^[\D]{0,3}(\d{1,2})\b', line_norm)
+        if dm:
+            val = int(dm.group(1))
+            if 1 <= val <= 31:
+                return val, dm.end()
+        return None, 0
+
     lines = all_ocr_text.split('\n')
     transactions = []
     current_tx = None
-    prev_saldo = initial_balance  # usar saldo inicial como baseline
+    prev_saldo = initial_balance
 
     for raw_line in lines:
         line = raw_line.strip()
@@ -167,71 +201,74 @@ def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=N
         if 'SI DESEA RECIBIR PAGOS' in line.upper():
             break
 
+        # Ignorar línea de balance inicial (no es movimiento)
+        if 'BALANCE INICIAL' in line.upper():
+            continue
+
         m = MESES_PAT.match(line)
         if m:
-            # Finalizar transacción anterior
             if current_tx:
                 prev_saldo = _finalize_tx(current_tx, prev_saldo)
                 transactions.append(current_tx)
 
             mes_abbr = m.group(1).upper()[:3]
-            ref = m.group(2)
-            rest = m.group(3)
+            day_inline = m.group(2)   # puede ser None
+            ref = m.group(3)
+            rest = m.group(4)
+            mes_num = meses_str.get(mes_abbr, "01")
 
-            # Extraer todos los montos del final de la línea
             amounts = MONEY_PAT.findall(rest)
             if not amounts:
                 continue
 
-            # El último monto es siempre el saldo
             saldo = _to_float(amounts[-1])
 
-            # El concepto es todo lo que queda antes del primer monto
-            first_amount_idx = rest.rfind(amounts[-1])
-            # Buscar el monto más a la izquierda como boundary del concepto
             concepto = rest
             for amt in amounts:
                 idx = concepto.find(amt)
                 if idx >= 0:
                     concepto = concepto[:idx].strip()
                     break
-            # Limpiar artifacts del OCR: ¡, |, caracteres repetidos al inicio
-            concepto = re.sub(r'^[¡!\|IÍÎÏ]+', '', concepto).strip()
-            concepto = re.sub(r'[\|\!¡]', ' ', concepto).strip()
-            concepto = re.sub(r'\s+', ' ', concepto)
+            concepto = _clean_concepto(concepto)
+
+            if day_inline:
+                fecha = f'{year_str}-{mes_num}-{int(day_inline):02d}'
+                day_found = True
+            else:
+                fecha = f'{year_str}-{mes_num}-01'  # placeholder, día en línea siguiente
+                day_found = False
 
             current_tx = {
                 'banco': 'INBURSA',
-                'fecha': f'{year_str}-{meses_str.get(mes_abbr, "01")}-01',
+                'fecha': fecha,
                 'concepto': concepto,
                 'referencia': ref,
                 'cargo': 0.0,
                 'abono': 0.0,
                 'saldo': saldo,
+                '_day_found': day_found,
             }
             continue
 
-        # Línea de continuación — buscar el día al inicio
-        if current_tx and current_tx['fecha'].endswith('-01'):
-            # El día aparece como número 01-31 al inicio de la línea
-            # OCR puede agregar 1-2 chars de artifact antes
-            dm = re.match(r'^[\D]{0,3}(\d{1,2})\b', line)
-            if dm:
-                day_candidate = int(dm.group(1))
-                if 1 <= day_candidate <= 31:
-                    day = str(day_candidate).zfill(2)
-                    mes_part = current_tx['fecha'][:8]  # YYYY-MM-
-                    current_tx['fecha'] = mes_part + day
-                    # Resto de la línea después del día puede ser concepto
-                    rest_after_day = line[dm.end():].strip()
-                    if rest_after_day and not MONEY_PAT.search(rest_after_day):
-                        current_tx['concepto'] = (current_tx['concepto'] + ' ' + rest_after_day).strip()
-        elif current_tx:
-            # Línea de continuación pura (sin día, sin nueva tx) — agregar al concepto
-            if not MONEY_PAT.search(line) and len(line) < 120:
-                # Excluir líneas de detalles SPEI (CLABE, RFC, etc.)
-                if not re.search(r'\b\d{10,}\b', line) and 'RFC NO DISPONIBLE' not in line.upper():
-                    current_tx['concepto'] = (current_tx['concepto'] + ' ' + line).strip()
+        if not current_tx:
+            continue
+
+        # Buscar día en línea de continuación (solo si aún no se encontró)
+        if not current_tx.get('_day_found'):
+            day_val, day_end = _try_extract_day(line)
+            if day_val is not None:
+                mes_part = current_tx['fecha'][:8]  # YYYY-MM-
+                current_tx['fecha'] = mes_part + str(day_val).zfill(2)
+                current_tx['_day_found'] = True
+                rest_after_day = re.sub(r'^[\[\|\-¡!]+', '', line[day_end:]).strip()
+                if rest_after_day and not MONEY_PAT.search(rest_after_day):
+                    current_tx['concepto'] = (current_tx['concepto'] + ' ' + rest_after_day).strip()
+                continue
+
+        # Línea de continuación — agregar al concepto si no es detalle técnico
+        if not MONEY_PAT.search(line) and len(line) < 120:
+            if not re.search(r'\b\d{10,}\b', line) and 'RFC NO DISPONIBLE' not in line.upper():
+                current_tx['concepto'] = (current_tx['concepto'] + ' ' + line).strip()
 
     if current_tx:
         prev_saldo = _finalize_tx(current_tx, prev_saldo)
