@@ -500,6 +500,17 @@ def extract_inbursa(pdf_path):
                     if not current_tx:
                         continue
 
+                    # Saltar encabezados/pies de página repetidos de Inbursa
+                    # Ejemplo: "Página: 10 de 16 «INBURSA ESTADO DE CUENTA Cliente Inbursa: ..."
+                    if not date_match and re.search(r'P[ÁA]GINA[:\s]*\d+\s+DE\s+\d+', text_upper):
+                        continue
+                    if not date_match and ('ESTADO DE CUENTA' in text_upper and 'INBURSA' in text_upper):
+                        continue
+                    if not date_match and 'CLIENTE INBURSA' in text_upper:
+                        continue
+                    if not date_match and re.search(r'RFC:\s+[A-Z]{4}\d{6}', text_upper):
+                        continue
+
                     if not date_match and _is_spei_detail_line(text_upper):
                         continue
 
