@@ -1,5 +1,5 @@
 import type { Cfdi, CfdiPagination } from './models';
-import { API_BASE_URL } from './api/config';
+import { API_BASE_URL, DIRECT_API_URL } from './api/config';
 
 export function getToken(): string | null {
     return localStorage.getItem('auth_token');
@@ -424,7 +424,7 @@ export async function processBankStatement(file: File, rfc: string): Promise<any
     formData.append('business_rfc', rfc);
     formData.append('rfc', rfc);
 
-    const response = await authFetch(`${API_BASE_URL}/api/bank-statements/process`, {
+    const response = await authFetch(`${DIRECT_API_URL}/api/bank-statements/process`, {
         method: 'POST',
         body: formData
     });
