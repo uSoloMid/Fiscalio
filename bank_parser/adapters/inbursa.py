@@ -133,9 +133,11 @@ def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=N
       - "ENE. — [REFERENCIA — |CONCEPTO MONTO SALDO"  (con guiones como separadores)
     """
     # Grupo 1: mes | Grupo 2: día inline (opcional) | Grupo 3: referencia | Grupo 4: resto
+    # Soporta: "ENE. 12[REF", "ENE. 12|REF", "ENE. 12 [REF", "3 ENE. 12 [REF"
     MESES_PAT = re.compile(
-        r'^(' + '|'.join(meses_str.keys()) + r')\.?\s+'
-        r'(?:(\d{1,2})[|\s]+)?'           # día inline opcional (1-2 dígitos)
+        r'^(?:\d{1,3}\s+)?'                # prefijo numérico opcional (nro de página OCR)
+        r'(' + '|'.join(meses_str.keys()) + r')\.?\s+'
+        r'(?:(\d{1,2})[\[|\s]+)?'          # día inline opcional (sep: [, |, o espacio)
         r'[^\d]{0,6}(\d{6,12})\s+'        # prefijo no-dígito (artefacto OCR) + referencia
         r'(.+)$',
         re.IGNORECASE
