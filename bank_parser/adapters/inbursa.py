@@ -5,19 +5,27 @@ import subprocess
 import tempfile
 
 
-def _group_lines(words, y_tolerance=4):
-    """Agrupa palabras en líneas visuales por proximidad en Y."""
+def _group_lines(words, y_tolerance=12):
+    """
+    Agrupa palabras en líneas visuales por proximidad en Y.
+    y_tolerance=12 porque los PDFs Inbursa separan el mes (NOV.) del día (03)
+    en ~11px de diferencia vertical dentro de la misma fila de tabla.
+    Compara contra el Y de la PRIMERA palabra del grupo (no la última)
+    para evitar el efecto cascada al acumular diferencias pequeñas.
+    """
     if not words:
         return []
     words_sorted = sorted(words, key=lambda w: (round(w['top'] / y_tolerance), w['x0']))
     lines = []
     current_line = [words_sorted[0]]
+    current_min_y = words_sorted[0]['top']
     for w in words_sorted[1:]:
-        if abs(w['top'] - current_line[-1]['top']) <= y_tolerance:
+        if abs(w['top'] - current_min_y) <= y_tolerance:
             current_line.append(w)
         else:
             lines.append(sorted(current_line, key=lambda x: x['x0']))
             current_line = [w]
+            current_min_y = w['top']
     if current_line:
         lines.append(sorted(current_line, key=lambda x: x['x0']))
     return lines
@@ -467,6 +475,9 @@ def extract_inbursa(pdf_path):
                     if ("FECHA" in text_upper and "CONCEPTO" in text_upper
                             and "SALDO" in text_upper):
                         start_y = line_words[0]['bottom'] + 1
+                        # Algunos PDFs van directo a la tabla sin "DETALLE DE MOVIMIENTOS"
+                        if state == "SEARCHING":
+                            state = "EXTRACTING"
 
                     if "SI DESEA RECIBIR PAGOS" in text_upper and state == "EXTRACTING":
                         cutoff_y = line_words[0]['top'] - 2
@@ -506,7 +517,7 @@ def extract_inbursa(pdf_path):
                         }
 
                         for w in line_words:
-                            if 60 < w['x0'] < 200 and re.match(r'^\d{6,}$', w['text']):
+                            if w['x0'] < 200 and re.match(r'^\d{6,}$', w['text']):
                                 current_tx["referencia"] = w['text']
                                 break
 
