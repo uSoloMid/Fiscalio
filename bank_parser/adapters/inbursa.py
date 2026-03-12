@@ -85,14 +85,18 @@ def _is_obfuscated_pdf(doc):
                 for span in line.get('spans', []):
                     font_name = span.get('font', '')
                     if 'AllAndNone' in font_name or 'allAndNone' in font_name:
+                        sys.stderr.write(f"[INBURSA-OBFUSCATED] font check triggered: {font_name}\n")
                         return True
         # Fallback: el font AllAndNone mapea caracteres al área privada Unicode (>0xE000)
         # NO usar ord>200 porque las letras acentuadas del español también superan ese valor
         text = page.get_text()
+        sys.stderr.write(f"[INBURSA-OBFUSCATED] font check passed, text len={len(text) if text else 0}\n")
         if text:
             private_use = sum(1 for c in text if ord(c) > 0xE000)
             ratio = private_use / max(len(text), 1)
+            sys.stderr.write(f"[INBURSA-OBFUSCATED] private_use={private_use}, ratio={ratio:.4f}\n")
             if ratio > 0.10:
+                sys.stderr.write(f"[INBURSA-OBFUSCATED] ratio check triggered\n")
                 return True
     except Exception:
         pass
