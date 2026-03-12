@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-03-12 — Parser Inbursa robusto: dual-path fitz+OCR con validación aritmética
+
+**Commit estable:** (ver commit actual)
+
+Reescritura completa de `bank_parser/adapters/inbursa.py` para soportar cualquier PDF Inbursa.
+
+**Estrategia dual-path:**
+- Extrae carátula (SA, ABONOS, CARGOS, SF) de páginas 0-3 vía fitz, con fallback OCR
+- Intenta extracción fitz → valida `SA + Σabonos - Σcargos = SF_carátula` con tolerancia 1 peso
+- Si fitz falla → intenta OCR → valida → usa el que tenga menor discrepancia
+
+**Bugs corregidos (5 en total):**
+1. Carátula tomaba el ÚLTIMO número de la línea (rendimientos) en vez del PRIMERO (monto real)
+2. Header de tabla (FECHA REFERENCIA CONCEPTO CARGOS…) se confundía con línea de resumen → guard `x0 < 60`
+3. OCR con 0 movimientos pasaba validación vacuamente → early return en `_validate_movements`
+4. Float y-offset de ~0.001px excluía montos de la fila → epsilon de 2px en `(row_top - 2) <= top`
+5. `/Con Efectivo 455.00` en zona CONCEPTO se asignaba como cargo → guard `if x1 < 300: continue`
+6. **Bug nuevo (esta sesión):** dos transacciones consecutivas separadas ~11.23px (< y_tolerance=12) se fusionaban en un solo anchor → el cargo de la primera sobreescrito por la segunda. Fix: detectar múltiples palabras de mes en el mismo anchor-group y dividir en sub-anchors independientes.
+
+**Resultados:**
+- Nov 2025 (11 25 INBURSA.pdf): 171 movs ✓ fitz
+- Dic 2025 (EdoCuenta_Inbursa 18): 185 movs ✓ fitz (antes 177 con 50,584.50 de discrepancia en cargos)
+
+---
+
 ## 2026-03-11 — Fix parser Inbursa — detección dinámica de columnas
 
 **Commit estable:** `6770297`
