@@ -50,9 +50,13 @@ def _detect_col_positions(pages_words):
                 cols = {}
                 for w in line_words:
                     t = w['text'].upper()
-                    if t in ('REFERENCIA', 'DESCRIPCION', 'CONCEPTO', 'REF.'):
-                        # Concepto empieza justo después de REFERENCIA
+                    if t in ('REFERENCIA', 'DESCRIPCION', 'REF.'):
+                        # Concepto empieza justo después de REFERENCIA (x1 de REFERENCIA)
                         cols['concepto_x0'] = w['x1'] + 1
+                    elif t == 'CONCEPTO':
+                        # Fallback: si no hay REFERENCIA, usar x0 de CONCEPTO
+                        if 'concepto_x0' not in cols:
+                            cols['concepto_x0'] = w['x0']
                     elif t == 'CARGOS':
                         cols['cargo']      = w['x1']   # borde derecho CARGOS
                         cols['cargo_x0']   = w['x0']   # borde izquierdo CARGOS
