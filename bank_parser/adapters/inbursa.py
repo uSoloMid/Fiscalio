@@ -174,6 +174,14 @@ def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=N
 
     def _try_extract_day(line):
         """Intenta extraer día 1-31 del inicio de la línea, normalizando confusiones OCR."""
+        # Caso especial: "[0XY" → OCR lee "| 05" como "[015" (días 01-09 con cero inicial)
+        # El primer dígito tras "[0" es artefacto; el último es el dígito real del día.
+        bracket_m = re.match(r'^\[0(\d)(\d)', line)
+        if bracket_m:
+            last_d = int(bracket_m.group(2))
+            if last_d > 0:
+                return last_d, bracket_m.end()
+
         # Normalizar O→0, S→5 solo si el primer token es muy corto (≤4 chars)
         first_tok = re.match(r'^\S+', line)
         line_norm = line
@@ -266,9 +274,10 @@ def _parse_ocr_transactions(all_ocr_text, year_str, meses_str, initial_balance=N
                 continue
 
         # Línea de continuación — agregar al concepto si no es detalle técnico
-        if not MONEY_PAT.search(line) and len(line) < 120:
-            if not re.search(r'\b\d{10,}\b', line) and 'RFC NO DISPONIBLE' not in line.upper():
-                current_tx['concepto'] = (current_tx['concepto'] + ' ' + line).strip()
+        line_cont = re.sub(r'^[\[\|\-¡!]+', '', line).strip()  # limpiar artefactos iniciales
+        if line_cont and not MONEY_PAT.search(line_cont) and len(line_cont) < 120:
+            if not re.search(r'\b\d{10,}\b', line_cont) and 'RFC NO DISPONIBLE' not in line_cont.upper():
+                current_tx['concepto'] = (current_tx['concepto'] + ' ' + line_cont).strip()
 
     if current_tx:
         prev_saldo = _finalize_tx(current_tx, prev_saldo)
