@@ -375,10 +375,11 @@ def extract_inbursa(pdf_path):
                     year_str = ym.group(1)
                     break
             else:
-                # Último recurso: buscar año 4 dígitos en rango 2020-2030 en carátula
-                all_years = re.findall(r'\b(20[2-3]\d)\b', first_page_text)
+                # Último recurso: buscar año 4 dígitos en rango 2020-2030 en el texto (sin límites de palabra)
+                all_years = re.findall(r'(202[0-9]|2030)', first_page_text)
                 if all_years:
-                    year_str = all_years[0]
+                    from collections import Counter
+                    year_str = Counter(all_years).most_common(1)[0][0]
 
         period_full = re.search(
             r'PERIODO\s+Del\s+([\d\w\s]+?)\s+al\s+([\d\w\s]+?)(?:\n|\r|$)',
@@ -461,14 +462,12 @@ def extract_inbursa(pdf_path):
 
         else:
             # ─── EXTRACCIÓN NORMAL (texto legible) ───────────────────
-            # Estrategia: cada fila empieza en la Y del mes (NOV, DIC…)
-            # y termina justo antes de donde empieza el siguiente mes.
-            # El último movimiento termina en "SI DESEA RECIBIR PAGOS".
+            # Estrategia: cada fila empieza en el día (ancla agrupada con mes)
             all_pages_words = [_fitz_words(doc[i]) for i in range(len(doc))]
             col_positions = _detect_col_positions(all_pages_words)
 
-            # Coordenadas exactas de columnas medidas del PDF Inbursa Nov/Dic 2025
-            # FECHA:0-46  REF:47-105  CONCEPTO:106-350  CARGOS:351-420  ABONOS:421-485  SALDO:486-570
+            # Coordenadas exactas de columnas medidos del PDF Inbursa Nov/Dic 2025
+            # FECHA:13-46  REF:47-105  CONCEPTO:106-350  CARGOS:351-420  ABONOS:421-485  SALDO:486-570
             # IMPORTANTE: _detect_col_positions devuelve x1 de la *palabra* del header, NO el borde
             # derecho de la columna. Los montos están right-aligned, así que el borde derecho real
             # es donde terminan los montos (≈420, 485, 570). Usar siempre los valores medidos
@@ -484,7 +483,8 @@ def extract_inbursa(pdf_path):
                 # Conservar concepto_x0 del header (puede variar), pero SOBRESCRIBIR
                 # cargo/abono/saldo con valores medidos (x1 de palabra != borde de columna)
                 col_positions.update(HARDCODED)
-                col_positions.setdefault('concepto_x0', 106.0)
+                if 'concepto_x0' not in col_positions:
+                    col_positions['concepto_x0'] = 106.0
                 sys.stderr.write(f"[INBURSA-DEBUG] col: cargo={col_positions['cargo']:.1f} abono={col_positions['abono']:.1f} saldo={col_positions['saldo']:.1f} concepto=[{col_positions.get('concepto_x0',0):.0f},{col_positions.get('cargo_x0',0):.0f}]\n")
 
             cargo_x      = col_positions['cargo']
@@ -518,7 +518,7 @@ def extract_inbursa(pdf_path):
                             or "DETALLE DE MOVIMIENTOS" in tu):
                         page_start_y = lw[0]['bottom'] + 1
                         in_extraction = True
-                    if "SI DESEA RECIBIR PAGOS" in tu and in_extraction:
+                    if ("SI DESEA RECIBIR PAGOS" in tu or "CLIENTE INBURSA:" in tu or "PÁGINA:" in tu) and in_extraction:
                         page_end_y = lw[0]['top'] - 2
                         stop_found = True
                         break
@@ -529,44 +529,59 @@ def extract_inbursa(pdf_path):
                 active = [w for w in words
                           if page_start_y <= w['top'] <= page_end_y]
 
-                # ── 2. Anclas de fila: cada mes en columna de fecha (x0 < 40) ──
-                month_anchors = []
-                for w in active:
-                    if w['x0'] < 40:
+                # ── 2. Anclas de fila: grupos de palabras en columna de fecha (x0 < 50) ──
+                date_words = [w for w in active if w['x0'] < 50]
+                # Agrupar día y mes que suelen estar en líneas contiguas (~11px)
+                date_groups = _group_lines(date_words, y_tolerance=12)
+
+                anchors = []
+                for group in date_groups:
+                    # El ancla es la palabra más alta del grupo para marcar el inicio real de la fila
+                    anchor_w = min(group, key=lambda x: x['top'])
+                    # Verificar que el grupo contenga algo que parezca un mes
+                    has_month = False
+                    for w in group:
                         t = w['text'].upper().rstrip('.')
                         if t in MESES_SET:
-                            month_anchors.append(w)
-                month_anchors.sort(key=lambda w: w['top'])
+                            has_month = True
+                            break
+                    if has_month:
+                        anchors.append({
+                            'top': anchor_w['top'],
+                            'words': group
+                        })
 
-                if not month_anchors:
+                if not anchors:
                     continue
 
                 # ── 3. Para cada fila [anchor.top, next_anchor.top) ────
-                for i, anchor in enumerate(month_anchors):
-                    row_top = anchor['top']
-                    row_bot = (month_anchors[i + 1]['top'] - 1
-                               if i + 1 < len(month_anchors)
+                for i, anchor_data in enumerate(anchors):
+                    row_top = anchor_data['top']
+                    row_bot = (anchors[i + 1]['top'] - 1
+                               if i + 1 < len(anchors)
                                else page_end_y)
 
                     row_words = [w for w in active
                                  if row_top <= w['top'] < row_bot]
 
-                    # Fecha
-                    month = anchor['text'].upper().rstrip('.')
+                    # Fecha: Extraer día y mes del grupo de palabras del ancla
+                    month_str = "ENE"
                     day = 1
-                    for w in row_words:
-                        if (w['x0'] < 40 and w is not anchor
-                                and re.match(r'^\d{1,2}$', w['text'])
-                                and 1 <= int(w['text']) <= 31):
-                            day = int(w['text'])
-                            break
-                    mes   = meses_str.get(month, "01")
+                    for w in anchor_data['words']:
+                        t = w['text'].upper().rstrip('.')
+                        if t in MESES_SET:
+                            month_str = t
+                        elif re.match(r'^\d{1,2}$', t) and 1 <= int(t) <= 31:
+                            day = int(t)
+
+                    mes   = meses_str.get(month_str, "01")
                     fecha = f"{year_str}-{mes}-{day:02d}"
 
                     # Referencia
                     ref = ""
                     for w in sorted(row_words, key=lambda x: x['top']):
-                        if 35 <= w['x0'] <= 200 and re.match(r'^\d{6,}$', w['text']):
+                        # El usuario dice REF: 47-105. Usamos un margen algo mayor (35-110)
+                        if 35 <= w['x0'] <= 110 and re.match(r'^\d{6,}$', w['text']):
                             ref = w['text']
                             break
 
@@ -578,12 +593,18 @@ def extract_inbursa(pdf_path):
                         if _is_money(w['text']):
                             val = float(re.sub(r'[\s,\u202f\xa0]', '', w['text']))
                             x1  = w['x1']
-                            if x1 > mid_as:
+                            # Rangos explicitos segun medicion (el monto termina en x1)
+                            if x1 > 500:
                                 saldo_val = val
-                            elif x1 > mid_ca:
+                            elif 421 <= x1 <= 500:
                                 abono = val
-                            else:
+                            elif 351 <= x1 <= 420:
                                 cargo = val
+                            else:
+                                # Fallback por si la detección geométrica movió algo
+                                if x1 > mid_as: saldo_val = val
+                                elif x1 > mid_ca: abono = val
+                                else: cargo = val
 
                     if saldo_val is None:
                         continue  # fila sin saldo → no es movimiento

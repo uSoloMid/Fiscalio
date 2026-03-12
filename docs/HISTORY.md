@@ -13,6 +13,7 @@
 - Bug 2: `_is_spei_detail_line` filtraba las líneas principales porque referencias de 10 dígitos activaban el check → casi todos los movimientos sin importes.
 - Bug 3: abonos cortos asignados como cargos por ambigüedad de distancia.
 - Fix: detección dinámica de columnas desde la fila cabecera CARGOS/ABONOS/SALDO; valor más a la derecha = SALDO siempre; punto medio cargo/abono como frontera exacta; filtro SPEI solo en líneas de continuación.
+- Mejora: Aplicación de rangos explícitos para montos (Cargos: 351-420, Abonos: 421-500, Saldo: >500) para mayor precisión según la estructura visual del PDF.
 - El PDF de Inbursa contiene 2 cuentas (principal + inversiones); corte en "SI DESEA RECIBIR PAGOS" para importar solo la principal.
 
 ---
