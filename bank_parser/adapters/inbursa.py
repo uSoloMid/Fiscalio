@@ -86,12 +86,13 @@ def _is_obfuscated_pdf(doc):
                     font_name = span.get('font', '')
                     if 'AllAndNone' in font_name or 'allAndNone' in font_name:
                         return True
-        # Fallback: si col_positions no se puede detectar y hay chars Latin Extended
+        # Fallback: el font AllAndNone mapea caracteres al área privada Unicode (>0xE000)
+        # NO usar ord>200 porque las letras acentuadas del español también superan ese valor
         text = page.get_text()
         if text:
-            non_ascii = sum(1 for c in text if ord(c) > 200)
-            ratio = non_ascii / max(len(text), 1)
-            if ratio > 0.15:
+            private_use = sum(1 for c in text if ord(c) > 0xE000)
+            ratio = private_use / max(len(text), 1)
+            if ratio > 0.10:
                 return True
     except Exception:
         pass
