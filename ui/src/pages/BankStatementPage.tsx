@@ -12,8 +12,8 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [statements, setStatements] = useState<any[]>([]);
     const [bankFilter, setBankFilter] = useState('all');
-    const [yearFilter, setYearFilter] = useState('all');
-    const [monthFilter, setMonthFilter] = useState('all');
+    const [yearFilter, setYearFilter] = useState(() => String(new Date().getFullYear()));
+    const [monthFilter, setMonthFilter] = useState(() => ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'][new Date().getMonth()]);
     const [searchTerm, setSearchTerm] = useState('');
     const [reconciliationMode, setReconciliationMode] = useState(false);
     const [reconciliationData, setReconciliationData] = useState<{ movements: BankMovement[]; stats: ReconciliationStats } | null>(null);
@@ -458,8 +458,17 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                             )) : (
                                 <div className="col-span-full py-40 flex flex-col items-center justify-center bg-gray-50/50 rounded-[60px] border-2 border-dashed border-gray-100">
                                     <span className="material-symbols-outlined text-gray-200 text-6xl mb-6">history</span>
-                                    <h4 className="text-gray-400 text-sm font-black uppercase tracking-[0.3em]">No hay actividad bancaria registrada</h4>
-                                    <p className="text-gray-400 text-xs font-medium italic mt-2">Sube tu primer PDF para comenzar la gestión financiera.</p>
+                                    {statements.length > 0 ? (
+                                        <>
+                                            <h4 className="text-gray-400 text-sm font-black uppercase tracking-[0.3em]">Sin estados de cuenta en este periodo</h4>
+                                            <p className="text-gray-400 text-xs font-medium italic mt-2">Cambia los filtros o sube el PDF del mes.</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h4 className="text-gray-400 text-sm font-black uppercase tracking-[0.3em]">No hay actividad bancaria registrada</h4>
+                                            <p className="text-gray-400 text-xs font-medium italic mt-2">Sube tu primer PDF para comenzar la gestión financiera.</p>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
