@@ -13,9 +13,10 @@ class BankStatementController extends Controller
     public function process(Request $request)
     {
         $request->validate([
-            // mimes:pdf,bin cubre application/pdf Y application/octet-stream
-            // (algunos PDFs de Banamex/Inbursa tienen mime detectado como octet-stream)
-            'file' => 'required|file|mimes:pdf,bin',
+            // Sin restricción de mimes: algunos PDFs tienen mime detectado como
+            // application/octet-stream u otras variantes no estándar. Si no es
+            // un PDF válido, el parser Python retorna un error controlado (500).
+            'file' => 'required|file',
             'rfc' => 'required|string'
         ]);
 
