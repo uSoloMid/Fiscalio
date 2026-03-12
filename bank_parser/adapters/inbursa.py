@@ -70,36 +70,49 @@ def _is_spei_detail_line(text_upper):
 
 def _is_obfuscated_pdf(doc):
     """
-    Detecta si el PDF de Inbursa usa el font AllAndNone ofuscado.
-    En ese caso la extracción de texto normal falla.
+    Detecta si el PDF de Inbursa tiene texto ilegible (realmente ofuscado).
+    NO se basa en el nombre del font (AllAndNone puede estar presente incluso
+    cuando el texto es legible en versiones más recientes de Inbursa).
+    En cambio, verifica si fitz extrae texto coherente: dígitos, meses en español,
+    palabras bancarias comunes. Si puede, el PDF es legible → no necesita OCR.
     """
     try:
-        # Leer rawdict de la primera página con movimientos (pag 2 normalmente)
-        page_idx = min(1, len(doc) - 1)
-        page = doc[page_idx]
-        d = page.get_text('rawdict')
-        for block in d.get('blocks', []):
-            if block.get('type') != 0:
-                continue
-            for line in block.get('lines', []):
-                for span in line.get('spans', []):
-                    font_name = span.get('font', '')
-                    if 'AllAndNone' in font_name or 'allAndNone' in font_name:
-                        sys.stderr.write(f"[INBURSA-OBFUSCATED] font check triggered: {font_name}\n")
-                        return True
-        # Fallback: el font AllAndNone mapea caracteres al área privada Unicode (>0xE000)
-        # NO usar ord>200 porque las letras acentuadas del español también superan ese valor
-        text = page.get_text()
-        sys.stderr.write(f"[INBURSA-OBFUSCATED] font check passed, text len={len(text) if text else 0}\n")
-        if text:
-            private_use = sum(1 for c in text if ord(c) > 0xE000)
-            ratio = private_use / max(len(text), 1)
-            sys.stderr.write(f"[INBURSA-OBFUSCATED] private_use={private_use}, ratio={ratio:.4f}\n")
-            if ratio > 0.10:
-                sys.stderr.write(f"[INBURSA-OBFUSCATED] ratio check triggered\n")
-                return True
-    except Exception:
-        pass
+        MESES = {'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN',
+                 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'}
+        PALABRAS_BANCO = {'SPEI', 'DEPOSITO', 'CARGO', 'ABONO', 'SALDO',
+                          'TRANSFERENCIA', 'DOMICILIADO', 'RETIRO', 'FECHA'}
+
+        # Revisar las primeras 3 páginas de movimientos
+        pages_to_check = range(min(3, len(doc)))
+        total_text = ""
+        for i in pages_to_check:
+            total_text += doc[i].get_text() or ""
+
+        if not total_text.strip():
+            sys.stderr.write("[INBURSA] sin texto extraíble → usando OCR\n")
+            return True
+
+        words_upper = set(re.findall(r'[A-ZÁÉÍÓÚÑÜ]{3,}', total_text.upper()))
+
+        # Si encontramos meses o palabras bancarias, el texto es legible
+        if words_upper & MESES:
+            sys.stderr.write(f"[INBURSA] texto legible (meses encontrados) → path normal\n")
+            return False
+        if words_upper & PALABRAS_BANCO:
+            sys.stderr.write(f"[INBURSA] texto legible (palabras bancarias) → path normal\n")
+            return False
+
+        # Si hay muchos caracteres del área privada Unicode → realmente ofuscado
+        private_use = sum(1 for c in total_text if ord(c) > 0xE000)
+        ratio = private_use / max(len(total_text), 1)
+        sys.stderr.write(f"[INBURSA] sin palabras reconocibles, private_use ratio={ratio:.4f}\n")
+        if ratio > 0.05:
+            sys.stderr.write("[INBURSA] PDF realmente ofuscado → usando OCR\n")
+            return True
+
+    except Exception as e:
+        sys.stderr.write(f"[INBURSA] error en detección: {e}\n")
+
     return False
 
 
