@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { listAccounts, updateAccount, createAccount, deleteAccount, importAccountsExcel } from '../services';
+import { listAccounts, updateAccount, createAccount, importAccountsExcel } from '../services';
 import type { Account } from '../models';
 
 interface TreeNode extends Account {
