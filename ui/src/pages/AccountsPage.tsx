@@ -386,6 +386,7 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
     };
 
     return (
+        <>
         <div className="text-gray-800 h-screen flex flex-col md:flex-row bg-[#f8fafc] overflow-hidden font-['Inter']">
             <div className="flex-1 flex flex-col min-w-0 bg-white shadow-2xl z-10">
                 <header className="h-auto md:h-20 px-4 md:px-8 py-4 md:py-0 flex flex-col md:flex-row items-center justify-between border-b border-gray-100 flex-shrink-0 gap-4">
@@ -756,5 +757,6 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                 </div>
             </div>
         )}
+        </>
     );
 };
