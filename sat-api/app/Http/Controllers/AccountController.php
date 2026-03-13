@@ -58,8 +58,21 @@ class AccountController extends Controller
             $natureMap = ['L' => 'Deudora', 'K' => 'Acreedora', 'D' => 'Deudora', 'A' => 'Acreedora'];
 
             $batch = [];
-            $headerSkipped = false;
             $seenCodes = [];
+            $cashFlowCodes = [];
+
+            // First pass: collect cash-flow marker codes (type=F with empty name)
+            foreach ($rows as $idx => $row) {
+                if ($idx < 4) continue;
+                $tc = strtoupper(trim((string)($row[0] ?? '')));
+                $rc = trim((string)($row[1] ?? ''));
+                $nm = trim((string)($row[2] ?? ''));
+                if (empty($rc) || $tc !== 'F' || !empty($nm)) continue;
+                $fc = (strlen($rc) == 8 && is_numeric($rc))
+                    ? substr($rc, 0, 3) . '-' . substr($rc, 3, 2) . '-' . substr($rc, 5, 3)
+                    : $rc;
+                $cashFlowCodes[$fc] = true;
+            }
 
             foreach ($rows as $idx => $row) {
                 if ($idx < 4)
@@ -70,6 +83,10 @@ class AccountController extends Controller
                 $name = trim((string)($row[2] ?? ''));
 
                 if (empty($rawCode))
+                    continue;
+
+                // Skip type=F rows with empty names (cash-flow markers only)
+                if (empty($name) && strtoupper(trim((string)$typeCode)) === 'F')
                     continue;
 
                 $formattedCode = $rawCode;
@@ -128,7 +145,7 @@ class AccountController extends Controller
                     'is_selectable' => true,
                     'is_postable' => ((int)($row[7] ?? 1) >= 2),
                     'currency' => 'MXN',
-                    'is_cash_flow' => (strtoupper($typeCode) === 'F'),
+                    'is_cash_flow' => isset($cashFlowCodes[$formattedCode]),
                     'is_active' => true,
                     'balance' => 0,
                     'created_at' => now(),

@@ -33,9 +33,23 @@ class ResetAccountsFromExcel extends Command
         ];
 
         $baseCatalog = [];
-        $seenCodes = [];
+        $seenCodes   = [];
+        $cashFlowCodes = [];
 
-        // Skip first 4 rows (1 to 4) as they are headers/metadata
+        // First pass: collect codes marked as cash-flow (type=F with empty name)
+        foreach ($rows as $idx => $row) {
+            if ($idx < 4) continue;
+            $typeCode = strtoupper(trim((string)($row[0] ?? '')));
+            $rawCode  = trim((string)($row[1] ?? ''));
+            $name     = trim((string)($row[2] ?? ''));
+            if (empty($rawCode) || $typeCode !== 'F' || !empty($name)) continue;
+            $fc = (strlen($rawCode) == 8 && is_numeric($rawCode))
+                ? substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3)
+                : $rawCode;
+            $cashFlowCodes[$fc] = true;
+        }
+
+        // Second pass: build catalog skipping empty-name marker rows
         foreach ($rows as $idx => $row) {
             if ($idx < 4)
                 continue;
@@ -45,6 +59,10 @@ class ResetAccountsFromExcel extends Command
             $name = trim((string)($row[2] ?? ''));
 
             if (empty($rawCode))
+                continue;
+
+            // Skip type=F rows with empty names — they are cash-flow markers, not real accounts
+            if (empty($name) && strtoupper(trim((string)$typeCode)) === 'F')
                 continue;
 
             // Format code to AAA-BB-CCC if it has 8 digits
@@ -104,7 +122,7 @@ class ResetAccountsFromExcel extends Command
                 'is_postable' => ((int)($row[7] ?? 1) >= 2),
                 'generate_auxiliaries' => false,
                 'currency' => 'MXN',
-                'is_cash_flow' => (strtoupper($typeCode) === 'F'),
+                'is_cash_flow' => isset($cashFlowCodes[$formattedCode]),
                 'is_active' => true,
                 'balance' => 0,
                 'is_custom' => false,
