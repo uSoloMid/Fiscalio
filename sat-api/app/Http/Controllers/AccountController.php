@@ -331,6 +331,10 @@ class AccountController extends Controller
             return response()->json(['message' => 'Archivo no encontrado'], 400);
 
         $content = file_get_contents($file->getRealPath());
+        // Contpaqi TXT files are typically exported in Windows-1252 (latin1) encoding
+        if (!mb_check_encoding($content, 'UTF-8')) {
+            $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
+        }
         $lines   = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
 
         $natureMap = ['L' => 'Deudora', 'K' => 'Acreedora', 'D' => 'Deudora', 'A' => 'Acreedora'];
