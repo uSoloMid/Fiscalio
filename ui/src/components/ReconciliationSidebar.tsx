@@ -425,8 +425,12 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
                                     )}
                                     <div className="flex justify-between items-end mt-6">
                                         <div>
-                                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] mb-1">Fecha Emisión</p>
-                                            <p className="text-[11px] font-black text-gray-700">{formatDate(cfdi.fecha)}</p>
+                                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] mb-1">
+                                                {cfdi.tipo === 'N' && cfdi.nomina_fecha_pago ? 'Fecha Pago Nómina' : 'Fecha Emisión'}
+                                            </p>
+                                            <p className="text-[11px] font-black text-gray-700">
+                                                {formatDate((cfdi.tipo === 'N' && cfdi.nomina_fecha_pago) ? cfdi.nomina_fecha_pago : cfdi.fecha)}
+                                            </p>
                                         </div>
                                         <div className="text-right">
                                             <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] mb-1">Total CFDI</p>

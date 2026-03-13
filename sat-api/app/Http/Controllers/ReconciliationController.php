@@ -44,7 +44,7 @@ class ReconciliationController extends Controller
         // Load all valid CFDIs for this business, optimized memory by selecting only necessary columns
         $query = Cfdi::select([
                 'id', 'uuid', 'rfc_emisor', 'rfc_receptor', 'name_emisor', 'name_receptor',
-                'fecha', 'total', 'tipo', 'metodo_pago', 'forma_pago', 'moneda', 'tipo_cambio', 'es_cancelado', 'traslados_locales', 'retenciones_locales'
+                'fecha', 'nomina_fecha_pago', 'total', 'tipo', 'metodo_pago', 'forma_pago', 'moneda', 'tipo_cambio', 'es_cancelado', 'traslados_locales', 'retenciones_locales'
             ])
             ->where(function ($q) use ($businessRfc) {
                 $q->where('rfc_emisor', $businessRfc)
@@ -238,8 +238,17 @@ class ReconciliationController extends Controller
 
             if (abs($cfdi->total - $amount) > 0.05) continue;
 
-            $daysDiff = (int) abs($movDate->diffInDays($cfdiDate));
-            if ($daysDiff > 45) continue; 
+            // Nómina: use FechaPago from complement (tighter window ±20 days); fallback to fecha
+            if ($cfdi->tipo === 'N') {
+                $matchDate = $cfdi->nomina_fecha_pago
+                    ? Carbon::parse($cfdi->nomina_fecha_pago)
+                    : $cfdiDate;
+                $daysDiff = (int) abs($movDate->diffInDays($matchDate));
+                if ($daysDiff > 20) continue;
+            } else {
+                $daysDiff = (int) abs($movDate->diffInDays($cfdiDate));
+                if ($daysDiff > 45) continue;
+            }
 
             $confidence = $this->computeConfidence($daysDiff, $cfdi, $businessRfc, $extractedRfc, $extractedName, $learnedRfcs, $isEgreso);
 
@@ -408,7 +417,7 @@ class ReconciliationController extends Controller
 
         $cfdis = Cfdi::select([
                 'id', 'uuid', 'rfc_emisor', 'rfc_receptor', 'name_emisor', 'name_receptor',
-                'fecha', 'total', 'tipo', 'metodo_pago', 'forma_pago',
+                'fecha', 'nomina_fecha_pago', 'total', 'tipo', 'metodo_pago', 'forma_pago',
             ])
             ->where(function ($sq) use ($businessRfc) {
                 $sq->where('rfc_emisor', $businessRfc)
