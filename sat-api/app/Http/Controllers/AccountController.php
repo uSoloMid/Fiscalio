@@ -245,6 +245,65 @@ class AccountController extends Controller
         }
     }
 
+    public function exportExcel(Request $request)
+    {
+        $business = $this->getBusiness($request);
+        $accounts = Account::where('business_id', $business->id)
+            ->orderBy('internal_code')
+            ->get();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // 4 header rows (matching Contpaqi format)
+        $sheet->setCellValue('A1', 'Tipo');
+        $sheet->setCellValue('B1', 'Código Interno');
+        $sheet->setCellValue('C1', 'Nombre');
+        $sheet->setCellValue('E1', 'Cuenta Padre');
+        $sheet->setCellValue('F1', 'Naturaleza');
+        $sheet->setCellValue('H1', 'Nivel');
+        $sheet->setCellValue('K1', 'Rubro NIF');
+        $sheet->setCellValue('Q1', 'Vínculo SAT');
+
+        $typeReverseMap = [
+            'Activo'   => 'A',
+            'Pasivo'   => 'P',
+            'Capital'  => 'C',
+            'Ingresos' => 'I',
+            'Egresos'  => 'E',
+            'Orden'    => 'O',
+        ];
+        $natureReverseMap = ['Deudora' => 'D', 'Acreedora' => 'A'];
+
+        $row = 5;
+        foreach ($accounts as $account) {
+            // Remove dashes to get 8-digit code
+            $rawCode   = str_replace('-', '', $account->internal_code);
+            $parentRaw = $account->parent_code
+                ? str_replace('-', '', $account->parent_code)
+                : '00000000';
+
+            $sheet->setCellValueExplicit("A{$row}", $typeReverseMap[$account->type] ?? 'A', \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit("B{$row}", $rawCode, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue("C{$row}", $account->name);
+            $sheet->setCellValueExplicit("E{$row}", $parentRaw, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $sheet->setCellValue("F{$row}", $natureReverseMap[$account->naturaleza] ?? 'D');
+            $sheet->setCellValue("H{$row}", $account->level);
+            $sheet->setCellValue("K{$row}", $account->nif_rubro ?? '');
+            $sheet->setCellValue("Q{$row}", $account->sat_code ?? '');
+            $row++;
+        }
+
+        $filename = 'Catalogo_' . $business->rfc . '_' . date('Y-m-d') . '.xlsx';
+        $writer   = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
     public function importExcel(Request $request)
     {
         $business = $this->getBusiness($request);
@@ -256,7 +315,6 @@ class AccountController extends Controller
         $rows = $spreadsheet->getActiveSheet()->toArray();
 
         $batch = [];
-        $headerSkipped = false;
         $count = 0;
 
         // Type mapping
@@ -278,11 +336,8 @@ class AccountController extends Controller
             'A' => 'Acreedora',
         ];
 
-        foreach ($rows as $row) {
-            if (!$headerSkipped) {
-                $headerSkipped = true;
-                continue;
-            }
+        foreach ($rows as $idx => $row) {
+            if ($idx < 4) continue; // skip 4 Contpaqi header rows
             if (empty($row[1]))
                 continue; // internal_code
 

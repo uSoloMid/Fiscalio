@@ -115,6 +115,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/tags/{id}', [TagController::class , 'update']);
         Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 
+        Route::get('/accounts/export', [\App\Http\Controllers\AccountController::class , 'exportExcel']);
         Route::post('/accounts/import', [\App\Http\Controllers\AccountController::class , 'importExcel']);
         Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
 

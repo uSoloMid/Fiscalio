@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { listAccounts, updateAccount, createAccount, importAccountsExcel } from '../services';
+import { listAccounts, updateAccount, createAccount, importAccountsExcel, exportAccountsExcel } from '../services';
 import type { Account } from '../models';
 
 interface TreeNode extends Account {
@@ -107,6 +107,13 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
         return path;
     }, [selectedAccountId, accounts]);
 
+    // Set of internal_codes that are ancestors of the selected account (excluding the selected itself)
+    const ancestorCodes = useMemo(() => {
+        const codes = new Set<string>();
+        breadcrumbPath.slice(0, -1).forEach(a => codes.add(a.internal_code));
+        return codes;
+    }, [breadcrumbPath]);
+
     // Auto-expand tree when searching
     useEffect(() => {
         if (search || onlyPostable || withoutSat || focusCode) {
@@ -194,6 +201,17 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
         setIsEditing(true);
     };
 
+    const handleExportExcel = async () => {
+        try {
+            setLoading(true);
+            await exportAccountsExcel(activeRfc, clientName);
+        } catch (e: any) {
+            alert(e.message || 'Error al exportar catálogo');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleExport = (format: 'csv' | 'json') => {
         let content = '';
         const timestamp = new Date().toISOString().split('T')[0];
@@ -259,11 +277,33 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
     const renderTreeNode = (node: TreeNode, depth: number = 0) => {
         const isExpanded = expandedNodes.has(node.internal_code);
         const hasChildren = node.children.length > 0;
+        const isSelected = selectedAccountId === node.id;
+        const isAncestor = !isSelected && ancestorCodes.has(node.internal_code);
+
+        const rowBg = isSelected
+            ? 'bg-blue-500/10 ring-2 ring-blue-300 shadow-md border-blue-200'
+            : isAncestor
+            ? 'bg-blue-50/60 border-blue-100/80'
+            : '';
+
+        const nameStyle = isSelected
+            ? 'font-black text-blue-700'
+            : isAncestor
+            ? 'font-black text-blue-500'
+            : node.is_postable
+            ? 'font-black text-gray-900'
+            : 'font-bold text-gray-400';
+
+        const arrowColor = isSelected
+            ? 'text-blue-500'
+            : isAncestor
+            ? 'text-blue-400'
+            : 'text-gray-400';
 
         return (
             <div key={node.id} className="flex flex-col">
                 <div
-                    className={`flex items-center group py-3.5 px-6 hover:bg-white hover:shadow-xl hover:shadow-blue-500/5 cursor-pointer rounded-[24px] transition-all duration-300 border border-transparent hover:border-blue-50/50 ${selectedAccountId === node.id ? 'bg-blue-50/80 ring-1 ring-blue-100 shadow-sm border-blue-100' : ''}`}
+                    className={`flex items-center group py-3.5 px-6 hover:bg-white hover:shadow-xl hover:shadow-blue-500/5 cursor-pointer rounded-[24px] transition-all duration-300 border border-transparent hover:border-blue-50/50 ${rowBg}`}
                     onClick={() => {
                         setSelectedAccountId(node.id);
                         if (hasChildren) toggleNode(node.internal_code);
@@ -272,16 +312,16 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                     <div style={{ width: `${depth * 28}px` }} className="flex-shrink-0" />
                     <div className="w-10 h-10 flex items-center justify-center mr-1">
                         {hasChildren ? (
-                            <span className="material-symbols-outlined text-gray-400 text-2xl transition-transform duration-300" style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }}>
+                            <span className={`material-symbols-outlined text-2xl transition-transform duration-300 ${arrowColor}`} style={{ transform: isExpanded ? 'rotate(90deg)' : 'none' }}>
                                 arrow_right
                             </span>
                         ) : (
-                            <div className="w-2 h-2 rounded-full bg-gray-200" />
+                            <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-blue-400' : isAncestor ? 'bg-blue-300' : 'bg-gray-200'}`} />
                         )}
                     </div>
 
                     <div className="flex-1 flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${node.is_postable ? 'bg-emerald-50 text-emerald-500' : 'bg-gray-50 text-gray-400'}`}>
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-500 text-white' : isAncestor ? 'bg-blue-100 text-blue-500' : node.is_postable ? 'bg-emerald-50 text-emerald-500' : 'bg-gray-50 text-gray-400'}`}>
                             <span className="material-symbols-outlined text-xl font-bold">
                                 {node.is_postable ? 'adjust' : 'account_balance'}
                             </span>
@@ -289,7 +329,7 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
 
                         <div className="flex flex-col min-w-0">
                             <div className="flex items-center gap-2">
-                                <span className={`text-sm tracking-tight truncate ${node.is_postable ? 'font-black text-gray-900' : 'font-bold text-gray-400'}`}>
+                                <span className={`text-sm tracking-tight truncate ${nameStyle}`}>
                                     {node.name}
                                 </span>
                                 {hasChildren && (
@@ -422,7 +462,7 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                             <span className="material-symbols-outlined">publish</span>
                         </button>
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json,.xls,.xlsx" />
-                        <button onClick={() => handleExport('csv')} className="p-2.5 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-2xl transition-all" title="Exportar CSV">
+                        <button onClick={handleExportExcel} className="p-2.5 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-2xl transition-all" title="Exportar Excel (formato Contpaqi)">
                             <span className="material-symbols-outlined">download</span>
                         </button>
                     </div>

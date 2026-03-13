@@ -226,6 +226,18 @@ export async function deleteAccount(id: number, rfc: string): Promise<void> {
     if (!response.ok) throw new Error('Error deleting account');
 }
 
+export async function exportAccountsExcel(rfc: string, clientName?: string): Promise<void> {
+    const response = await authFetch(`${API_BASE_URL}/api/accounts/export?rfc=${rfc}`);
+    if (!response.ok) throw new Error('Error al exportar catálogo');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Catalogo_${clientName || rfc}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
 export async function importAccountsExcel(file: File, rfc: string): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
