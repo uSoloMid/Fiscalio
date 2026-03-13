@@ -333,28 +333,32 @@ class AccountController extends Controller
         // mode: 'upsert' (default) = update existing + add new | 'new_only' = skip existing
         $mode = $request->input('mode', 'upsert');
 
-        $content = file_get_contents($file->getRealPath());
-        // Contpaqi TXT files are typically exported in Windows-1252 (latin1) encoding
-        if (!mb_check_encoding($content, 'UTF-8')) {
-            $content = mb_convert_encoding($content, 'UTF-8', 'Windows-1252');
-        }
-        $lines   = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
+        // Read raw bytes — Contpaqi TXT uses Windows-1252 fixed-width fields.
+        // We MUST parse numeric/structural fields from raw bytes BEFORE any encoding
+        // conversion, because multibyte UTF-8 chars (ó=2B, ñ=2B) would shift positions.
+        $rawContent = file_get_contents($file->getRealPath());
+        $rawLines   = preg_split('/\r\n|\r|\n/', $rawContent);
+
+        // Helper: extract a field at a byte position and convert it to UTF-8
+        $field = function (string $line, int $pos, int $len) {
+            $raw = substr($line, $pos, $len);
+            // Convert from Windows-1252 to UTF-8 (single-byte source, so positions are stable)
+            return trim(mb_convert_encoding($raw, 'UTF-8', 'Windows-1252'));
+        };
 
         $natureMap = ['L' => 'Deudora', 'K' => 'Acreedora', 'D' => 'Deudora', 'A' => 'Acreedora'];
 
-        // First pass: collect cash-flow codes and NIF rubros
-        // NIF rubro is on the RF line that immediately follows its C line
+        // First pass: collect cash-flow codes and NIF rubros (from RF lines following C lines)
         $cashFlowCodes = [];
-        $nifRubros     = []; // formattedCode => nif_rubro string
+        $nifRubros     = [];
         $lastCode      = null;
 
-        foreach ($lines as $line) {
+        foreach ($rawLines as $line) {
             if (strlen($line) < 4) continue;
             $prefix = strtoupper(substr($line, 0, 2));
 
             if ($prefix === 'RF') {
-                // Capture NIF rubro for the previous account
-                $nifRubro = trim(substr($line, 3));
+                $nifRubro = $field($line, 3, strlen($line));
                 if ($lastCode && !empty($nifRubro)) {
                     $nifRubros[$lastCode] = $nifRubro;
                 }
@@ -371,20 +375,19 @@ class AccountController extends Controller
                 : $rawCode;
 
             if ($tc === 'F') {
-                $name = strlen($line) > 34 ? trim(substr($line, 34, 50)) : '';
-                if (empty($name)) { $cashFlowCodes[$fc] = true; $lastCode = null; continue; }
+                $nameRaw = trim(substr($line, 34, 50));
+                if (empty($nameRaw)) { $cashFlowCodes[$fc] = true; $lastCode = null; continue; }
             }
 
             $lastCode = $fc;
         }
 
-        // Second pass: build accounts
+        // Second pass: build accounts — all positions in BYTES (Windows-1252)
         $batch     = [];
         $seenCodes = [];
         $count     = 0;
-        $lastCode  = null;
 
-        foreach ($lines as $line) {
+        foreach ($rawLines as $line) {
             if (strlen($line) < 11) continue;
             if (strtoupper(substr($line, 0, 2)) === 'RF') continue;
 
@@ -394,8 +397,8 @@ class AccountController extends Controller
 
             if (empty($rawCode) || !is_numeric($rawCode)) continue;
 
-            $name = strlen($line) > 84 ? trim(substr($line, 34, 50)) : (strlen($line) > 34 ? trim(substr($line, 34)) : '');
-
+            // Name: Spanish name at bytes 34-83 (50 bytes)
+            $name = $field($line, 34, 50);
             if (empty($name) && $tc === 'F') continue;
 
             $formattedCode = strlen($rawCode) == 8
@@ -405,7 +408,7 @@ class AccountController extends Controller
             if (isset($seenCodes[$formattedCode])) continue;
             $seenCodes[$formattedCode] = true;
 
-            // Parent code at fixed position 136-143 (always 8 digits in Contpaqi TXT)
+            // Parent at bytes 136-143 (8 bytes, always numeric)
             $parentCode = null;
             if (strlen($line) > 143) {
                 $parentRaw = substr($line, 136, 8);
@@ -414,12 +417,12 @@ class AccountController extends Controller
                 }
             }
 
-            // Nature at position 167, level at position 171 (Contpaqi TXT fixed-width)
-            $nature     = strlen($line) > 167 ? trim(substr($line, 167, 1)) : 'L';
-            $naturaleza = $natureMap[strtoupper($nature)] ?? 'Deudora';
-            $level = 1;
+            // Nature at byte 167 (1 byte), level at byte 171 (1 byte)
+            $nature     = strlen($line) > 167 ? strtoupper(substr($line, 167, 1)) : 'L';
+            $naturaleza = $natureMap[$nature] ?? 'Deudora';
+            $level      = 1;
             if (strlen($line) > 171) {
-                $lvl = trim(substr($line, 171, 1));
+                $lvl = substr($line, 171, 1);
                 if (is_numeric($lvl)) $level = (int)$lvl;
             }
 
