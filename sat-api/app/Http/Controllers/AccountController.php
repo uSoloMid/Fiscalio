@@ -66,6 +66,8 @@ class AccountController extends Controller
                     $headerSkipped = true;
                     continue;
                 }
+                if (($row[0] ?? '') !== 'C')
+                    continue;
                 if (empty($row[1]))
                     continue;
 
@@ -78,6 +80,31 @@ class AccountController extends Controller
                 if (isset($seenCodes[$formattedCode]))
                     continue;
                 $seenCodes[$formattedCode] = true;
+
+                $firstDigit = substr($rawCode, 0, 1);
+                $type = 'Activo';
+                switch ($firstDigit) {
+                    case '1':
+                        $type = 'Activo';
+                        break;
+                    case '2':
+                        $type = 'Pasivo';
+                        break;
+                    case '3':
+                        $type = 'Capital';
+                        break;
+                    case '4':
+                        $type = 'Ingresos';
+                        break;
+                    case '5':
+                    case '6':
+                    case '7':
+                        $type = 'Egresos';
+                        break;
+                    default:
+                        $type = 'Orden';
+                        break;
+                }
 
                 $parentCode = trim((string)($row[4] ?? '0'));
                 if (strlen($parentCode) == 8) {
@@ -94,7 +121,7 @@ class AccountController extends Controller
                     'sat_agrupador' => $row[16] ?? '',
                     'name' => trim($row[2] ?? 'S/N'),
                     'level' => (int)($row[7] ?? 1),
-                    'type' => $typeMap[strtoupper($row[0] ?? '')] ?? 'Activo',
+                    'type' => $type,
                     'naturaleza' => $natureMap[strtoupper($row[5] ?? '')] ?? 'Deudora',
                     'parent_code' => $parentCode,
                     'nif_rubro' => trim((string)($row[10] ?? '')),

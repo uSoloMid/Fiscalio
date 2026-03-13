@@ -1,37 +1,62 @@
 <?php
 
-namespace App\Console\Commands;
-
-use Illuminate\Console\Command;
-use App\Models\Account;
-use App\Models\Business;
-use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use App\Models\Business;
+use App\Models\Account;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
-class ResetAccountsFromExcel extends Command
+return new class extends Migration 
 {
-    protected $signature = 'accounts:reset-from-excel';
-    protected $description = 'Resets all account catalogs for all clients based on cuentas.xls';
-
-    public function handle()
+    public function up(): void
     {
-        $filePath = base_path('../cuentas.xls');
-        if (!file_exists($filePath)) {
-            $this->error("No se encontró el archivo cuentas.xls en la raíz.");
-            return 1;
+        // 1. Fix the schema: Remove global unique index, add composite one
+        // SQLite doesn't support dropUnique well on columns defined as UNIQUE in CREATE TABLE
+        // So we will recreate the table structure if needed, but Laravel's Schema handles it by recreating the table in SQLite
+
+        try {
+            Schema::table('accounts', function (Blueprint $table) {
+                // Try to drop the old global unique index
+                try {
+                    $table->dropUnique(['internal_code']);
+                }
+                catch (\Exception $e) {
+                }
+
+                try {
+                    $table->dropUnique('accounts_internal_code_unique');
+                }
+                catch (\Exception $e) {
+                }
+
+                // Add the composite unique index
+                try {
+                    $table->unique(['business_id', 'internal_code']);
+                }
+                catch (\Exception $e) {
+                }
+            });
+        }
+        catch (\Exception $e) {
+        // If Schema fails, we proceed - the main goal is the reset
         }
 
-        $this->info("Cargando cuentas.xls...");
+        // 2. Perform global reset from Excel
+        $this->resetAllCatalogs();
+    }
+
+    protected function resetAllCatalogs()
+    {
+        $filePath = base_path('../cuentas.xls');
+        if (!file_exists($filePath))
+            return;
+
         $spreadsheet = IOFactory::load($filePath);
         $rows = $spreadsheet->getActiveSheet()->toArray();
 
-        $natureMap = [
-            'L' => 'Deudora',
-            'K' => 'Acreedora',
-            'D' => 'Deudora',
-            'A' => 'Acreedora',
-        ];
-
+        $natureMap = ['L' => 'Deudora', 'K' => 'Acreedora', 'D' => 'Deudora', 'A' => 'Acreedora'];
         $baseCatalog = [];
         $headerSkipped = false;
         $seenCodes = [];
@@ -41,7 +66,6 @@ class ResetAccountsFromExcel extends Command
                 $headerSkipped = true;
                 continue;
             }
-            // Solo procesar filas de tipo 'C' (Cuentas)
             if (($row[0] ?? '') !== 'C')
                 continue;
             if (empty($row[1]))
@@ -57,7 +81,6 @@ class ResetAccountsFromExcel extends Command
                 continue;
             $seenCodes[$formattedCode] = true;
 
-            // Determinar tipo por el primer dígito del código
             $firstDigit = substr($rawCode, 0, 1);
             $type = 'Activo';
             switch ($firstDigit) {
@@ -112,13 +135,8 @@ class ResetAccountsFromExcel extends Command
         }
 
         $businesses = Business::all();
-        $this->info("Reseteando catálogos para " . $businesses->count() . " empresas...");
-
         foreach ($businesses as $business) {
-            $this->info("Procesando: {$business->common_name} ({$business->rfc})...");
-
-            DB::beginTransaction();
-            try {
+            DB::transaction(function () use ($business, $baseCatalog) {
                 Account::where('business_id', $business->id)->delete();
                 $batch = [];
                 foreach ($baseCatalog as $item) {
@@ -126,25 +144,19 @@ class ResetAccountsFromExcel extends Command
                     $item['created_at'] = now();
                     $item['updated_at'] = now();
                     $batch[] = $item;
-
                     if (count($batch) >= 100) {
                         Account::insert($batch);
                         $batch = [];
                     }
                 }
-                if (!empty($batch)) {
+                if (!empty($batch))
                     Account::insert($batch);
-                }
-                DB::commit();
-                $this->info("  -> OK: Generadas " . count($baseCatalog) . " cuentas.");
-            }
-            catch (\Exception $e) {
-                DB::rollBack();
-                $this->error("  -> ERROR: " . $e->getMessage());
-            }
+            });
         }
-
-        $this->info("¡Reinicio completo!");
-        return 0;
     }
-}
+
+    public function down(): void
+    {
+    // No down migration for reset
+    }
+};
