@@ -42,7 +42,7 @@ class ResetAccountsFromExcel extends Command
             $typeCode = strtoupper(trim((string)($row[0] ?? '')));
             $rawCode  = trim((string)($row[1] ?? ''));
             $name     = trim((string)($row[2] ?? ''));
-            if (empty($rawCode) || $typeCode !== 'F' || !empty($name)) continue;
+            if (empty($rawCode) || $typeCode === 'RF' || $typeCode !== 'F' || !empty($name)) continue;
             $fc = (strlen($rawCode) == 8 && is_numeric($rawCode))
                 ? substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3)
                 : $rawCode;
@@ -61,9 +61,11 @@ class ResetAccountsFromExcel extends Command
             if (empty($rawCode))
                 continue;
 
-            // Skip type=F rows with empty names — they are cash-flow markers, not real accounts
-            if (empty($name) && strtoupper(trim((string)$typeCode)) === 'F')
-                continue;
+            $tc = strtoupper(trim((string)$typeCode));
+            // Skip RF rows (NIF rubro references, not real accounts)
+            if ($tc === 'RF') continue;
+            // Skip type=F rows with empty names (cash-flow markers only)
+            if (empty($name) && $tc === 'F') continue;
 
             // Format code to AAA-BB-CCC if it has 8 digits
             $formattedCode = $rawCode;

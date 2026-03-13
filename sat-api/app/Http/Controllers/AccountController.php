@@ -67,7 +67,7 @@ class AccountController extends Controller
                 $tc = strtoupper(trim((string)($row[0] ?? '')));
                 $rc = trim((string)($row[1] ?? ''));
                 $nm = trim((string)($row[2] ?? ''));
-                if (empty($rc) || $tc !== 'F' || !empty($nm)) continue;
+                if (empty($rc) || $tc === 'RF' || $tc !== 'F' || !empty($nm)) continue;
                 $fc = (strlen($rc) == 8 && is_numeric($rc))
                     ? substr($rc, 0, 3) . '-' . substr($rc, 3, 2) . '-' . substr($rc, 5, 3)
                     : $rc;
@@ -85,9 +85,11 @@ class AccountController extends Controller
                 if (empty($rawCode))
                     continue;
 
+                $tc = strtoupper(trim((string)$typeCode));
+                // Skip RF rows (NIF rubro references, not real accounts)
+                if ($tc === 'RF') continue;
                 // Skip type=F rows with empty names (cash-flow markers only)
-                if (empty($name) && strtoupper(trim((string)$typeCode)) === 'F')
-                    continue;
+                if (empty($name) && $tc === 'F') continue;
 
                 $formattedCode = $rawCode;
                 if (strlen($rawCode) == 8 && is_numeric($rawCode)) {
