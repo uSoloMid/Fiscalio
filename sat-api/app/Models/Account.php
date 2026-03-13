@@ -26,7 +26,9 @@ class Account extends Model
         'is_cash_flow',
         'is_active',
         'description',
-        'balance'
+        'balance',
+        'nif_rubro',
+        'sat_agrupador'
     ];
 
     protected $casts = [

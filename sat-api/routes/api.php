@@ -25,7 +25,7 @@ Route::prefix('agent')->middleware('agent.secret')->group(function () {
     Route::get('sync-clients', [AgentController::class , 'syncClients']);
     Route::post('confirm-credentials', [AgentController::class , 'confirmCredentials']);
     Route::get('runner-tick', [AgentController::class , 'runnerTick']);
-    Route::post('upload-document', [\App\Http\Controllers\SatDocumentController::class, 'uploadFromAgent']);
+    Route::post('upload-document', [\App\Http\Controllers\SatDocumentController::class , 'uploadFromAgent']);
 });
 
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -115,6 +115,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/tags/{id}', [TagController::class , 'update']);
         Route::delete('/tags/{id}', [TagController::class , 'destroy']);
 
+        Route::post('/accounts/import', [\App\Http\Controllers\AccountController::class , 'importExcel']);
         Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
 
         // Bank Statements
@@ -126,25 +127,25 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/bank-movements/{id}', [\App\Http\Controllers\BankStatementController::class , 'updateMovement']);
 
         // Reconciliation
-        Route::get('/reconciliation/suggest/{statementId}', [\App\Http\Controllers\ReconciliationController::class, 'suggest']);
-        Route::post('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class, 'reconcile']);
-        Route::delete('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class, 'unreconcile']);
+        Route::get('/reconciliation/suggest/{statementId}', [\App\Http\Controllers\ReconciliationController::class , 'suggest']);
+        Route::post('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class , 'reconcile']);
+        Route::delete('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class , 'unreconcile']);
 
         // SAT Documents (CSF + Opinión 32-D)
-        Route::get('/sat-documents/missing', [\App\Http\Controllers\SatDocumentController::class, 'missing']);
-        Route::get('/sat-documents', [\App\Http\Controllers\SatDocumentController::class, 'index']);
-        Route::get('/sat-documents/{id}/download', [\App\Http\Controllers\SatDocumentController::class, 'download']);
+        Route::get('/sat-documents/missing', [\App\Http\Controllers\SatDocumentController::class , 'missing']);
+        Route::get('/sat-documents', [\App\Http\Controllers\SatDocumentController::class , 'index']);
+        Route::get('/sat-documents/{id}/download', [\App\Http\Controllers\SatDocumentController::class , 'download']);
 
         // Manual Scraper (XML Scraper)
-        Route::get('/scraper-manual', [Api\ScraperManualController::class, 'index']);
-        Route::get('/scraper-manual/stats', [Api\ScraperManualController::class, 'stats']);
-        Route::post('/scraper-manual/bulk', [Api\ScraperManualController::class, 'bulkQueue']);
-        Route::post('/scraper-manual/reset', [Api\ScraperManualController::class, 'resetQueue']);
+        Route::get('/scraper-manual', [Api\ScraperManualController::class , 'index']);
+        Route::get('/scraper-manual/stats', [Api\ScraperManualController::class , 'stats']);
+        Route::post('/scraper-manual/bulk', [Api\ScraperManualController::class , 'bulkQueue']);
+        Route::post('/scraper-manual/reset', [Api\ScraperManualController::class , 'resetQueue']);
     });
 
 // WhatsApp Business webhook (public — no auth)
-Route::get('/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'verify']);
-Route::post('/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class, 'webhook']);
+Route::get('/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class , 'verify']);
+Route::post('/whatsapp/webhook', [\App\Http\Controllers\WhatsAppController::class , 'webhook']);
 
 require __DIR__ . '/debug_routes.php';
 require __DIR__ . '/debug_cwd.php';

@@ -72,6 +72,8 @@ class AccountController extends Controller
                         'is_selectable' => $ma->is_selectable,
                         'is_postable' => $ma->is_postable,
                         'currency' => $ma->currency,
+                        'nif_rubro' => $ma->nif_rubro,
+                        'sat_agrupador' => $ma->sat_agrupador,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
@@ -147,6 +149,96 @@ class AccountController extends Controller
         }
     }
 
+    public function importExcel(Request $request)
+    {
+        $business = $this->getBusiness($request);
+        $file = $request->file('file');
+        if (!$file)
+            return response()->json(['message' => 'Archivo no encontrado'], 400);
+
+        $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getRealPath());
+        $rows = $spreadsheet->getActiveSheet()->toArray();
+
+        $batch = [];
+        $headerSkipped = false;
+        $count = 0;
+
+        // Type mapping
+        $typeMap = [
+            'A' => 'Activo',
+            'P' => 'Pasivo',
+            'C' => 'Capital',
+            'I' => 'Ingresos',
+            'E' => 'Egresos',
+            'G' => 'Egresos', // Gastos
+            'O' => 'Orden',
+        ];
+
+        // Nature mapping
+        $natureMap = [
+            'L' => 'Deudora',
+            'K' => 'Acreedora',
+            'D' => 'Deudora',
+            'A' => 'Acreedora',
+        ];
+
+        foreach ($rows as $row) {
+            if (!$headerSkipped) {
+                $headerSkipped = true;
+                continue;
+            }
+            if (empty($row[1]))
+                continue; // internal_code
+
+            $rawCode = trim($row[1]);
+            // Format 10101001 -> 101-01-001 or similar if needed
+            // For now, we will store it as is or try to match the AAA-BB-CCC pattern
+            $formattedCode = $rawCode;
+            if (strlen($rawCode) == 8) {
+                $formattedCode = substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3);
+            }
+
+            $parentCode = trim($row[4] ?? '');
+            if (strlen($parentCode) == 8) {
+                $parentCode = substr($parentCode, 0, 3) . '-' . substr($parentCode, 3, 2) . '-' . substr($parentCode, 5, 3);
+            }
+            if ($parentCode === '0' || $parentCode === '00000000')
+                $parentCode = null;
+
+            $batch[] = [
+                'business_id' => $business->id,
+                'is_custom' => true,
+                'internal_code' => $formattedCode,
+                'sat_code' => $row[16] ?? null,
+                'sat_agrupador' => $row[16] ?? null,
+                'name' => trim($row[2]),
+                'level' => (int)($row[7] ?? 1),
+                'type' => $typeMap[strtoupper($row[0] ?? '')] ?? 'Activo',
+                'naturaleza' => $natureMap[strtoupper($row[5] ?? '')] ?? 'Deudora',
+                'parent_code' => $parentCode,
+                'nif_rubro' => trim($row[10] ?? ''),
+                'is_selectable' => true,
+                'is_postable' => ((int)($row[7] ?? 1) >= 2),
+                'currency' => 'MXN',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+
+            if (count($batch) >= 100) {
+                Account::upsert($batch, ['business_id', 'internal_code'], ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code', 'sat_agrupador', 'nif_rubro', 'is_postable']);
+                $count += count($batch);
+                $batch = [];
+            }
+        }
+
+        if (!empty($batch)) {
+            Account::upsert($batch, ['business_id', 'internal_code'], ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code', 'sat_agrupador', 'nif_rubro', 'is_postable']);
+            $count += count($batch);
+        }
+
+        return response()->json(['message' => "Se importaron/actualizaron $count cuentas correctamente."]);
+    }
+
     public function show(Request $request, $id)
     {
         $business = $this->getBusiness($request);
@@ -174,10 +266,26 @@ class AccountController extends Controller
             'is_postable' => 'boolean',
             'generate_auxiliaries' => 'boolean',
             'currency' => 'string|max:3',
-            'is_cash_flow' => 'boolean',
             'is_active' => 'boolean',
-            'description' => 'nullable|string'
+            'description' => 'nullable|string',
+            'nif_rubro' => 'nullable|string',
+            'sat_agrupador' => 'nullable|string',
         ]);
+
+        if (!empty($validated['parent_code'])) {
+            $parent = Account::where('business_id', $business->id)
+                ->where('internal_code', $validated['parent_code'])
+                ->first();
+
+            if ($parent) {
+                if (empty($validated['nif_rubro'])) {
+                    $validated['nif_rubro'] = $parent->nif_rubro;
+                }
+                if (empty($validated['sat_agrupador'])) {
+                    $validated['sat_agrupador'] = $parent->sat_agrupador;
+                }
+            }
+        }
 
         $validated['business_id'] = $business->id;
         $validated['is_custom'] = true;
@@ -209,9 +317,10 @@ class AccountController extends Controller
             'is_postable' => 'boolean',
             'generate_auxiliaries' => 'boolean',
             'currency' => 'string|max:3',
-            'is_cash_flow' => 'boolean',
             'is_active' => 'boolean',
-            'description' => 'nullable|string'
+            'description' => 'nullable|string',
+            'nif_rubro' => 'nullable|string',
+            'sat_agrupador' => 'nullable|string',
         ]);
 
         $account->update($validated);

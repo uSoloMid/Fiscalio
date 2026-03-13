@@ -22,6 +22,7 @@
         "phpcfdi/rfc": "^1.1.0",
         "phpcfdi/sat-estado-cfdi": "^2.0",
         "phpcfdi/sat-ws-descarga-masiva": "^0.5",
+        "phpoffice/phpspreadsheet": "^5.5",
         "simplesoftwareio/simple-qrcode": "^4.2"
     },
     "require-dev": {
