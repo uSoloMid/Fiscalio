@@ -238,10 +238,11 @@ export async function exportAccountsExcel(rfc: string, clientName?: string): Pro
     URL.revokeObjectURL(url);
 }
 
-export async function importAccountsTxt(file: File, rfc: string): Promise<any> {
+export async function importAccountsTxt(file: File, rfc: string, mode: 'upsert' | 'new_only' = 'upsert'): Promise<any> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('rfc', rfc);
+    formData.append('mode', mode);
 
     const response = await authFetch(`${API_BASE_URL}/api/accounts/import-txt`, {
         method: 'POST',

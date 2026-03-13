@@ -330,6 +330,9 @@ class AccountController extends Controller
         if (!$file)
             return response()->json(['message' => 'Archivo no encontrado'], 400);
 
+        // mode: 'upsert' (default) = update existing + add new | 'new_only' = skip existing
+        $mode = $request->input('mode', 'upsert');
+
         $content = file_get_contents($file->getRealPath());
         // Contpaqi TXT files are typically exported in Windows-1252 (latin1) encoding
         if (!mb_check_encoding($content, 'UTF-8')) {
@@ -402,25 +405,21 @@ class AccountController extends Controller
             if (isset($seenCodes[$formattedCode])) continue;
             $seenCodes[$formattedCode] = true;
 
-            // Parent code at fixed position 134-141 (may be 6 digits = first 6 of 8-digit code)
+            // Parent code at fixed position 136-143 (always 8 digits in Contpaqi TXT)
             $parentCode = null;
-            if (strlen($line) > 134) {
-                $parentRaw = trim(substr($line, 134, 8));
-                $parentRaw = ltrim($parentRaw, '0') ? $parentRaw : ''; // keep as-is but detect all-zero
-                if (!empty($parentRaw) && is_numeric($parentRaw)
-                    && $parentRaw !== '00000000' && $parentRaw !== '000000' && $parentRaw !== '0') {
-                    // Pad to 8 digits (TXT stores only first 6 significant digits)
-                    $parentPadded = str_pad($parentRaw, 8, '0');
-                    $parentCode = substr($parentPadded, 0, 3) . '-' . substr($parentPadded, 3, 2) . '-' . substr($parentPadded, 5, 3);
+            if (strlen($line) > 143) {
+                $parentRaw = substr($line, 136, 8);
+                if (is_numeric($parentRaw) && $parentRaw !== '00000000') {
+                    $parentCode = substr($parentRaw, 0, 3) . '-' . substr($parentRaw, 3, 2) . '-' . substr($parentRaw, 5, 3);
                 }
             }
 
-            // Nature at position 163, level at position 167
-            $nature     = strlen($line) > 163 ? trim(substr($line, 163, 1)) : 'L';
+            // Nature at position 167, level at position 171 (Contpaqi TXT fixed-width)
+            $nature     = strlen($line) > 167 ? trim(substr($line, 167, 1)) : 'L';
             $naturaleza = $natureMap[strtoupper($nature)] ?? 'Deudora';
             $level = 1;
-            if (strlen($line) > 167) {
-                $lvl = trim(substr($line, 167, 1));
+            if (strlen($line) > 171) {
+                $lvl = trim(substr($line, 171, 1));
                 if (is_numeric($lvl)) $level = (int)$lvl;
             }
 
@@ -465,22 +464,31 @@ class AccountController extends Controller
             ];
 
             if (count($batch) >= 100) {
-                Account::upsert($batch, ['business_id', 'internal_code'],
-                    ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code',
-                     'sat_agrupador', 'nif_rubro', 'is_postable', 'is_cash_flow']);
+                if ($mode === 'new_only') {
+                    DB::table('accounts')->insertOrIgnore($batch);
+                } else {
+                    Account::upsert($batch, ['business_id', 'internal_code'],
+                        ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code',
+                         'sat_agrupador', 'nif_rubro', 'is_postable', 'is_cash_flow']);
+                }
                 $count += count($batch);
                 $batch = [];
             }
         }
 
         if (!empty($batch)) {
-            Account::upsert($batch, ['business_id', 'internal_code'],
-                ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code',
-                 'sat_agrupador', 'nif_rubro', 'is_postable', 'is_cash_flow']);
+            if ($mode === 'new_only') {
+                DB::table('accounts')->insertOrIgnore($batch);
+            } else {
+                Account::upsert($batch, ['business_id', 'internal_code'],
+                    ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code',
+                     'sat_agrupador', 'nif_rubro', 'is_postable', 'is_cash_flow']);
+            }
             $count += count($batch);
         }
 
-        return response()->json(['message' => "Se importaron/actualizaron {$count} cuentas desde TXT Contpaqi."]);
+        $modeLabel = $mode === 'new_only' ? 'nuevas cuentas agregadas' : 'cuentas importadas/actualizadas';
+        return response()->json(['message' => "Se procesaron {$count} {$modeLabel} desde TXT Contpaqi.", 'imported' => $count]);
     }
 
     public function importExcel(Request $request)

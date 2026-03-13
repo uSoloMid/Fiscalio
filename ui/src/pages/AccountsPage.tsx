@@ -24,6 +24,7 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Account>>({});
     const [focusCode, setFocusCode] = useState<string | null>(null);
+    const [importModal, setImportModal] = useState<{ file: File } | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -216,35 +217,35 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
         fileInputRef.current?.click();
     };
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const doImport = async (mode: 'upsert' | 'new_only') => {
+        if (!importModal) return;
+        const { file } = importModal;
+        setImportModal(null);
+        const fileName = file.name.toLowerCase();
+        try {
+            setLoading(true);
+            let result: any;
+            if (fileName.endsWith('.txt')) {
+                result = await importAccountsTxt(file, activeRfc, mode);
+            } else {
+                result = await importAccountsExcel(file, activeRfc);
+            }
+            alert(result.message || 'Catálogo importado correctamente');
+            await fetchAccounts();
+        } catch (error: any) {
+            alert(error.message || 'Error al importar');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
+        e.target.value = '';
         const fileName = file.name.toLowerCase();
-        if (fileName.endsWith('.txt')) {
-            try {
-                setLoading(true);
-                const result = await importAccountsTxt(file, activeRfc);
-                alert(`Catálogo importado correctamente desde TXT: ${result.imported ?? ''} cuentas`);
-                await fetchAccounts();
-            } catch (error: any) {
-                alert(error.message || 'Error al importar TXT');
-            } finally {
-                setLoading(false);
-            }
-            return;
-        }
-        if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
-            try {
-                setLoading(true);
-                await importAccountsExcel(file, activeRfc);
-                alert('Catálogo importado correctamente desde Excel');
-                await fetchAccounts();
-            } catch (error: any) {
-                alert(error.message || 'Error al importar Excel');
-            } finally {
-                setLoading(false);
-            }
+        if (fileName.endsWith('.txt') || fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+            setImportModal({ file });
             return;
         }
 
@@ -717,5 +718,43 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                 )}
             </aside>
         </div>
+
+        {/* Import mode modal */}
+        {importModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm mx-4">
+                    <h2 className="text-lg font-black text-gray-900 mb-1">Importar catálogo</h2>
+                    <p className="text-sm text-gray-500 mb-6">{importModal.file.name}</p>
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={() => doImport('upsert')}
+                            className="w-full py-3.5 px-4 rounded-2xl bg-blue-500 text-white font-bold text-sm hover:bg-blue-600 transition-all text-left flex items-start gap-3"
+                        >
+                            <span className="material-symbols-outlined text-xl mt-0.5">sync</span>
+                            <span>
+                                <span className="block">Actualizar existentes + agregar nuevas</span>
+                                <span className="font-normal opacity-80">Reemplaza nombre, nivel y datos de cuentas ya existentes</span>
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => doImport('new_only')}
+                            className="w-full py-3.5 px-4 rounded-2xl bg-emerald-500 text-white font-bold text-sm hover:bg-emerald-600 transition-all text-left flex items-start gap-3"
+                        >
+                            <span className="material-symbols-outlined text-xl mt-0.5">add_circle</span>
+                            <span>
+                                <span className="block">Solo agregar cuentas nuevas</span>
+                                <span className="font-normal opacity-80">No modifica cuentas que ya existen</span>
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setImportModal(null)}
+                            className="w-full py-2.5 text-gray-400 text-sm hover:text-gray-600 transition-all"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     );
 };
