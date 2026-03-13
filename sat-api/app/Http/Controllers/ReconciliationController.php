@@ -41,8 +41,9 @@ class ReconciliationController extends Controller
             $month = $monthsMap[$m[1]] ?? 0;
             $year = (int)$m[2];
             if ($month > 0) {
-                $startDate = Carbon::create($year, $month, 1)->subMonth()->startOfMonth();
-                $endDate = Carbon::create($year, $month, 1)->endOfMonth()->addDays(15); 
+                // Expand range: 2 months before and up to the end of the next month
+                $startDate = Carbon::create($year, $month, 1)->subMonths(2)->startOfMonth();
+                $endDate = Carbon::create($year, $month, 1)->addMonth()->endOfMonth(); 
                 $query->whereBetween('fecha', [$startDate, $endDate]);
             }
         }
@@ -152,37 +153,43 @@ class ReconciliationController extends Controller
         $candidates = [];
 
         foreach ($cfdis as $cfdi) {
-            if ($isEgreso  && !in_array($cfdi->tipo, ['E', 'P'])) continue;
-            if (!$isEgreso && !in_array($cfdi->tipo, ['I', 'P'])) continue;
-
-            if ($cfdi->moneda !== 'MXN' && $cfdi->tipo_cambio != 1) continue;
-
-            if ($cfdi->tipo === 'I') {
-                if (!$isEgreso && $cfdi->rfc_emisor !== $businessRfc) continue;
-                if ($isEgreso && $cfdi->rfc_receptor !== $businessRfc) continue;
-                if ($cfdi->metodo_pago === 'PPD') continue;
-                if ($cfdi->metodo_pago === 'PUE') {
-                    $cfdiDate = Carbon::parse($cfdi->fecha);
-                    if ($cfdiDate->format('Y-m') !== $movDate->format('Y-m')) continue;
-                }
+            // Basic filtering based on Business participation
+            if ($isEgreso) {
+                // For money out (cargos), we want:
+                // 1. Invoices from suppliers (tipo I, we are receptor) - GASTOS
+                // 2. Payments to suppliers (tipo P, we are receptor) - REPs
+                // 3. Credit notes we issued (tipo E, we are emisor)
+                if ($cfdi->tipo === 'I' && $cfdi->rfc_receptor !== $businessRfc) continue;
+                if ($cfdi->tipo === 'P' && $cfdi->rfc_receptor !== $businessRfc) continue;
+                if ($cfdi->tipo === 'E' && $cfdi->rfc_emisor !== $businessRfc) continue;
+            } else {
+                // For money in (abonos), we want:
+                // 1. Invoices to clients (tipo I, we are emisor) - INGRESOS
+                // 2. Payments from clients (tipo P, we are emisor) - REPs
+                // 3. Credit notes from suppliers (tipo E, we are receptor)
+                if ($cfdi->tipo === 'I' && $cfdi->rfc_emisor !== $businessRfc) continue;
+                if ($cfdi->tipo === 'P' && $cfdi->rfc_emisor !== $businessRfc) continue;
+                if ($cfdi->tipo === 'E' && $cfdi->rfc_receptor !== $businessRfc) continue;
             }
 
-            if ($cfdi->tipo === 'E' && $cfdi->rfc_emisor !== $businessRfc) continue;
+            // Simple currency check for now
+            if ($cfdi->moneda !== 'MXN' && $cfdi->tipo_cambio != 1) continue;
+
+            $cfdiDate = Carbon::parse($cfdi->fecha);
 
             if ($cfdi->tipo === 'P') {
-                if (!$isEgreso && $cfdi->rfc_emisor  !== $businessRfc) continue;
-                if ($isEgreso  && $cfdi->rfc_receptor !== $businessRfc) continue;
-
                 $propios = $cfdi->pagosPropios;
                 if ($propios->isEmpty()) continue;
 
                 $repTotal  = (float) $propios->sum('monto_pagado');
-                if (abs($repTotal - $amount) > 0.02) continue;
+                if (abs($repTotal - $amount) > 0.05) continue; 
 
-                $payDate  = Carbon::parse($propios->first()->fecha_pago);
-                if ($payDate->format('Y-m') !== $movDate->format('Y-m')) continue;
-
+                $pagoData = $propios->first();
+                $payDate  = Carbon::parse($pagoData->fecha_pago);
+                
                 $daysDiff = (int) abs($movDate->diffInDays($payDate));
+                if ($daysDiff > 35) continue;
+
                 $confidence = $this->computeConfidence($daysDiff, $cfdi, $businessRfc, $extractedRfc, $extractedName, $learnedRfcs, $isEgreso);
                 $relatedUuids = $propios->pluck('uuid_relacionado')->filter()->values()->all();
 
@@ -207,10 +214,11 @@ class ReconciliationController extends Controller
                 continue;
             }
 
-            if (abs($cfdi->total - $amount) > 0.02) continue;
+            if (abs($cfdi->total - $amount) > 0.05) continue;
 
-            $cfdiDate   = Carbon::parse($cfdi->fecha);
-            $daysDiff   = (int) abs($movDate->diffInDays($cfdiDate));
+            $daysDiff = (int) abs($movDate->diffInDays($cfdiDate));
+            if ($daysDiff > 45) continue; 
+
             $confidence = $this->computeConfidence($daysDiff, $cfdi, $businessRfc, $extractedRfc, $extractedName, $learnedRfcs, $isEgreso);
 
             $candidates[] = [
@@ -233,9 +241,11 @@ class ReconciliationController extends Controller
             $ra = $this->confidenceRank($a['confidence']);
             $rb = $this->confidenceRank($b['confidence']);
             if ($ra !== $rb) return $rb <=> $ra;
-            $aIsRep = ($a['match_via'] === 'payment') ? 0 : 1;
-            $bIsRep = ($b['match_via'] === 'payment') ? 0 : 1;
-            if ($aIsRep !== $bIsRep) return $aIsRep <=> $bIsRep;
+            
+            $aIsP = $a['tipo'] === 'P' ? 1 : 0;
+            $bIsP = $b['tipo'] === 'P' ? 1 : 0;
+            if ($aIsP !== $bIsP) return $bIsP <=> $aIsP;
+
             return $a['days_diff'] <=> $b['days_diff'];
         });
 
@@ -245,14 +255,19 @@ class ReconciliationController extends Controller
     private function computeConfidence(int $daysDiff, Cfdi $cfdi, string $businessRfc, ?string $extractedRfc, ?string $extractedName, array $learnedRfcs, bool $isEgreso): string {
         $counterpartRfc  = $isEgreso ? $cfdi->rfc_emisor  : $cfdi->rfc_receptor;
         $counterpartName = $isEgreso ? ($cfdi->name_emisor ?? '') : ($cfdi->name_receptor ?? '');
-        if (in_array($counterpartRfc, $learnedRfcs)) return 'green';
+        
+        $isLearned = in_array($counterpartRfc, $learnedRfcs);
         $rfcInDesc = $extractedRfc && $extractedRfc === $counterpartRfc;
         $nameMatch = $extractedName && $counterpartName && $this->nameMatches($extractedName, $counterpartName);
-        $identityMatch = $rfcInDesc || $nameMatch;
-        if ($identityMatch && $daysDiff <= 10) return 'green';
+        
+        $identityMatch = $isLearned || $rfcInDesc || $nameMatch;
+
+        if ($identityMatch && $daysDiff <= 15) return 'green';
+        if ($identityMatch && $daysDiff <= 32) return 'green'; 
         if ($identityMatch) return 'yellow';
-        if ($daysDiff <= 5) return 'yellow';
-        return 'yellow'; 
+        if ($daysDiff <= 3) return 'yellow';
+        
+        return 'red'; 
     }
 
     private function confidenceRank(string $confidence): int {
@@ -266,12 +281,36 @@ class ReconciliationController extends Controller
 
     private function extractCounterpartName(string $description, bool $isEgreso): ?string {
         $desc = strtoupper($description);
+        
+        // Remove common noisy prefixes/suffixes
+        $noise = ['SPEI RECIBIDO', 'SPEI ENVIADO', 'TRANSFERENCIA INTERBANCARIA', 'TRASPASO ENTRE CUENTAS', 'PAGO FACTURA', 'IVA', 'RET', 'COMPRA', 'PAGO EN'];
+        foreach ($noise as $n) $desc = str_replace($n, '', $desc);
+
         if ($isEgreso) {
-            if (preg_match('/AL BENEF\\.?\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s]{4,60?})(?:\\s*[\\(\\[CTA]|$)/u', $desc, $m)) return trim($m[1]);
+            // Banamex / Generic "Beneficiary"
+            if (preg_match('/AL BENEF\\.?\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})(?:\\s*[\\(\\[CTA]|$)/u', $desc, $m)) return trim($m[1]);
+            // BBVA / SPEI
+            if (preg_match('/SPEI\\s+A\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})/u', $desc, $m)) return trim($m[1]);
+            // Generic "Pago a"
+            if (preg_match('/PAGO\\s+A\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})/u', $desc, $m)) return trim($m[1]);
+            // Santander / Banorte Transfers
+            if (preg_match('/(?:TRF|TRANSF)\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})(?:\\s+\\d{4,}|$)/u', $desc, $m)) return trim($m[1]);
         } else {
-            if (preg_match('/POR ORDEN DE\\s+(.{4,60?}?)(?:\\s+CTA\\.|$)/u', $desc, $m)) return trim($m[1]);
-            if (preg_match('/CLIENTE:\\s+(.{4,60?}?)(?:\\s+P[AÁ]|$)/u', $desc, $m)) return trim($m[1]);
+            // "Por orden de" (Received SPEI)
+            if (preg_match('/POR ORDEN DE\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})(?:\\s+CTA\\.|$)/u', $desc, $m)) return trim($m[1]);
+            // BBVA / SPEI Recibido
+            if (preg_match('/SPEI\\s+DE\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})/u', $desc, $m)) return trim($m[1]);
+            // "Cliente"
+            if (preg_match('/CLIENTE:\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})(?:\\s+P[AÁ]|$)/u', $desc, $m)) return trim($m[1]);
+            // Generic Depositor
+            if (preg_match('/DEP\\d?\\s+([A-ZÁÉÍÓÚÜÑ,\\/\\s.]{4,60?})/u', $desc, $m)) return trim($m[1]);
         }
+        
+        $cleaned = trim(preg_replace('/\\s+/', ' ', $desc));
+        if (strlen($cleaned) >= 5 && strlen($cleaned) <= 60 && !preg_match('/\\d{5,}/', $cleaned)) {
+            return $cleaned;
+        }
+
         return null;
     }
 
