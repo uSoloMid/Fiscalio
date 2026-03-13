@@ -212,28 +212,6 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
         }
     };
 
-    const handleExport = (format: 'csv' | 'json') => {
-        let content = '';
-        const timestamp = new Date().toISOString().split('T')[0];
-        const filename = `Catalogo_${clientName}_${timestamp}.${format}`;
-
-        if (format === 'csv') {
-            const headers = ['Código Interno', 'Código SAT', 'Nombre', 'Nivel', 'Tipo', 'Naturaleza', 'Posteable'];
-            content = [headers.join(','), ...filteredAccounts.map(a =>
-                [`"${a.internal_code}"`, `"${a.sat_code}"`, `"${a.name}"`, a.level, `"${a.type}"`, `"${a.naturaleza}"`, a.is_postable ? 'Sí' : 'No'].join(',')
-            )].join('\n');
-        } else {
-            content = JSON.stringify(filteredAccounts, null, 2);
-        }
-
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = filename;
-        link.click();
-    };
-
     const handleImportClick = () => {
         fileInputRef.current?.click();
     };

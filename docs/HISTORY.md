@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-03-12 — Cuentas: visual feedback árbol + export/import Excel Contpaqi
+
+**Commit estable:** `20044ec`
+- Visual feedback en árbol: cuenta seleccionada con azul intenso + icono coloreado; ancestros con azul suave
+- Endpoint `GET /accounts/export` genera `.xlsx` en formato Contpaqi (4 headers, columnas exactas)
+- `importExcel` corregido para saltar 4 filas de header (consistente con `seedCatalog`)
+- Botón de descarga exporta Excel Contpaqi en lugar de CSV
+- El catálogo ya era per-cliente (by `business_id`); la duplicación era por migraciones de reset global que ya corrieron
+
+---
+
 ## 2026-03-12 — Parser Inbursa robusto: dual-path fitz+OCR con validación aritmética
 
 **Commit estable:** (ver commit actual)
