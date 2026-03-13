@@ -323,6 +323,160 @@ class AccountController extends Controller
         ]);
     }
 
+    public function importTxt(Request $request)
+    {
+        $business = $this->getBusiness($request);
+        $file = $request->file('file');
+        if (!$file)
+            return response()->json(['message' => 'Archivo no encontrado'], 400);
+
+        $content = file_get_contents($file->getRealPath());
+        $lines   = explode("\n", str_replace(["\r\n", "\r"], "\n", $content));
+
+        $natureMap = ['L' => 'Deudora', 'K' => 'Acreedora', 'D' => 'Deudora', 'A' => 'Acreedora'];
+
+        // First pass: collect cash-flow codes and NIF rubros
+        // NIF rubro is on the RF line that immediately follows its C line
+        $cashFlowCodes = [];
+        $nifRubros     = []; // formattedCode => nif_rubro string
+        $lastCode      = null;
+
+        foreach ($lines as $line) {
+            if (strlen($line) < 4) continue;
+            $prefix = strtoupper(substr($line, 0, 2));
+
+            if ($prefix === 'RF') {
+                // Capture NIF rubro for the previous account
+                $nifRubro = trim(substr($line, 3));
+                if ($lastCode && !empty($nifRubro)) {
+                    $nifRubros[$lastCode] = $nifRubro;
+                }
+                $lastCode = null;
+                continue;
+            }
+
+            $tc      = strtoupper(substr($line, 0, 1));
+            $rawCode = trim(substr($line, 3, 8));
+            if (empty($rawCode) || !is_numeric($rawCode)) { $lastCode = null; continue; }
+
+            $fc = strlen($rawCode) == 8
+                ? substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3)
+                : $rawCode;
+
+            if ($tc === 'F') {
+                $name = strlen($line) > 34 ? trim(substr($line, 34, 50)) : '';
+                if (empty($name)) { $cashFlowCodes[$fc] = true; $lastCode = null; continue; }
+            }
+
+            $lastCode = $fc;
+        }
+
+        // Second pass: build accounts
+        $batch     = [];
+        $seenCodes = [];
+        $count     = 0;
+        $lastCode  = null;
+
+        foreach ($lines as $line) {
+            if (strlen($line) < 11) continue;
+            if (strtoupper(substr($line, 0, 2)) === 'RF') continue;
+
+            $typeCode = substr($line, 0, 1);
+            $tc       = strtoupper($typeCode);
+            $rawCode  = trim(substr($line, 3, 8));
+
+            if (empty($rawCode) || !is_numeric($rawCode)) continue;
+
+            $name = strlen($line) > 84 ? trim(substr($line, 34, 50)) : (strlen($line) > 34 ? trim(substr($line, 34)) : '');
+
+            if (empty($name) && $tc === 'F') continue;
+
+            $formattedCode = strlen($rawCode) == 8
+                ? substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3)
+                : $rawCode;
+
+            if (isset($seenCodes[$formattedCode])) continue;
+            $seenCodes[$formattedCode] = true;
+
+            // Parent code at fixed position 134-141
+            $parentCode = null;
+            if (strlen($line) > 141) {
+                $parentRaw = trim(substr($line, 134, 8));
+                if (!empty($parentRaw) && is_numeric($parentRaw) && $parentRaw !== '00000000' && $parentRaw !== '0') {
+                    $parentCode = strlen($parentRaw) == 8
+                        ? substr($parentRaw, 0, 3) . '-' . substr($parentRaw, 3, 2) . '-' . substr($parentRaw, 5, 3)
+                        : $parentRaw;
+                }
+            }
+
+            // Nature at position 163, level at position 167
+            $nature     = strlen($line) > 163 ? trim(substr($line, 163, 1)) : 'L';
+            $naturaleza = $natureMap[strtoupper($nature)] ?? 'Deudora';
+            $level = 1;
+            if (strlen($line) > 167) {
+                $lvl = trim(substr($line, 167, 1));
+                if (is_numeric($lvl)) $level = (int)$lvl;
+            }
+
+            // Type by first digit
+            $firstDigit = substr($rawCode, 0, 1);
+            switch ($firstDigit) {
+                case '1': $type = 'Activo'; break;
+                case '2': $type = 'Pasivo'; break;
+                case '3': $type = 'Capital'; break;
+                case '4': $type = 'Ingresos'; break;
+                case '5': case '6': case '7': $type = 'Egresos'; break;
+                default: $type = 'Orden'; break;
+            }
+
+            // SAT agrupador = last non-whitespace token of the C line
+            $parts   = preg_split('/\s+/', rtrim($line));
+            $lastTok = end($parts);
+            $satCode = ($lastTok && $lastTok !== '0') ? $lastTok : '';
+
+            // NIF rubro comes from the RF line collected in first pass
+            $nifRubro = $nifRubros[$formattedCode] ?? '';
+
+            $batch[] = [
+                'business_id'   => $business->id,
+                'is_custom'     => false,
+                'internal_code' => $formattedCode,
+                'sat_code'      => $satCode,
+                'sat_agrupador' => $satCode,
+                'name'          => $name ?: 'S/N (' . $typeCode . ')',
+                'level'         => $level,
+                'type'          => $type,
+                'naturaleza'    => $naturaleza,
+                'parent_code'   => $parentCode,
+                'nif_rubro'     => $nifRubro,
+                'is_selectable' => true,
+                'is_postable'   => ($level >= 2),
+                'currency'      => 'MXN',
+                'is_cash_flow'  => isset($cashFlowCodes[$formattedCode]),
+                'is_active'     => true,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ];
+
+            if (count($batch) >= 100) {
+                Account::upsert($batch, ['business_id', 'internal_code'],
+                    ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code',
+                     'sat_agrupador', 'nif_rubro', 'is_postable', 'is_cash_flow']);
+                $count += count($batch);
+                $batch = [];
+            }
+        }
+
+        if (!empty($batch)) {
+            Account::upsert($batch, ['business_id', 'internal_code'],
+                ['name', 'level', 'type', 'naturaleza', 'parent_code', 'sat_code',
+                 'sat_agrupador', 'nif_rubro', 'is_postable', 'is_cash_flow']);
+            $count += count($batch);
+        }
+
+        return response()->json(['message' => "Se importaron/actualizaron {$count} cuentas desde TXT Contpaqi."]);
+    }
+
     public function importExcel(Request $request)
     {
         $business = $this->getBusiness($request);

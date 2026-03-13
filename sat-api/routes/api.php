@@ -117,6 +117,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         Route::get('/accounts/export', [\App\Http\Controllers\AccountController::class , 'exportExcel']);
         Route::post('/accounts/import', [\App\Http\Controllers\AccountController::class , 'importExcel']);
+        Route::post('/accounts/import-txt', [\App\Http\Controllers\AccountController::class , 'importTxt']);
         Route::apiResource('accounts', \App\Http\Controllers\AccountController::class);
 
         // Bank Statements

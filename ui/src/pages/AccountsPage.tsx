@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { listAccounts, updateAccount, createAccount, importAccountsExcel, exportAccountsExcel } from '../services';
+import { listAccounts, updateAccount, createAccount, importAccountsExcel, importAccountsTxt, exportAccountsExcel } from '../services';
 import type { Account } from '../models';
 
 interface TreeNode extends Account {
@@ -221,6 +221,19 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
         if (!file) return;
 
         const fileName = file.name.toLowerCase();
+        if (fileName.endsWith('.txt')) {
+            try {
+                setLoading(true);
+                const result = await importAccountsTxt(file, activeRfc);
+                alert(`Catálogo importado correctamente desde TXT: ${result.imported ?? ''} cuentas`);
+                await fetchAccounts();
+            } catch (error: any) {
+                alert(error.message || 'Error al importar TXT');
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
         if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
             try {
                 setLoading(true);
@@ -439,7 +452,7 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                         <button onClick={handleImportClick} className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-2xl transition-all" title="Importar JSON">
                             <span className="material-symbols-outlined">publish</span>
                         </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json,.xls,.xlsx" />
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json,.xls,.xlsx,.txt" />
                         <button onClick={handleExportExcel} className="p-2.5 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-2xl transition-all" title="Exportar Excel (formato Contpaqi)">
                             <span className="material-symbols-outlined">download</span>
                         </button>
