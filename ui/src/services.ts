@@ -226,6 +226,22 @@ export async function deleteAccount(id: number, rfc: string): Promise<void> {
     if (!response.ok) throw new Error('Error deleting account');
 }
 
+export async function importAccountsExcel(file: File, rfc: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('rfc', rfc);
+
+    const response = await authFetch(`${API_BASE_URL}/api/accounts/import`, {
+        method: 'POST',
+        body: formData
+    });
+    if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.message || 'Error al importar catálogo');
+    }
+    return response.json();
+}
+
 export async function getRecentRequests(): Promise<any[]> {
     const response = await authFetch(`${API_BASE_URL}/api/sat/recent-requests`);
     if (!response.ok) throw new Error('Error fetching recent requests');

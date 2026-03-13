@@ -132,6 +132,8 @@ export interface Account {
     is_custom: boolean;
     balance: number;
     description?: string;
+    nif_rubro?: string;
+    sat_agrupador?: string;
     created_at?: string;
     updated_at?: string;
     // UI fields

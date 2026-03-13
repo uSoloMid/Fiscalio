@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { listAccounts, updateAccount, createAccount } from '../services';
+import { listAccounts, updateAccount, createAccount, deleteAccount, importAccountsExcel } from '../services';
 import type { Account } from '../models';
 
 interface TreeNode extends Account {
@@ -224,17 +224,33 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
         const file = e.target.files?.[0];
         if (!file) return;
 
+        const fileName = file.name.toLowerCase();
+        if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
+            try {
+                setLoading(true);
+                await importAccountsExcel(file, activeRfc);
+                alert('Catálogo importado correctamente desde Excel');
+                await fetchAccounts();
+            } catch (error: any) {
+                alert(error.message || 'Error al importar Excel');
+            } finally {
+                setLoading(false);
+            }
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = async (event) => {
             try {
                 const json = JSON.parse(event.target?.result as string);
                 if (Array.isArray(json)) {
-                    if (confirm(`¿Importar ${json.length} cuentas? Esto actualizará/creará cuentas según el código interno.`)) {
-                        fetchAccounts();
+                    if (confirm(`¿Importar ${json.length} cuentas? Esto actualmente solo se soporta vía Excel para sincronización masiva.`)) {
+                        // El backend ya tiene una ruta de import, podríamos adaptarla o simplemente avisar
+                        alert("Por ahora usa el formato Excel (.xls) para importaciones.");
                     }
                 }
             } catch (error) {
-                alert("Formato de archivo inválido. Usa JSON exportado.");
+                alert("Formato de archivo inválido. Usa JSON exportado o Excel.");
             }
         };
         reader.readAsText(file);
@@ -405,7 +421,7 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                         <button onClick={handleImportClick} className="p-2.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-2xl transition-all" title="Importar JSON">
                             <span className="material-symbols-outlined">publish</span>
                         </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json,.xls,.xlsx" />
                         <button onClick={() => handleExport('csv')} className="p-2.5 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-2xl transition-all" title="Exportar CSV">
                             <span className="material-symbols-outlined">download</span>
                         </button>
@@ -469,6 +485,8 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                                     <tr>
                                         <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Código Interno</th>
                                         <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Nombre de la Cuenta</th>
+                                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Rubro NIF</th>
+                                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">SAT Agrupador</th>
                                         <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Vínculo SAT</th>
                                         <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Tipo / Clasificación</th>
                                         <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Posteable</th>
@@ -487,6 +505,8 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                                                     )}
                                                 </div>
                                             </td>
+                                            <td className="px-8 py-5 text-[10px] font-black text-gray-400 font-mono tracking-widest">{acc.nif_rubro || '-'}</td>
+                                            <td className="px-8 py-5 text-[10px] font-black text-emerald-500 font-mono tracking-widest">{acc.sat_agrupador || '-'}</td>
                                             <td className="px-8 py-5">
                                                 {acc.sat_code ? (
                                                     <div className="flex items-center gap-2">
@@ -619,6 +639,24 @@ export const AccountsPage = ({ onBack, clientName, activeRfc }: { onBack?: () =>
                                             <option value="Deudora">Deudora</option>
                                             <option value="Acreedora">Acreedora</option>
                                         </select>
+                                    </div>
+                                    <div className="flex flex-col gap-3">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Rubro NIF</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.nif_rubro || ''}
+                                            onChange={e => setEditForm({ ...editForm, nif_rubro: e.target.value })}
+                                            className="w-full px-5 py-3.5 rounded-[20px] border border-gray-100 bg-gray-50 text-xs font-bold"
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-3">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">SAT Agrupador</label>
+                                        <input
+                                            type="text"
+                                            value={editForm.sat_agrupador || ''}
+                                            onChange={e => setEditForm({ ...editForm, sat_agrupador: e.target.value })}
+                                            className="w-full px-5 py-3.5 rounded-[20px] border border-gray-100 bg-gray-50 text-xs font-bold"
+                                        />
                                     </div>
                                 </div>
                             </section>
