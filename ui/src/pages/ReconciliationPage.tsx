@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { listBankStatements, getReconciliationSuggestions, reconcileMovement } from '../services';
+import { listBankStatements, getReconciliationSuggestions, reconcileMovement, authFetch } from '../services';
+import { API_BASE_URL } from '../api/config';
 import { MovementReconcileRow } from '../components/MovementReconcileRow';
 import { ReconciliationSidebar } from '../components/ReconciliationSidebar';
 import type { BankStatement, BankMovement, ReconciliationStats } from '../models';
@@ -41,7 +42,12 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const [isSelectorOpen, setIsSelectorOpen] = useState(true);
     const [selectedMovement, setSelectedMovement] = useState<BankMovement | null>(null);
     const [filter, setFilter] = useState<'all' | 'pending' | 'reconciled'>('all');
-    const [colWidths, setColWidths] = useState([90, 340, 150, 150, 180, 48]);
+    const [colWidths, setColWidths] = useState([90, 280, 120, 120, 60, 100, 240, 140, 64]);
+
+    // PDF Viewer state
+    const [viewingUuid, setViewingUuid] = useState<string | null>(null);
+    const [viewBlobUrl, setViewBlobUrl] = useState<string | null>(null);
+    const [viewingTitle, setViewingTitle] = useState<string>('');
 
     // Added filters to match BankStatementPage and persist
     const [bankFilter, setBankFilter] = useState(() => localStorage.getItem('bank_filter') || 'all');
@@ -81,7 +87,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         window.addEventListener('mouseup', onUp);
     };
 
-    const COL_HEADERS = ['FECHA', 'DESCRIPCIÓN', 'CARGO (-)', 'ABONO (+)', 'ESTADO', ''];
+    const COL_HEADERS = ['FECHA', 'DESCRIPCIÓN', 'CARGO (-)', 'ABONO (+)', 'TIPO', 'FORMA PAGO', 'RFC / PROVEEDOR', 'ESTADO', ''];
 
     useEffect(() => {
         loadStatements();
@@ -143,11 +149,47 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
             if (!prev) return prev;
             const movements = prev.movements.map(m =>
                 m.id === movementId
-                    ? { ...m, cfdi_id: null, confidence: null, reconciled_at: null, is_reviewed: false }
+                    ? { ...m, cfdi_id: null, confidence: null, reconciled_at: null, is_reviewed: false, cfdi: null }
                     : m
             );
             return { movements, stats: computeStats(movements) };
         });
+    };
+
+    const handleViewPdf = async (uuid: string, title: string) => {
+        try {
+            const response = await authFetch(`${API_BASE_URL}/api/cfdis/${uuid}/pdf?inline=1`);
+            if (!response.ok) throw new Error('Error al cargar PDF');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            if (viewBlobUrl) URL.revokeObjectURL(viewBlobUrl);
+            setViewBlobUrl(url);
+            setViewingUuid(uuid);
+            setViewingTitle(title);
+        } catch (e) {
+            alert('No se pudo abrir el PDF');
+        }
+    };
+
+    const handleDownloadPdf = async (uuid: string) => {
+        try {
+            const response = await authFetch(`${API_BASE_URL}/api/cfdis/${uuid}/pdf`);
+            if (!response.ok) throw new Error('Error');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `CFDI_${uuid}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            alert('Error al descargar PDF');
+        }
+    };
+
+    const handleCloseViewer = () => {
+        setViewingUuid(null);
+        if (viewBlobUrl) { URL.revokeObjectURL(viewBlobUrl); setViewBlobUrl(null); }
     };
 
     const handleSelectMovement = (movement: BankMovement) => {
@@ -519,6 +561,8 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                                                 isSelected={selectedMovement?.id === m.id}
                                                 onSelect={handleSelectMovement}
                                                 onUnreconciled={handleMovementUnreconciled}
+                                                onViewPdf={handleViewPdf}
+                                                onDownloadPdf={handleDownloadPdf}
                                                 gridTemplate={gridTemplate}
                                             />
                                         ))}
@@ -560,6 +604,44 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                     />
                 )}
             </div>
+
+            {/* PDF Viewer Modal */}
+            {viewingUuid && viewBlobUrl && (
+                <div className="fixed inset-0 z-[100] bg-black/60 flex flex-col items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0 bg-gray-50/50">
+                            <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-red-500">picture_as_pdf</span>
+                                <div>
+                                    <p className="text-sm font-black text-gray-900 uppercase tracking-wide">Vista Previa CFDI</p>
+                                    <p className="text-[10px] font-bold text-gray-400 truncate max-w-md">{viewingTitle || viewingUuid}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleDownloadPdf(viewingUuid!)}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black rounded-xl transition-all uppercase tracking-widest shadow-sm shadow-blue-100"
+                                >
+                                    <span className="material-symbols-outlined text-base">download</span>
+                                    Descargar
+                                </button>
+                                <button
+                                    onClick={handleCloseViewer}
+                                    className="p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                        </div>
+                        <iframe
+                            src={`${viewBlobUrl}#toolbar=1&view=FitH`}
+                            className="flex-1 w-full"
+                            title="Visor PDF"
+                            style={{ border: 'none' }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
