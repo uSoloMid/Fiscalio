@@ -23,7 +23,7 @@ export function UsersPage({ onBack }: Props) {
 
     // Modal crear usuario
     const [showCreate, setShowCreate] = useState(false);
-    const [form, setForm] = useState({ name: '', email: '', password: '' });
+    const [form, setForm] = useState({ name: '', email: '', password: '', is_admin: false });
     const [formError, setFormError] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -64,7 +64,7 @@ export function UsersPage({ onBack }: Props) {
         try {
             await createUser(form);
             setShowCreate(false);
-            setForm({ name: '', email: '', password: '' });
+            setForm({ name: '', email: '', password: '', is_admin: false });
             loadAll();
         } catch (err: any) {
             setFormError(err.message);
@@ -275,6 +275,27 @@ export function UsersPage({ onBack }: Props) {
                                     placeholder="Mínimo 6 caracteres"
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-[#0C6B4B] focus:border-[#0C6B4B] outline-none"
                                 />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Rol</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(f => ({ ...f, is_admin: false }))}
+                                        className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${!form.is_admin ? 'bg-blue-50 border-blue-300 text-blue-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        Contador
+                                        <span className="block text-xs font-normal opacity-70 mt-0.5">Solo ve sus clientes</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(f => ({ ...f, is_admin: true }))}
+                                        className={`flex-1 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${form.is_admin ? 'bg-[#0C6B4B]/10 border-[#0C6B4B] text-[#0C6B4B]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        Admin
+                                        <span className="block text-xs font-normal opacity-70 mt-0.5">Ve todos los clientes</span>
+                                    </button>
+                                </div>
                             </div>
                             {formError && (
                                 <div className="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">{formError}</div>

@@ -616,7 +616,7 @@ export async function listUsers(): Promise<any[]> {
     return response.json();
 }
 
-export async function createUser(data: { name: string; email: string; password: string }): Promise<any> {
+export async function createUser(data: { name: string; email: string; password: string; is_admin?: boolean }): Promise<any> {
     const response = await authFetch(`${API_BASE_URL}/api/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

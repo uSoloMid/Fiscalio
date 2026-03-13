@@ -33,13 +33,14 @@ class UserController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
+            'is_admin' => 'boolean',
         ]);
 
         $user = User::create([
             'name'                 => $request->name,
             'email'                => $request->email,
             'password'             => Hash::make($request->password),
-            'is_admin'             => false,
+            'is_admin'             => $request->boolean('is_admin', false),
             'current_workspace_id' => $request->user()->current_workspace_id,
         ]);
 
@@ -57,9 +58,13 @@ class UserController extends Controller
             'name'     => 'sometimes|string|max:255',
             'email'    => "sometimes|email|unique:users,email,{$id}",
             'password' => 'sometimes|string|min:6',
+            'is_admin' => 'sometimes|boolean',
         ]);
 
         $data = $request->only(['name', 'email']);
+        if ($request->has('is_admin')) {
+            $data['is_admin'] = $request->boolean('is_admin');
+        }
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }
@@ -77,7 +82,6 @@ class UserController extends Controller
 
         $user = User::where('id', $id)
             ->where('current_workspace_id', $request->user()->current_workspace_id)
-            ->where('is_admin', false)
             ->firstOrFail();
 
         $user->delete();
