@@ -49,7 +49,76 @@ class AccountController extends Controller
 
     protected function seedCatalog($business)
     {
-        // Si existe el primer negocio (César), lo usamos como plantilla maestra porque está limpio y jerarquizado
+        $filePath = base_path('../cuentas.xls');
+        if (file_exists($filePath)) {
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+            $rows = $spreadsheet->getActiveSheet()->toArray();
+
+            $typeMap = ['A' => 'Activo', 'P' => 'Pasivo', 'C' => 'Capital', 'I' => 'Ingresos', 'E' => 'Egresos', 'G' => 'Egresos', 'O' => 'Orden'];
+            $natureMap = ['L' => 'Deudora', 'K' => 'Acreedora', 'D' => 'Deudora', 'A' => 'Acreedora'];
+
+            $batch = [];
+            $headerSkipped = false;
+            $seenCodes = [];
+
+            foreach ($rows as $row) {
+                if (!$headerSkipped) {
+                    $headerSkipped = true;
+                    continue;
+                }
+                if (empty($row[1]))
+                    continue;
+
+                $rawCode = trim((string)$row[1]);
+                $formattedCode = $rawCode;
+                if (strlen($rawCode) == 8) {
+                    $formattedCode = substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3);
+                }
+
+                if (isset($seenCodes[$formattedCode]))
+                    continue;
+                $seenCodes[$formattedCode] = true;
+
+                $parentCode = trim((string)($row[4] ?? '0'));
+                if (strlen($parentCode) == 8) {
+                    $parentCode = substr($parentCode, 0, 3) . '-' . substr($parentCode, 3, 2) . '-' . substr($parentCode, 5, 3);
+                }
+                if ($parentCode === '0' || $parentCode === '00000000')
+                    $parentCode = null;
+
+                $batch[] = [
+                    'business_id' => $business->id,
+                    'is_custom' => false,
+                    'internal_code' => $formattedCode,
+                    'sat_code' => $row[16] ?? '',
+                    'sat_agrupador' => $row[16] ?? '',
+                    'name' => trim($row[2] ?? 'S/N'),
+                    'level' => (int)($row[7] ?? 1),
+                    'type' => $typeMap[strtoupper($row[0] ?? '')] ?? 'Activo',
+                    'naturaleza' => $natureMap[strtoupper($row[5] ?? '')] ?? 'Deudora',
+                    'parent_code' => $parentCode,
+                    'nif_rubro' => trim((string)($row[10] ?? '')),
+                    'is_selectable' => true,
+                    'is_postable' => ((int)($row[7] ?? 1) >= 2),
+                    'currency' => 'MXN',
+                    'is_cash_flow' => false,
+                    'is_active' => true,
+                    'balance' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+
+                if (count($batch) >= 100) {
+                    Account::insert($batch);
+                    $batch = [];
+                }
+            }
+            if (!empty($batch))
+                Account::insert($batch);
+            return;
+        }
+
+        // Si existe el primer negocio (César), lo usamos como plantilla maestra
         $masterBusiness = \App\Models\Business::find(1);
         if ($masterBusiness && $masterBusiness->id !== $business->id) {
             $masterAccounts = Account::where('business_id', $masterBusiness->id)
