@@ -275,8 +275,14 @@ class ReconciliationController extends Controller
     }
 
     private function computeConfidence(int $daysDiff, Cfdi $cfdi, string $businessRfc, ?string $extractedRfc, ?string $extractedName, array $learnedRfcs, bool $isEgreso): string {
-        $counterpartRfc  = $isEgreso ? $cfdi->rfc_emisor  : $cfdi->rfc_receptor;
-        $counterpartName = $isEgreso ? ($cfdi->name_emisor ?? '') : ($cfdi->name_receptor ?? '');
+        // Nómina: el negocio es emisor, la contraparte es el receptor (empleado)
+        if ($cfdi->tipo === 'N') {
+            $counterpartRfc  = $cfdi->rfc_receptor;
+            $counterpartName = $cfdi->name_receptor ?? '';
+        } else {
+            $counterpartRfc  = $isEgreso ? $cfdi->rfc_emisor  : $cfdi->rfc_receptor;
+            $counterpartName = $isEgreso ? ($cfdi->name_emisor ?? '') : ($cfdi->name_receptor ?? '');
+        }
         
         $isLearned = in_array($counterpartRfc, $learnedRfcs);
         $rfcInDesc = $extractedRfc && $extractedRfc === $counterpartRfc;
@@ -379,7 +385,7 @@ class ReconciliationController extends Controller
         $isEgreso = $movement->cargo > 0;
         $keyword  = $this->extractKeyword($movement->description, $isEgreso);
         if (!$keyword) return;
-        $counterpartRfc = $isEgreso ? $cfdi->rfc_emisor : $cfdi->rfc_receptor;
+        $counterpartRfc = $cfdi->tipo === 'N' ? $cfdi->rfc_receptor : ($isEgreso ? $cfdi->rfc_emisor : $cfdi->rfc_receptor);
         if (!$counterpartRfc) return;
         ReconciliationPattern::withoutTimestamps(function () use ($businessId, $keyword, $counterpartRfc) {
             $existing = ReconciliationPattern::where('business_id', $businessId)->where('description_keyword', $keyword)->where('counterpart_rfc', $counterpartRfc)->first();
