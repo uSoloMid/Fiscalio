@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 class ResetAccountsFromExcel extends Command
 {
     protected $signature = 'accounts:reset-from-excel';
-    protected $description = 'Resets all account catalogs for all clients based on cuentas.xls';
+    protected $description = 'Resets all account catalogs for all clients based on cuentas.xls strictly following Contpaqi format';
 
     public function handle()
     {
@@ -33,23 +33,23 @@ class ResetAccountsFromExcel extends Command
         ];
 
         $baseCatalog = [];
-        $headerSkipped = false;
         $seenCodes = [];
 
-        foreach ($rows as $row) {
-            if (!$headerSkipped) {
-                $headerSkipped = true;
-                continue;
-            }
-            // Solo procesar filas de tipo 'C' (Cuentas)
-            if (($row[0] ?? '') !== 'C')
-                continue;
-            if (empty($row[1]))
+        // Skip first 4 rows (1 to 4) as they are headers/metadata
+        foreach ($rows as $idx => $row) {
+            if ($idx < 4)
                 continue;
 
-            $rawCode = trim((string)$row[1]);
+            $typeCode = $row[0] ?? '';
+            $rawCode = trim((string)($row[1] ?? ''));
+            $name = trim((string)($row[2] ?? ''));
+
+            if (empty($rawCode))
+                continue;
+
+            // Format code to AAA-BB-CCC if it has 8 digits
             $formattedCode = $rawCode;
-            if (strlen($rawCode) == 8) {
+            if (strlen($rawCode) == 8 && is_numeric($rawCode)) {
                 $formattedCode = substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3);
             }
 
@@ -57,7 +57,7 @@ class ResetAccountsFromExcel extends Command
                 continue;
             $seenCodes[$formattedCode] = true;
 
-            // Determinar tipo por el primer dígito del código
+            // Determine type by first character of code if not explicitly Activo/Pasivo
             $firstDigit = substr($rawCode, 0, 1);
             $type = 'Activo';
             switch ($firstDigit) {
@@ -83,18 +83,18 @@ class ResetAccountsFromExcel extends Command
                     break;
             }
 
-            $parentCode = trim((string)($row[4] ?? '0'));
-            if (strlen($parentCode) == 8) {
+            $parentCode = trim((string)($row[4] ?? ''));
+            if (strlen($parentCode) == 8 && is_numeric($parentCode)) {
                 $parentCode = substr($parentCode, 0, 3) . '-' . substr($parentCode, 3, 2) . '-' . substr($parentCode, 5, 3);
             }
-            if ($parentCode === '0' || $parentCode === '00000000')
+            if ($parentCode === '0' || $parentCode === '00000000' || empty($parentCode))
                 $parentCode = null;
 
             $baseCatalog[] = [
                 'internal_code' => $formattedCode,
-                'sat_code' => $row[16] ?? '',
-                'sat_agrupador' => $row[16] ?? '',
-                'name' => trim($row[2] ?? 'S/N'),
+                'sat_code' => trim((string)($row[16] ?? '')),
+                'sat_agrupador' => trim((string)($row[16] ?? '')),
+                'name' => $name ?: 'S/N (' . $typeCode . ')',
                 'level' => (int)($row[7] ?? 1),
                 'type' => $type,
                 'naturaleza' => $natureMap[strtoupper($row[5] ?? '')] ?? 'Deudora',
@@ -104,7 +104,7 @@ class ResetAccountsFromExcel extends Command
                 'is_postable' => ((int)($row[7] ?? 1) >= 2),
                 'generate_auxiliaries' => false,
                 'currency' => 'MXN',
-                'is_cash_flow' => false,
+                'is_cash_flow' => (strtoupper($typeCode) === 'F'),
                 'is_active' => true,
                 'balance' => 0,
                 'is_custom' => false,
@@ -119,7 +119,9 @@ class ResetAccountsFromExcel extends Command
 
             DB::beginTransaction();
             try {
-                Account::where('business_id', $business->id)->delete();
+                // ABSOLUTE DELETE
+                DB::table('accounts')->where('business_id', $business->id)->delete();
+
                 $batch = [];
                 foreach ($baseCatalog as $item) {
                     $item['business_id'] = $business->id;
@@ -128,15 +130,15 @@ class ResetAccountsFromExcel extends Command
                     $batch[] = $item;
 
                     if (count($batch) >= 100) {
-                        Account::insert($batch);
+                        DB::table('accounts')->insert($batch);
                         $batch = [];
                     }
                 }
                 if (!empty($batch)) {
-                    Account::insert($batch);
+                    DB::table('accounts')->insert($batch);
                 }
                 DB::commit();
-                $this->info("  -> OK: Generadas " . count($baseCatalog) . " cuentas.");
+                $this->info("  -> OK: " . count($baseCatalog) . " cuentas.");
             }
             catch (\Exception $e) {
                 DB::rollBack();

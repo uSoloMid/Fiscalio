@@ -61,19 +61,19 @@ class AccountController extends Controller
             $headerSkipped = false;
             $seenCodes = [];
 
-            foreach ($rows as $row) {
-                if (!$headerSkipped) {
-                    $headerSkipped = true;
-                    continue;
-                }
-                if (($row[0] ?? '') !== 'C')
-                    continue;
-                if (empty($row[1]))
+            foreach ($rows as $idx => $row) {
+                if ($idx < 4)
                     continue;
 
-                $rawCode = trim((string)$row[1]);
+                $typeCode = $row[0] ?? '';
+                $rawCode = trim((string)($row[1] ?? ''));
+                $name = trim((string)($row[2] ?? ''));
+
+                if (empty($rawCode))
+                    continue;
+
                 $formattedCode = $rawCode;
-                if (strlen($rawCode) == 8) {
+                if (strlen($rawCode) == 8 && is_numeric($rawCode)) {
                     $formattedCode = substr($rawCode, 0, 3) . '-' . substr($rawCode, 3, 2) . '-' . substr($rawCode, 5, 3);
                 }
 
@@ -106,20 +106,20 @@ class AccountController extends Controller
                         break;
                 }
 
-                $parentCode = trim((string)($row[4] ?? '0'));
-                if (strlen($parentCode) == 8) {
+                $parentCode = trim((string)($row[4] ?? ''));
+                if (strlen($parentCode) == 8 && is_numeric($parentCode)) {
                     $parentCode = substr($parentCode, 0, 3) . '-' . substr($parentCode, 3, 2) . '-' . substr($parentCode, 5, 3);
                 }
-                if ($parentCode === '0' || $parentCode === '00000000')
+                if ($parentCode === '0' || $parentCode === '00000000' || empty($parentCode))
                     $parentCode = null;
 
                 $batch[] = [
                     'business_id' => $business->id,
                     'is_custom' => false,
                     'internal_code' => $formattedCode,
-                    'sat_code' => $row[16] ?? '',
-                    'sat_agrupador' => $row[16] ?? '',
-                    'name' => trim($row[2] ?? 'S/N'),
+                    'sat_code' => trim((string)($row[16] ?? '')),
+                    'sat_agrupador' => trim((string)($row[16] ?? '')),
+                    'name' => $name ?: 'S/N (' . $typeCode . ')',
                     'level' => (int)($row[7] ?? 1),
                     'type' => $type,
                     'naturaleza' => $natureMap[strtoupper($row[5] ?? '')] ?? 'Deudora',
@@ -128,7 +128,7 @@ class AccountController extends Controller
                     'is_selectable' => true,
                     'is_postable' => ((int)($row[7] ?? 1) >= 2),
                     'currency' => 'MXN',
-                    'is_cash_flow' => false,
+                    'is_cash_flow' => (strtoupper($typeCode) === 'F'),
                     'is_active' => true,
                     'balance' => 0,
                     'created_at' => now(),
