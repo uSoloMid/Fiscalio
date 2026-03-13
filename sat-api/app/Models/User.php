@@ -43,4 +43,20 @@ class User extends Authenticatable
     {
         return $this->hasMany(Workspace::class , 'owner_id');
     }
+
+    /**
+     * Query base de businesses accesibles para este usuario.
+     * Admin: todos los del workspace. Contador: solo los asignados via business_user.
+     */
+    public function accessibleBusinessQuery()
+    {
+        $query = Business::where('workspace_id', $this->current_workspace_id);
+
+        if (!$this->is_admin) {
+            $assignedIds = $this->businesses()->pluck('businesses.id');
+            $query->whereIn('id', $assignedIds);
+        }
+
+        return $query;
+    }
 }

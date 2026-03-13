@@ -14,11 +14,15 @@ import { RecentRequests } from '../components/RecentRequests';
 export const DashboardPage = ({
     onSelectClient,
     onViewHistory,
-    onViewScraper
+    onViewScraper,
+    isAdmin = false,
+    onViewUsers,
 }: {
     onSelectClient: (rfc: string, name: string, lastSyncAt: string, validUntil: string) => void,
     onViewHistory: () => void,
-    onViewScraper: () => void
+    onViewScraper: () => void,
+    isAdmin?: boolean,
+    onViewUsers?: () => void,
 }) => {
     // Data states
     const [clients, setClients] = useState<any[]>([]);
@@ -409,6 +413,11 @@ export const DashboardPage = ({
                     <button onClick={onViewScraper} title="Scrapper Manual (Cola)" className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
                         <span className="material-symbols-outlined">rocket_launch</span>
                     </button>
+                    {isAdmin && onViewUsers && (
+                        <button onClick={onViewUsers} title="Gestión de usuarios" className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all">
+                            <span className="material-symbols-outlined">group</span>
+                        </button>
+                    )}
                     <button className="p-3 rounded-2xl text-gray-400 hover:bg-gray-50 transition-all opacity-40">
                         <span className="material-symbols-outlined">task</span>
                     </button>

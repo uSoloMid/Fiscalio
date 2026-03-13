@@ -601,3 +601,59 @@ export async function resetScraperQueue(): Promise<any> {
     if (!response.ok) throw new Error('Error al reiniciar cola');
     return response.json();
 }
+
+// ── Usuario actual ────────────────────────────────────────────────────────────
+export async function getCurrentUser(): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/user`);
+    if (!response.ok) return null;
+    return response.json();
+}
+
+// ── Gestión de usuarios (solo admin) ─────────────────────────────────────────
+export async function listUsers(): Promise<any[]> {
+    const response = await authFetch(`${API_BASE_URL}/api/users`);
+    if (!response.ok) throw new Error('Error cargando usuarios');
+    return response.json();
+}
+
+export async function createUser(data: { name: string; email: string; password: string }): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || Object.values(err.errors ?? {})[0] || 'Error al crear usuario');
+    }
+    return response.json();
+}
+
+export async function updateUser(id: number, data: { name?: string; email?: string; password?: string }): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || 'Error al actualizar usuario');
+    }
+    return response.json();
+}
+
+export async function deleteUser(id: number): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/users/${id}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error('Error al eliminar usuario');
+    return response.json();
+}
+
+export async function syncUserBusinesses(userId: number, businessIds: number[]): Promise<any> {
+    const response = await authFetch(`${API_BASE_URL}/api/users/${userId}/businesses`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_ids: businessIds }),
+    });
+    if (!response.ok) throw new Error('Error al asignar clientes');
+    return response.json();
+}

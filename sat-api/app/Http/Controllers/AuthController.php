@@ -25,8 +25,8 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'user' => $user,
-            'token' => $user->createToken('auth_token')->plainTextToken
+            'user'  => $user->load('currentWorkspace'),
+            'token' => $user->createToken('auth_token')->plainTextToken,
         ]);
     }
 

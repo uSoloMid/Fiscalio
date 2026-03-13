@@ -6,8 +6,8 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLoginSuccess }: LoginPageProps) {
-    const [email, setEmail] = useState('1');
-    const [password, setPassword] = useState('1');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -150,9 +150,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
 
                         <div className="mt-6 text-center text-sm">
                             <span className="text-gray-500">¿No tienes cuenta? </span>
-                            <a href="#" className="font-medium text-[#0C6B4B] hover:text-[#0a573b]">
-                                Regístrate
-                            </a>
+                            <span className="text-gray-400">Contacta a tu administrador.</span>
                         </div>
 
                     </div>

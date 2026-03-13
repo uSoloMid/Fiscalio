@@ -3,22 +3,26 @@ import { InvoicesPage } from './pages/InvoicesPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { SatRequestsHistoryPage } from './pages/SatRequestsHistoryPage'
 import { ScraperManualPage } from './pages/ScraperManualPage'
+import { UsersPage } from './pages/UsersPage'
 import { LoginPage } from './pages/LoginPage'
 import { ErrorBoundary } from './ErrorBoundary'
-import { getToken } from './services'
+import { getToken, getCurrentUser } from './services'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getToken());
+  const [currentUser, setCurrentUser] = useState<{ id: number; name: string; is_admin: boolean } | null>(null);
   const [activeRfc, setActiveRfc] = useState(localStorage.getItem('active_rfc') || '');
   const [activeClientName, setActiveClientName] = useState(localStorage.getItem('active_client_name') || '');
   const [activeLastSync, setActiveLastSync] = useState(localStorage.getItem('active_last_sync') || '');
   const [activeValidUntil, setActiveValidUntil] = useState(localStorage.getItem('active_valid_until') || '');
   const [showHistory, setShowHistory] = useState(false);
   const [showScraper, setShowScraper] = useState(false);
+  const [showUsers, setShowUsers] = useState(false);
 
   useEffect(() => {
     const handleAuthExpired = () => {
       setIsAuthenticated(false);
+      setCurrentUser(null);
     };
 
     window.addEventListener('auth_token_expired', handleAuthExpired);
@@ -26,6 +30,13 @@ function App() {
       window.removeEventListener('auth_token_expired', handleAuthExpired);
     };
   }, []);
+
+  // Cargar usuario actual al montar si ya está autenticado
+  useEffect(() => {
+    if (isAuthenticated && !currentUser) {
+      getCurrentUser().then(setCurrentUser);
+    }
+  }, [isAuthenticated]);
 
   const handleSelectClient = (rfc: string, name: string, lastSync: string = '', validUntil: string = '') => {
     localStorage.setItem('active_rfc', rfc);
@@ -51,8 +62,10 @@ function App() {
     setShowHistory(false);
   };
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = async () => {
     setIsAuthenticated(true);
+    const user = await getCurrentUser();
+    setCurrentUser(user);
   };
 
   if (!isAuthenticated) {
@@ -73,11 +86,15 @@ function App() {
         <SatRequestsHistoryPage onBack={() => setShowHistory(false)} />
       ) : showScraper ? (
         <ScraperManualPage onBack={() => setShowScraper(false)} />
+      ) : showUsers ? (
+        <UsersPage onBack={() => setShowUsers(false)} />
       ) : (
         <DashboardPage
           onSelectClient={handleSelectClient}
           onViewHistory={() => setShowHistory(true)}
           onViewScraper={() => setShowScraper(true)}
+          isAdmin={currentUser?.is_admin ?? false}
+          onViewUsers={() => setShowUsers(true)}
         />
       )}
     </ErrorBoundary>

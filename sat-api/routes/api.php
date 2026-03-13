@@ -143,6 +143,15 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/scraper-manual/stats', [Api\ScraperManualController::class , 'stats']);
         Route::post('/scraper-manual/bulk', [Api\ScraperManualController::class , 'bulkQueue']);
         Route::post('/scraper-manual/reset', [Api\ScraperManualController::class , 'resetQueue']);
+
+        // User management (solo admin)
+        Route::middleware('is_admin')->group(function () {
+            Route::get('/users', [\App\Http\Controllers\UserController::class , 'index']);
+            Route::post('/users', [\App\Http\Controllers\UserController::class , 'store']);
+            Route::put('/users/{id}', [\App\Http\Controllers\UserController::class , 'update']);
+            Route::delete('/users/{id}', [\App\Http\Controllers\UserController::class , 'destroy']);
+            Route::put('/users/{id}/businesses', [\App\Http\Controllers\UserController::class , 'syncBusinesses']);
+        });
     });
 
 // WhatsApp Business webhook (public — no auth)

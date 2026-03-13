@@ -14,7 +14,8 @@ class ClientController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Business::with(['group', 'tags'])->withCount('petitions');
+        $query = $request->user()->accessibleBusinessQuery()
+            ->with(['group', 'tags'])->withCount('petitions');
 
         if ($request->filled('q')) {
             $q = $request->q;
@@ -61,7 +62,7 @@ class ClientController extends Controller
     public function updateGroup(Request $request, $id)
     {
         $request->validate(['group_id' => 'nullable|exists:groups,id']);
-        $business = Business::findOrFail($id);
+        $business = $request->user()->accessibleBusinessQuery()->findOrFail($id);
         $business->update(['group_id' => $request->group_id]);
         return response()->json($business->load('group'));
     }
@@ -69,7 +70,7 @@ class ClientController extends Controller
     public function updateTags(Request $request, $id)
     {
         $request->validate(['tag_ids' => 'array', 'tag_ids.*' => 'exists:tags,id']);
-        $business = Business::findOrFail($id);
+        $business = $request->user()->accessibleBusinessQuery()->findOrFail($id);
         $business->tags()->sync($request->tag_ids);
         return response()->json($business->load('tags'));
     }
@@ -152,14 +153,15 @@ class ClientController extends Controller
         $business = Business::updateOrCreate(
         ['rfc' => strtoupper($request->rfc)],
         [
-            'legal_name' => $request->legal_name,
-            'common_name' => $request->common_name ?? $request->legal_name,
-            'certificate' => base64_encode($certContent),
-            'private_key' => base64_encode($keyContent),
-            'passphrase' => $request->passphrase,
-            'ciec' => $request->ciec,
-            'group_id' => $request->group_id,
-            'valid_until' => $validUntil,
+            'legal_name'   => $request->legal_name,
+            'common_name'  => $request->common_name ?? $request->legal_name,
+            'certificate'  => base64_encode($certContent),
+            'private_key'  => base64_encode($keyContent),
+            'passphrase'   => $request->passphrase,
+            'ciec'         => $request->ciec,
+            'group_id'     => $request->group_id,
+            'valid_until'  => $validUntil,
+            'workspace_id' => $request->user()->current_workspace_id,
         ]
         );
 
@@ -175,7 +177,7 @@ class ClientController extends Controller
             'passphrase' => 'nullable|string',
         ]);
 
-        $business = Business::findOrFail($id);
+        $business = $request->user()->accessibleBusinessQuery()->findOrFail($id);
         $business->update($request->only(['legal_name', 'common_name', 'ciec', 'passphrase']));
 
         return response()->json($business);
@@ -199,7 +201,7 @@ class ClientController extends Controller
         }
         $validUntil = $data ? date('Y-m-d H:i:s', $data['validTo_time_t']) : now()->addYears(4);
 
-        $business = Business::findOrFail($id);
+        $business = $request->user()->accessibleBusinessQuery()->findOrFail($id);
         $business->update([
             'certificate' => base64_encode($certContent),
             'private_key' => base64_encode($keyContent),
@@ -214,9 +216,9 @@ class ClientController extends Controller
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $business = Business::findOrFail($id);
+        $business = $request->user()->accessibleBusinessQuery()->findOrFail($id);
         $business->delete();
         return response()->json(['success' => true]);
     }
