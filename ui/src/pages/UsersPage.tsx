@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { listUsers, createUser, deleteUser, syncUserBusinesses } from '../services';
 import { listClients } from '../api/clients';
+import { listGroups } from '../api/groups';
 
 interface UserRow {
     id: number;
@@ -30,6 +31,8 @@ export function UsersPage({ onBack }: Props) {
     const [assignUser, setAssignUser] = useState<UserRow | null>(null);
     const [selectedBusinessIds, setSelectedBusinessIds] = useState<number[]>([]);
     const [savingAssign, setSavingAssign] = useState(false);
+    const [groups, setGroups] = useState<{ id: number; name: string }[]>([]);
+    const [groupFilter, setGroupFilter] = useState<string>('all'); // 'all' | group id as string
 
     useEffect(() => {
         loadAll();
@@ -39,12 +42,14 @@ export function UsersPage({ onBack }: Props) {
         setLoading(true);
         setError('');
         try {
-            const [usersData, businessesData] = await Promise.all([
+            const [usersData, businessesData, groupsData] = await Promise.all([
                 listUsers(),
                 listClients({ pageSize: 500 }),
+                listGroups(),
             ]);
             setUsers(usersData);
             setAllBusinesses(businessesData.data ?? businessesData);
+            setGroups(groupsData);
         } catch (e: any) {
             setError(e.message || 'Error cargando datos');
         } finally {
@@ -101,6 +106,35 @@ export function UsersPage({ onBack }: Props) {
         setSelectedBusinessIds(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
         );
+    }
+
+    // Businesses filtrados según el grupo seleccionado en el modal
+    const filteredBusinesses = groupFilter === 'all'
+        ? allBusinesses
+        : groupFilter === 'none'
+            ? allBusinesses.filter(b => !(b as any).group_id)
+            : allBusinesses.filter(b => String((b as any).group_id) === groupFilter);
+
+    function selectGroup(gid: string) {
+        setGroupFilter(gid);
+        // Seleccionar todos los del grupo manteniendo los de otros grupos
+        const inGroup = (gid === 'all'
+            ? allBusinesses
+            : gid === 'none'
+                ? allBusinesses.filter(b => !(b as any).group_id)
+                : allBusinesses.filter(b => String((b as any).group_id) === gid)
+        ).map(b => b.id);
+        setSelectedBusinessIds(prev => [...new Set([...prev, ...inGroup])]);
+    }
+
+    function deselectGroup(gid: string) {
+        const inGroup = (gid === 'all'
+            ? allBusinesses
+            : gid === 'none'
+                ? allBusinesses.filter(b => !(b as any).group_id)
+                : allBusinesses.filter(b => String((b as any).group_id) === gid)
+        ).map(b => b.id);
+        setSelectedBusinessIds(prev => prev.filter(id => !inGroup.includes(id)));
     }
 
     return (
@@ -268,54 +302,97 @@ export function UsersPage({ onBack }: Props) {
             {/* Modal asignar clientes */}
             {assignUser && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-lg flex flex-col" style={{ maxHeight: '80vh' }}>
-                        <div className="mb-4">
-                            <h2 className="text-lg font-bold text-gray-900">Clientes de {assignUser.name}</h2>
-                            <p className="text-sm text-gray-500 mt-1">
-                                Selecciona los RFCs que este contador puede ver.
-                                {selectedBusinessIds.length > 0 && (
-                                    <span className="ml-2 text-[#0C6B4B] font-medium">{selectedBusinessIds.length} seleccionados</span>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-xl flex flex-col" style={{ maxHeight: '85vh' }}>
+                        {/* Header */}
+                        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-lg font-bold text-gray-900">Clientes de {assignUser.name}</h2>
+                                    <p className="text-sm text-gray-500 mt-0.5">
+                                        {selectedBusinessIds.length === 0
+                                            ? 'Sin clientes asignados'
+                                            : <span className="text-[#0C6B4B] font-medium">{selectedBusinessIds.length} seleccionado{selectedBusinessIds.length !== 1 ? 's' : ''}</span>
+                                        }
+                                    </p>
+                                </div>
+                                <div className="flex gap-2 text-xs">
+                                    <button onClick={() => selectGroup('all')} className="text-blue-600 hover:underline font-medium">Todos</button>
+                                    <span className="text-gray-300">·</span>
+                                    <button onClick={() => deselectGroup('all')} className="text-gray-500 hover:underline">Ninguno</button>
+                                </div>
+                            </div>
+
+                            {/* Filtro por grupo */}
+                            <div className="flex gap-2 mt-3 flex-wrap">
+                                <button
+                                    onClick={() => setGroupFilter('all')}
+                                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${groupFilter === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                >
+                                    Todos ({allBusinesses.length})
+                                </button>
+                                {groups.map(g => {
+                                    const count = allBusinesses.filter(b => String((b as any).group_id) === String(g.id)).length;
+                                    return (
+                                        <button
+                                            key={g.id}
+                                            onClick={() => setGroupFilter(String(g.id))}
+                                            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 ${groupFilter === String(g.id) ? 'bg-[#0C6B4B] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                        >
+                                            {g.name}
+                                            <span className={`text-[10px] ${groupFilter === String(g.id) ? 'opacity-80' : 'text-gray-400'}`}>({count})</span>
+                                        </button>
+                                    );
+                                })}
+                                {allBusinesses.some(b => !(b as any).group_id) && (
+                                    <button
+                                        onClick={() => setGroupFilter('none')}
+                                        className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${groupFilter === 'none' ? 'bg-gray-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                    >
+                                        Sin grupo ({allBusinesses.filter(b => !(b as any).group_id).length})
+                                    </button>
                                 )}
-                            </p>
+                            </div>
+
+                            {/* Acciones rápidas del grupo visible */}
+                            {groupFilter !== 'all' && (
+                                <div className="flex gap-3 mt-2 text-xs">
+                                    <button onClick={() => selectGroup(groupFilter)} className="text-[#0C6B4B] hover:underline font-medium">
+                                        + Agregar todos del grupo
+                                    </button>
+                                    <button onClick={() => deselectGroup(groupFilter)} className="text-red-500 hover:underline">
+                                        − Quitar todos del grupo
+                                    </button>
+                                </div>
+                            )}
                         </div>
 
-                        {/* Seleccionar / deseleccionar todos */}
-                        <div className="flex gap-2 mb-3">
-                            <button
-                                onClick={() => setSelectedBusinessIds(allBusinesses.map(b => b.id))}
-                                className="text-xs text-blue-600 hover:underline"
-                            >
-                                Todos
-                            </button>
-                            <span className="text-gray-300">|</span>
-                            <button
-                                onClick={() => setSelectedBusinessIds([])}
-                                className="text-xs text-gray-500 hover:underline"
-                            >
-                                Ninguno
-                            </button>
-                        </div>
-
-                        <div className="overflow-y-auto flex-1 border border-gray-200 rounded-xl divide-y">
-                            {allBusinesses.map(b => (
-                                <label key={b.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer">
+                        {/* Lista */}
+                        <div className="overflow-y-auto flex-1 divide-y divide-gray-50 px-2">
+                            {filteredBusinesses.length === 0 ? (
+                                <p className="text-center py-8 text-gray-400 text-sm">No hay clientes en este grupo</p>
+                            ) : filteredBusinesses.map(b => (
+                                <label key={b.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 cursor-pointer rounded-lg">
                                     <input
                                         type="checkbox"
                                         checked={selectedBusinessIds.includes(b.id)}
                                         onChange={() => toggleBusiness(b.id)}
-                                        className="w-4 h-4 accent-[#0C6B4B] rounded"
+                                        className="w-4 h-4 accent-[#0C6B4B] flex-shrink-0"
                                     />
-                                    <div className="min-w-0">
-                                        <span className="text-sm font-medium text-gray-800">{b.rfc}</span>
-                                        <span className="text-xs text-gray-500 ml-2 truncate">{b.common_name || b.legal_name}</span>
+                                    <div className="min-w-0 flex-1">
+                                        <span className="text-sm font-semibold text-gray-800">{b.rfc}</span>
+                                        <span className="text-xs text-gray-400 ml-2">{b.common_name || b.legal_name}</span>
                                     </div>
+                                    {selectedBusinessIds.includes(b.id) && (
+                                        <span className="w-2 h-2 rounded-full bg-[#0C6B4B] flex-shrink-0" />
+                                    )}
                                 </label>
                             ))}
                         </div>
 
-                        <div className="flex justify-end gap-2 mt-4">
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
                             <button
-                                onClick={() => setAssignUser(null)}
+                                onClick={() => { setAssignUser(null); setGroupFilter('all'); }}
                                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 font-medium"
                             >
                                 Cancelar
