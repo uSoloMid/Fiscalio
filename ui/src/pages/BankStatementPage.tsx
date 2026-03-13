@@ -11,9 +11,24 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
     const [result, setResult] = useState<any>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [statements, setStatements] = useState<any[]>([]);
-    const [bankFilter, setBankFilter] = useState('all');
-    const [yearFilter, setYearFilter] = useState(() => String(new Date().getFullYear()));
-    const [monthFilter, setMonthFilter] = useState(() => ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'][new Date().getMonth()]);
+
+    // Filters synced with localStorage (matching ReconciliationPage)
+    const [bankFilter, setBankFilter] = useState(() => localStorage.getItem('bank_filter') || 'all');
+    const [yearFilter, setYearFilter] = useState(() => localStorage.getItem('year_filter') || String(new Date().getFullYear()));
+    const [monthFilter, setMonthFilter] = useState(() => localStorage.getItem('month_filter') || ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'][new Date().getMonth()]);
+
+    useEffect(() => {
+        localStorage.setItem('bank_filter', bankFilter);
+    }, [bankFilter]);
+
+    useEffect(() => {
+        localStorage.setItem('year_filter', yearFilter);
+    }, [yearFilter]);
+
+    useEffect(() => {
+        localStorage.setItem('month_filter', monthFilter);
+    }, [monthFilter]);
+
     const [searchTerm, setSearchTerm] = useState('');
     const [reconciliationMode, setReconciliationMode] = useState(false);
     const [reconciliationData, setReconciliationData] = useState<{ movements: BankMovement[]; stats: ReconciliationStats } | null>(null);

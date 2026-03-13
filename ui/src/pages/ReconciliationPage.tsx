@@ -14,13 +14,13 @@ const fmt = (n: number) =>
     n.toLocaleString('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2 });
 
 const BANK_COLORS: Record<string, string> = {
-    bbva:       'bg-blue-600',
-    banamex:    'bg-red-600',
-    santander:  'bg-red-500',
-    hsbc:       'bg-red-800',
-    banorte:    'bg-orange-600',
-    inbursa:    'bg-blue-800',
-    banbajío:   'bg-emerald-700',
+    bbva: 'bg-blue-600',
+    banamex: 'bg-red-600',
+    santander: 'bg-red-500',
+    hsbc: 'bg-red-800',
+    banorte: 'bg-orange-600',
+    inbursa: 'bg-blue-800',
+    banbajío: 'bg-emerald-700',
     scotiabank: 'bg-yellow-600',
 };
 const getBankColor = (name: string) => {
@@ -42,6 +42,23 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const [selectedMovement, setSelectedMovement] = useState<BankMovement | null>(null);
     const [filter, setFilter] = useState<'all' | 'pending' | 'reconciled'>('all');
     const [colWidths, setColWidths] = useState([90, 340, 150, 150, 180, 48]);
+
+    // Added filters to match BankStatementPage and persist
+    const [bankFilter, setBankFilter] = useState(() => localStorage.getItem('bank_filter') || 'all');
+    const [yearFilter, setYearFilter] = useState(() => localStorage.getItem('year_filter') || String(new Date().getFullYear()));
+    const [monthFilter, setMonthFilter] = useState(() => localStorage.getItem('month_filter') || ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'][new Date().getMonth()]);
+
+    useEffect(() => {
+        localStorage.setItem('bank_filter', bankFilter);
+    }, [bankFilter]);
+
+    useEffect(() => {
+        localStorage.setItem('year_filter', yearFilter);
+    }, [yearFilter]);
+
+    useEffect(() => {
+        localStorage.setItem('month_filter', monthFilter);
+    }, [monthFilter]);
 
     const gridTemplate = colWidths.map(w => `${w}px`).join(' ');
 
@@ -74,7 +91,10 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         setIsLoadingStatements(true);
         try {
             const data = await listBankStatements(activeRfc);
-            setStatements(data);
+            setStatements(data || []);
+        } catch (e) {
+            console.error("Error loading statements", e);
+            setStatements([]);
         } finally {
             setIsLoadingStatements(false);
         }
@@ -176,6 +196,19 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         return stats;
     };
 
+    const filteredStatements = statements.filter(s => {
+        const matchesBank = bankFilter === 'all' || s.bank_name.toLowerCase() === bankFilter.toLowerCase();
+        const matchesYear = yearFilter === 'all' || (s.period && s.period.includes(yearFilter));
+        const matchesMonth = monthFilter === 'all' || (s.period && s.period.split('-')[0] === monthFilter);
+        return matchesBank && matchesYear && matchesMonth;
+    });
+
+    const monthsOrder = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+    const uniqueBanks = Array.from(new Set(statements.map(s => s.bank_name)));
+    const uniqueYears = Array.from(new Set(statements.map(s => s.period?.split('-')[1]).filter(y => y))).sort();
+    const uniqueMonths = Array.from(new Set(statements.map(s => s.period?.split('-')[0]).filter(m => m)))
+        .sort((a, b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b));
+
     const selectedStatement = statements.find(s => s.id === selectedId);
     const greenPendingCount = reconciliationData?.movements.filter(
         m => !m.cfdi_id && m.suggestions?.[0]?.confidence === 'green'
@@ -188,7 +221,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const progressPct = totalCount > 0 ? Math.round((reconciledCount / totalCount) * 100) : 0;
 
     const filteredMovements = allMovements.filter(m => {
-        if (filter === 'pending')    return !m.cfdi_id;
+        if (filter === 'pending') return !m.cfdi_id;
         if (filter === 'reconciled') return !!m.cfdi_id;
         return true;
     });
@@ -199,8 +232,8 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         const reconciled = (s as any).reconciled_count ?? 0;
         const pct = total > 0 ? Math.round((reconciled / total) * 100) : 0;
         if (pct >= 80) return { label: 'Conciliado', color: 'text-emerald-700 bg-emerald-50', dot: 'bg-emerald-500' };
-        if (pct > 0)   return { label: 'Pendiente',  color: 'text-yellow-700 bg-yellow-50',  dot: 'bg-yellow-400' };
-        return           { label: 'Sin Iniciar', color: 'text-gray-400 bg-gray-50',       dot: 'bg-gray-300' };
+        if (pct > 0) return { label: 'Pendiente', color: 'text-yellow-700 bg-yellow-50', dot: 'bg-yellow-400' };
+        return { label: 'Sin Iniciar', color: 'text-gray-400 bg-gray-50', dot: 'bg-gray-300' };
     };
 
     return (
@@ -209,7 +242,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
             {/* ── Bank selector ── */}
             {isSelectorOpen ? (
                 /* Expanded */
-                <div className="bg-white border-b border-gray-100 px-8 py-6 flex-shrink-0">
+                <div className="bg-white border-b border-gray-100 px-8 py-6 flex-shrink-0 min-h-[300px]">
                     <div className="flex items-start justify-between mb-6">
                         <div>
                             <button
@@ -222,6 +255,32 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                             <h1 className="text-xl font-black text-gray-900">Conciliación Bancaria</h1>
                             <p className="text-xs font-bold text-gray-400 mt-0.5 uppercase tracking-widest">{clientName}</p>
                         </div>
+                        <div className="flex items-center gap-3">
+                            <select
+                                value={bankFilter}
+                                onChange={e => setBankFilter(e.target.value)}
+                                className="text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
+                            >
+                                <option value="all">Bancos</option>
+                                {uniqueBanks.map(b => <option key={b} value={b}>{b}</option>)}
+                            </select>
+                            <select
+                                value={monthFilter}
+                                onChange={e => setMonthFilter(e.target.value)}
+                                className="text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
+                            >
+                                <option value="all">Mes</option>
+                                {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                            <select
+                                value={yearFilter}
+                                onChange={e => setYearFilter(e.target.value)}
+                                className="text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
+                            >
+                                <option value="all">Año</option>
+                                {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
+                            </select>
+                        </div>
                     </div>
 
                     {isLoadingStatements ? (
@@ -232,12 +291,17 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                     ) : statements.length === 0 ? (
                         <div className="py-8 text-center">
                             <span className="material-symbols-outlined text-4xl text-gray-200 block mb-2">account_balance</span>
-                            <p className="text-xs font-black text-gray-300 uppercase tracking-widest">Sin estados de cuenta</p>
-                            <p className="text-xs text-gray-400 mt-1">Importa un PDF bancario para comenzar</p>
+                            <p className="text-xs font-black text-gray-300 uppercase tracking-widest">Sin estados de cuenta registrados</p>
+                            <p className="text-xs text-gray-400 mt-1">Sube un PDF bancario en el módulo de Bancos primero</p>
+                        </div>
+                    ) : filteredStatements.length === 0 ? (
+                        <div className="py-8 text-center">
+                            <span className="material-symbols-outlined text-4xl text-gray-200 block mb-2">filter_list_off</span>
+                            <p className="text-xs font-black text-gray-300 uppercase tracking-widest">Sin resultados con estos filtros</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                            {statements.map(s => {
+                            {filteredStatements.map(s => {
                                 const total = (s as any).movements_count ?? 0;
                                 const reconciled = (s as any).reconciled_count ?? 0;
                                 const pct = total > 0 ? Math.round((reconciled / total) * 100) : 0;
@@ -250,13 +314,11 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                                     <button
                                         key={s.id}
                                         onClick={() => handleSelectStatement(s.id)}
-                                        className={`text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md ${
-                                            s.id === selectedId
-                                                ? 'border-emerald-500 shadow-sm shadow-emerald-100'
-                                                : 'border-gray-100 hover:border-gray-200 bg-white'
-                                        }`}
+                                        className={`text-left p-4 rounded-2xl border-2 transition-all hover:shadow-md ${s.id === selectedId
+                                            ? 'border-emerald-500 shadow-sm shadow-emerald-100'
+                                            : 'border-gray-100 hover:border-gray-200 bg-white'
+                                            }`}
                                     >
-                                        {/* Bank avatar + name */}
                                         <div className="flex items-center gap-3 mb-3">
                                             <div className={`w-9 h-9 rounded-xl ${bankColor} flex items-center justify-center text-white text-sm font-black flex-shrink-0`}>
                                                 {bankInitial}
@@ -269,15 +331,9 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                                                 <span className="material-symbols-outlined text-emerald-500 text-base ml-auto flex-shrink-0">check_circle</span>
                                             )}
                                         </div>
-
-                                        {/* Period */}
                                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">{s.period}</p>
-
-                                        {/* Balance */}
                                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Saldo Final</p>
                                         <p className="text-base font-black text-gray-900 mt-0.5">{fmt(parseFloat(s.final_balance as any))}</p>
-
-                                        {/* Status + progress */}
                                         <div className="flex items-center justify-between mt-3">
                                             <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full ${status.color}`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
@@ -335,10 +391,10 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                     {reconciliationData && (
                         <div className="flex items-center gap-3">
                             {[
-                                { key: 'green',    label: 'Auto',     color: 'text-emerald-600' },
-                                { key: 'yellow',   label: 'Revisar',  color: 'text-yellow-600' },
-                                { key: 'red',      label: 'Manual',   color: 'text-red-500' },
-                                { key: 'unmatched',label: 'Pendiente',color: 'text-gray-400' },
+                                { key: 'green', label: 'Auto', color: 'text-emerald-600' },
+                                { key: 'yellow', label: 'Revisar', color: 'text-yellow-600' },
+                                { key: 'red', label: 'Manual', color: 'text-red-500' },
+                                { key: 'unmatched', label: 'Pendiente', color: 'text-gray-400' },
                             ].map(({ key, label, color }) => (
                                 <span key={key} className={`text-[9px] font-black uppercase tracking-widest ${color}`}>
                                     {(reconciliationData.stats as any)[key]} {label}
@@ -397,23 +453,21 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                             {reconciliationData && (
                                 <div className="bg-white border-b border-gray-100 px-6 py-2 flex items-center gap-1 flex-shrink-0">
                                     {([
-                                        { key: 'all'        as const, label: 'Todas',       count: totalCount },
-                                        { key: 'pending'    as const, label: 'Pendientes',  count: pendingCount },
+                                        { key: 'all' as const, label: 'Todas', count: totalCount },
+                                        { key: 'pending' as const, label: 'Pendientes', count: pendingCount },
                                         { key: 'reconciled' as const, label: 'Conciliadas', count: reconciledCount },
                                     ]).map(({ key, label, count }) => (
                                         <button
                                             key={key}
                                             onClick={() => setFilter(key)}
-                                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
-                                                filter === key
-                                                    ? 'bg-gray-900 text-white'
-                                                    : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'
-                                            }`}
+                                            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${filter === key
+                                                ? 'bg-gray-900 text-white'
+                                                : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'
+                                                }`}
                                         >
                                             {label}
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                                filter === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
-                                            }`}>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filter === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                                                }`}>
                                                 {count}
                                             </span>
                                         </button>
