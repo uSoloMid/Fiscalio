@@ -548,7 +548,7 @@ export const DashboardPage = ({
                                 >
                                     <option value="all">Todos los grupos</option>
                                     <option value="null">Sin grupo</option>
-                                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                                    {visibleGroupsForCards.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
                                 <button
                                     onClick={() => setIsManageGroupsOpen(true)}
