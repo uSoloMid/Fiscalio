@@ -31,6 +31,7 @@ export const DashboardPage = ({
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
     const [totalSystemClients, setTotalSystemClients] = useState(0);
+    const [allAccessibleClients, setAllAccessibleClients] = useState<any[]>([]);
     const [missingDocs, setMissingDocs] = useState<{ missing_csf: any[], missing_opinion: any[], negative_opinions: any[] }>({ missing_csf: [], missing_opinion: [], negative_opinions: [] });
 
     // UI states
@@ -121,11 +122,12 @@ export const DashboardPage = ({
     const loadInitialData = async () => {
         try {
             const [gRes, tRes, totalRes, missingRes] = await Promise.all([
-                listGroups(), listTags(), listClients({ pageSize: 1 }),
+                listGroups(), listTags(), listClients({ pageSize: 500 }),
                 getMissingDocs(),
             ]);
             setGroups(gRes);
             setTags(tRes);
+            setAllAccessibleClients(totalRes.data || []);
             setTotalSystemClients(totalRes.total || 0);
             setMissingDocs({
                 missing_csf: missingRes?.missing_csf ?? [],
@@ -345,6 +347,17 @@ export const DashboardPage = ({
             console.error("Error deleting client", err);
         }
     };
+
+    // Groups filtered to those with accessible clients (fixes metadata leak + negative Sin Grupo count)
+    const visibleGroupsForCards = useMemo(() => {
+        if (allAccessibleClients.length === 0) return groups;
+        return groups
+            .map(g => ({
+                ...g,
+                businesses_count: allAccessibleClients.filter((c: any) => c.group_id === g.id).length,
+            }))
+            .filter(g => g.businesses_count > 0);
+    }, [groups, allAccessibleClients]);
 
     // Grouping logic
     const groupedClients = useMemo(() => {
@@ -573,7 +586,7 @@ export const DashboardPage = ({
                     {/* Groups Overview Row */}
                     <section>
                         <GroupCardsRow
-                            groups={groups}
+                            groups={visibleGroupsForCards}
                             selectedGroupId={selectedGroupId}
                             onSelectGroup={setSelectedGroupId}
                             totalClients={totalSystemClients}
