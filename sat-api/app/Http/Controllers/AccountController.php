@@ -402,14 +402,16 @@ class AccountController extends Controller
             if (isset($seenCodes[$formattedCode])) continue;
             $seenCodes[$formattedCode] = true;
 
-            // Parent code at fixed position 134-141
+            // Parent code at fixed position 134-141 (may be 6 digits = first 6 of 8-digit code)
             $parentCode = null;
-            if (strlen($line) > 141) {
+            if (strlen($line) > 134) {
                 $parentRaw = trim(substr($line, 134, 8));
-                if (!empty($parentRaw) && is_numeric($parentRaw) && $parentRaw !== '00000000' && $parentRaw !== '0') {
-                    $parentCode = strlen($parentRaw) == 8
-                        ? substr($parentRaw, 0, 3) . '-' . substr($parentRaw, 3, 2) . '-' . substr($parentRaw, 5, 3)
-                        : $parentRaw;
+                $parentRaw = ltrim($parentRaw, '0') ? $parentRaw : ''; // keep as-is but detect all-zero
+                if (!empty($parentRaw) && is_numeric($parentRaw)
+                    && $parentRaw !== '00000000' && $parentRaw !== '000000' && $parentRaw !== '0') {
+                    // Pad to 8 digits (TXT stores only first 6 significant digits)
+                    $parentPadded = str_pad($parentRaw, 8, '0');
+                    $parentCode = substr($parentPadded, 0, 3) . '-' . substr($parentPadded, 3, 2) . '-' . substr($parentPadded, 5, 3);
                 }
             }
 
