@@ -23,6 +23,24 @@ class ReconciliationController extends Controller
         $businessRfc = $business->rfc;
         $businessId  = $business->id;
 
+        // Collect CFDIs already linked to movements for this business (to exclude from suggestions)
+        $linkedIds = BankMovement::whereNotNull('cfdi_id')
+            ->whereHas('statement', fn($q) => $q->where('business_id', $businessId))
+            ->pluck('cfdi_id')->unique()->all();
+
+        // Also exclude invoices covered by already-linked REPs
+        if (!empty($linkedIds)) {
+            $repUuids = Cfdi::whereIn('id', $linkedIds)->where('tipo', 'P')->pluck('uuid')->all();
+            if (!empty($repUuids)) {
+                $relUuids = \App\Models\CfdiPayment::whereIn('uuid_pago', $repUuids)
+                    ->pluck('uuid_relacionado')->all();
+                if (!empty($relUuids)) {
+                    $relIds = Cfdi::whereIn('uuid', $relUuids)->pluck('id')->all();
+                    $linkedIds = array_values(array_unique(array_merge($linkedIds, $relIds)));
+                }
+            }
+        }
+
         // Load all valid CFDIs for this business, optimized memory by selecting only necessary columns
         $query = Cfdi::select([
                 'id', 'uuid', 'rfc_emisor', 'rfc_receptor', 'name_emisor', 'name_receptor',
@@ -33,7 +51,8 @@ class ReconciliationController extends Controller
                   ->orWhere('rfc_receptor', $businessRfc);
             })
             ->where('es_cancelado', 0)
-            ->whereIn('tipo', ['I', 'E', 'P']);
+            ->whereIn('tipo', ['I', 'E', 'P', 'N'])
+            ->when(!empty($linkedIds), fn($q) => $q->whereNotIn('id', $linkedIds));
 
         // Optimization: limit search range near the statement period if available
         if ($statement->period && preg_match('/^([A-Z]{3})-(\d{4})$/', $statement->period, $m)) {
@@ -154,7 +173,10 @@ class ReconciliationController extends Controller
 
         foreach ($cfdis as $cfdi) {
             // Basic filtering based on Business participation
-            if ($isEgreso) {
+            if ($cfdi->tipo === 'N') {
+                // Nómina: only for egreso (we pay employees), we are always emisor
+                if (!$isEgreso || $cfdi->rfc_emisor !== $businessRfc) continue;
+            } elseif ($isEgreso) {
                 // For money out (cargos), we want:
                 // 1. Invoices from suppliers (tipo I, we are receptor) - GASTOS
                 // 2. Payments to suppliers (tipo P, we are receptor) - REPs
@@ -364,5 +386,41 @@ class ReconciliationController extends Controller
             if ($existing) $existing->increment('confirmed_count');
             else ReconciliationPattern::create(['business_id' => $businessId, 'description_keyword' => $keyword, 'counterpart_rfc' => $counterpartRfc, 'confirmed_count' => 1]);
         });
+    }
+
+    public function searchCfdis(Request $request)
+    {
+        $request->validate([
+            'rfc'       => 'required|string',
+            'q'         => 'required|string|min:2',
+            'direction' => 'nullable|in:egreso,ingreso',
+        ]);
+
+        $businessRfc = strtoupper(trim($request->rfc));
+        $q           = trim($request->q);
+        $isEgreso    = $request->direction === 'egreso';
+
+        $cfdis = Cfdi::select([
+                'id', 'uuid', 'rfc_emisor', 'rfc_receptor', 'name_emisor', 'name_receptor',
+                'fecha', 'total', 'tipo', 'metodo_pago', 'forma_pago',
+            ])
+            ->where(function ($sq) use ($businessRfc) {
+                $sq->where('rfc_emisor', $businessRfc)
+                   ->orWhere('rfc_receptor', $businessRfc);
+            })
+            ->where('es_cancelado', 0)
+            ->whereIn('tipo', ['I', 'E', 'P', 'N'])
+            ->where(function ($sq) use ($q) {
+                $sq->where('uuid', 'like', "%{$q}%")
+                   ->orWhere('rfc_emisor', 'like', "%{$q}%")
+                   ->orWhere('rfc_receptor', 'like', "%{$q}%")
+                   ->orWhere('name_emisor', 'like', "%{$q}%")
+                   ->orWhere('name_receptor', 'like', "%{$q}%");
+            })
+            ->orderByDesc('fecha')
+            ->limit(30)
+            ->get();
+
+        return response()->json(['cfdis' => $cfdis]);
     }
 }

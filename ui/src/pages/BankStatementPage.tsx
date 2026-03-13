@@ -648,6 +648,7 @@ export const BankStatementPage = ({ activeRfc, clientName, onBack }: { activeRfc
                                     {selectedMovement && (
                                         <ReconciliationSidebar
                                             movement={selectedMovement}
+                                            activeRfc={activeRfc}
                                             onClose={() => setSelectedMovement(null)}
                                             onReconciled={handleMovementReconciled}
                                             onViewPdf={handleViewPdf}

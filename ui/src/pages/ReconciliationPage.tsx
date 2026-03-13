@@ -599,6 +599,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                 {selectedMovement && !isSelectorOpen && (
                     <ReconciliationSidebar
                         movement={selectedMovement}
+                        activeRfc={activeRfc}
                         onClose={() => setSelectedMovement(null)}
                         onReconciled={handleMovementReconciled}
                         onViewPdf={handleViewPdf}

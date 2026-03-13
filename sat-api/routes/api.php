@@ -130,6 +130,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // Reconciliation
         Route::get('/reconciliation/suggest/{statementId}', [\App\Http\Controllers\ReconciliationController::class , 'suggest']);
+        Route::get('/reconciliation/search', [\App\Http\Controllers\ReconciliationController::class , 'searchCfdis']);
         Route::post('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class , 'reconcile']);
         Route::delete('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class , 'unreconcile']);
 

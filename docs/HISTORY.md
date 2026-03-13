@@ -5,6 +5,16 @@
 
 ---
 
+## 2026-03-13 — Conciliaciones: facturas ya vinculadas, nómina, asignación manual
+
+**Commit estable:** pendiente
+
+- **Facturas ya vinculadas excluidas de sugerencias:** Al calcular sugerencias, se excluyen CFDIs que ya están vinculados a otro movimiento. Si el CFDI vinculado es un REP, también se excluyen las facturas que ese REP cubre (vía `cfdi_payments`).
+- **Soporte nómina (tipo N):** Facturas de nómina (Emitidas tipo N, rfc_emisor = RFC del negocio) ahora aparecen como sugerencias para movimientos de egreso.
+- **Asignación manual:** Nuevo botón "Asignar manualmente" en la sidebar. Al activarse, muestra un buscador que consulta el backend por UUID, RFC o nombre. Los resultados se vinculan con confianza 'red' (manual). Nuevo endpoint `GET /api/reconciliation/search`.
+
+---
+
 ## 2026-03-12 — Cuentas: visual feedback árbol + export/import Excel Contpaqi
 
 **Commit estable:** `20044ec`

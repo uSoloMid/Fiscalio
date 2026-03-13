@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { reconcileMovement } from '../services';
+import { useState, useEffect, useRef } from 'react';
+import { reconcileMovement, searchCfdisManual } from '../services';
 import type { BankMovement, ReconciliationSuggestion } from '../models';
 
 interface Props {
     movement: BankMovement;
+    activeRfc: string;
     onClose: () => void;
     onReconciled: (updated: BankMovement) => void;
     onViewPdf: (uuid: string, title: string) => void;
@@ -22,10 +23,15 @@ const formatDate = (dateStr: string) => {
 
 type FilterChip = 'monto' | 'fecha' | 'rfc';
 
-export function ReconciliationSidebar({ movement, onClose, onReconciled, onViewPdf, onDownloadPdf }: Props) {
+export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconciled, onViewPdf, onDownloadPdf }: Props) {
     const [search, setSearch] = useState('');
     const [activeFilters, setActiveFilters] = useState<Set<FilterChip>>(new Set(['monto']));
     const [loadingId, setLoadingId] = useState<number | null>(null);
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [manualQuery, setManualQuery] = useState('');
+    const [manualResults, setManualResults] = useState<any[]>([]);
+    const [manualLoading, setManualLoading] = useState(false);
+    const manualDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const isEgreso = movement.cargo > 0;
     const amount = isEgreso ? movement.cargo : movement.abono;
@@ -44,6 +50,39 @@ export function ReconciliationSidebar({ movement, onClose, onReconciled, onViewP
             next.has(f) ? next.delete(f) : next.add(f);
             return next;
         });
+    };
+
+    useEffect(() => {
+        if (!isManualMode || manualQuery.trim().length < 2) {
+            setManualResults([]);
+            return;
+        }
+        if (manualDebounce.current) clearTimeout(manualDebounce.current);
+        manualDebounce.current = setTimeout(async () => {
+            setManualLoading(true);
+            try {
+                const res = await searchCfdisManual(activeRfc, manualQuery.trim(), isEgreso ? 'egreso' : 'ingreso');
+                setManualResults(res.cfdis ?? []);
+            } catch {
+                setManualResults([]);
+            } finally {
+                setManualLoading(false);
+            }
+        }, 400);
+        return () => { if (manualDebounce.current) clearTimeout(manualDebounce.current); };
+    }, [manualQuery, isManualMode]);
+
+    const handleConfirmManual = async (cfdi: any) => {
+        setLoadingId(cfdi.id);
+        try {
+            const res = await reconcileMovement(movement.id, cfdi.id, 'red');
+            onReconciled({ ...res.movement, suggestions: [] });
+        } catch (e) {
+            console.error(e);
+            alert('Error al conciliar. Revisa la consola.');
+        } finally {
+            setLoadingId(null);
+        }
     };
 
     const handleConfirm = async (s: ReconciliationSuggestion) => {
@@ -293,43 +332,126 @@ export function ReconciliationSidebar({ movement, onClose, onReconciled, onViewP
                 </p>
             </div>
 
-            {/* Search */}
-            <div className="px-6 mt-4 flex-shrink-0">
-                <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus-within:border-blue-400 focus-within:bg-white transition-all">
-                    <span className="material-symbols-outlined text-gray-400 text-lg">search</span>
-                    <input
-                        type="text"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Buscar por Folio, RFC o Monto..."
-                        className="flex-1 bg-transparent text-xs text-gray-700 font-bold placeholder-gray-400 outline-none"
-                    />
+            {/* Search (sugerencias) / Manual search */}
+            {!isManualMode ? (
+                <>
+                    <div className="px-6 mt-4 flex-shrink-0">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl focus-within:border-blue-400 focus-within:bg-white transition-all">
+                            <span className="material-symbols-outlined text-gray-400 text-lg">search</span>
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={e => setSearch(e.target.value)}
+                                placeholder="Buscar por Folio, RFC o Monto..."
+                                className="flex-1 bg-transparent text-xs text-gray-700 font-bold placeholder-gray-400 outline-none"
+                            />
+                        </div>
+                    </div>
+                    <div className="px-6 mt-4 flex gap-2 flex-shrink-0">
+                        {([
+                            { key: 'monto' as FilterChip, label: 'Mismo monto' },
+                            { key: 'fecha' as FilterChip, label: 'Fecha próxima' },
+                            { key: 'rfc' as FilterChip, label: 'RFC frecuente' },
+                        ]).map(({ key, label }) => (
+                            <button
+                                key={key}
+                                onClick={() => toggleFilter(key)}
+                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${activeFilters.has(key)
+                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-100'
+                                    : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+                                    }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                </>
+            ) : (
+                <div className="px-6 mt-4 flex-shrink-0">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-2xl focus-within:border-amber-400 transition-all">
+                        <span className="material-symbols-outlined text-amber-400 text-lg">manage_search</span>
+                        <input
+                            autoFocus
+                            type="text"
+                            value={manualQuery}
+                            onChange={e => setManualQuery(e.target.value)}
+                            placeholder="UUID, RFC, nombre del emisor/receptor..."
+                            className="flex-1 bg-transparent text-xs text-gray-700 font-bold placeholder-gray-400 outline-none"
+                        />
+                        {manualLoading && <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />}
+                    </div>
                 </div>
-            </div>
-
-            {/* Filter chips */}
-            <div className="px-6 mt-4 flex gap-2 flex-shrink-0">
-                {([
-                    { key: 'monto' as FilterChip, label: 'Mismo monto' },
-                    { key: 'fecha' as FilterChip, label: 'Fecha próxima' },
-                    { key: 'rfc' as FilterChip, label: 'RFC frecuente' },
-                ]).map(({ key, label }) => (
-                    <button
-                        key={key}
-                        onClick={() => toggleFilter(key)}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${activeFilters.has(key)
-                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-100'
-                            : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
-                            }`}
-                    >
-                        {label}
-                    </button>
-                ))}
-            </div>
+            )}
 
             {/* Suggestions list */}
             <div className="flex-1 overflow-y-auto px-6 mt-6 pb-4 space-y-6 scrollbar-hide">
-                {filtered.length === 0 ? (
+                {isManualMode ? (
+                    manualQuery.trim().length < 2 ? (
+                        <div className="text-center py-16 flex flex-col items-center">
+                            <span className="material-symbols-outlined text-5xl text-amber-200 mb-3">manage_search</span>
+                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Escribe al menos 2 caracteres</p>
+                            <p className="text-[9px] text-gray-300 mt-1">UUID, RFC, nombre del proveedor</p>
+                        </div>
+                    ) : manualResults.length === 0 ? (
+                        <div className="text-center py-16 flex flex-col items-center">
+                            <span className="material-symbols-outlined text-5xl text-gray-200 mb-3">search_off</span>
+                            <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Sin resultados</p>
+                        </div>
+                    ) : (
+                        manualResults.map((cfdi) => {
+                            const name = isEgreso ? (cfdi.name_emisor || cfdi.rfc_emisor) : (cfdi.name_receptor || cfdi.rfc_receptor);
+                            const rfc = isEgreso ? cfdi.rfc_emisor : cfdi.rfc_receptor;
+                            const isLoading = loadingId === cfdi.id;
+                            return (
+                                <div key={cfdi.id} className="relative rounded-[32px] border-2 border-amber-100 hover:border-amber-200 p-6 transition-all">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                            {cfdi.tipo}: <span className="text-gray-300 ml-1">{cfdi.uuid.slice(0, 14)}…</span>
+                                        </span>
+                                        <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full uppercase tracking-tighter">
+                                            Manual
+                                        </span>
+                                    </div>
+                                    <p className="font-black text-gray-900 text-sm leading-tight uppercase truncate mb-1">{name || '—'}</p>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">RFC: {rfc || '—'}</p>
+                                    {cfdi.forma_pago && (
+                                        <span className="inline-block mt-3 text-[9px] font-black text-blue-500 bg-blue-50 px-2 py-1 rounded-lg uppercase tracking-wider border border-blue-100">
+                                            {cfdi.forma_pago}
+                                        </span>
+                                    )}
+                                    <div className="flex justify-between items-end mt-6">
+                                        <div>
+                                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] mb-1">Fecha Emisión</p>
+                                            <p className="text-[11px] font-black text-gray-700">{formatDate(cfdi.fecha)}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em] mb-1">Total CFDI</p>
+                                            <p className="text-xl font-black text-gray-900 tabular-nums">{fmt(cfdi.total)}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 mt-6">
+                                        <button
+                                            onClick={() => onViewPdf(cfdi.uuid, name || cfdi.uuid)}
+                                            className="w-12 h-12 flex items-center justify-center rounded-[18px] border border-gray-100 text-gray-400 hover:text-blue-500 hover:border-blue-100 hover:bg-blue-50 transition-all flex-shrink-0"
+                                            title="Ver PDF"
+                                        >
+                                            <span className="material-symbols-outlined text-lg">visibility</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleConfirmManual(cfdi)}
+                                            disabled={loadingId !== null}
+                                            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-[18px] font-black text-[11px] uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50 bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-100 border border-amber-400"
+                                        >
+                                            {isLoading
+                                                ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                                : <><span className="material-symbols-outlined text-base font-black">link</span>Asignar</>}
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )
+                ) : filtered.length === 0 ? (
                     <div className="text-center py-20 flex flex-col items-center">
                         <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mb-4">
                             <span className="material-symbols-outlined text-4xl text-gray-200">search_off</span>
@@ -445,12 +567,27 @@ export function ReconciliationSidebar({ movement, onClose, onReconciled, onViewP
             </div>
 
             {/* Footer */}
-            <div className="border-t border-gray-100 px-6 py-6 text-center flex-shrink-0 bg-gray-50/30">
-                <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-3">¿No encuentras la factura?</p>
-                <button className="flex items-center gap-2 mx-auto px-6 py-3 bg-white border border-gray-200 rounded-2xl text-[11px] font-black text-emerald-600 hover:text-emerald-700 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-50 transition-all uppercase tracking-widest">
-                    <span className="material-symbols-outlined text-lg">upload_file</span>
-                    Subir XML Manual
-                </button>
+            <div className="border-t border-gray-100 px-6 py-4 flex-shrink-0 bg-gray-50/30">
+                {isManualMode ? (
+                    <button
+                        onClick={() => { setIsManualMode(false); setManualQuery(''); setManualResults([]); }}
+                        className="flex items-center gap-2 mx-auto px-6 py-3 bg-white border border-gray-200 rounded-2xl text-[11px] font-black text-gray-500 hover:border-gray-300 transition-all uppercase tracking-widest"
+                    >
+                        <span className="material-symbols-outlined text-lg">arrow_back</span>
+                        Volver a sugerencias
+                    </button>
+                ) : (
+                    <div className="text-center">
+                        <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-3">¿No encuentras la factura?</p>
+                        <button
+                            onClick={() => setIsManualMode(true)}
+                            className="flex items-center gap-2 mx-auto px-6 py-3 bg-white border border-amber-200 rounded-2xl text-[11px] font-black text-amber-600 hover:text-amber-700 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-50 transition-all uppercase tracking-widest"
+                        >
+                            <span className="material-symbols-outlined text-lg">manage_search</span>
+                            Asignar manualmente
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

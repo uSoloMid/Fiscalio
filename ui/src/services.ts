@@ -535,6 +535,13 @@ export async function unreconcileMovement(movementId: number): Promise<any> {
     return response.json();
 }
 
+export async function searchCfdisManual(rfc: string, q: string, direction: 'egreso' | 'ingreso'): Promise<any> {
+    const params = new URLSearchParams({ rfc, q, direction });
+    const response = await authFetch(`${API_BASE_URL}/api/reconciliation/search?${params}`);
+    if (!response.ok) throw new Error('Error al buscar CFDIs');
+    return response.json();
+}
+
 export async function deleteBankStatement(id: number, rfc: string): Promise<void> {
     const response = await authFetch(`${API_BASE_URL}/api/bank-statements/${id}?rfc=${rfc}`, {
         method: 'DELETE'
