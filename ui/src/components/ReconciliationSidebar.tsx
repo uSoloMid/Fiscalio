@@ -40,9 +40,13 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
     const cfdi = movement.cfdi;
 
     const counterpart = (s: any) =>
-        isEgreso ? (s.name_emisor || s.rfc_emisor) : (s.name_receptor || s.rfc_receptor);
+        s.tipo === 'N'
+            ? (s.name_receptor || s.rfc_receptor)
+            : isEgreso ? (s.name_emisor || s.rfc_emisor) : (s.name_receptor || s.rfc_receptor);
     const counterpartRfc = (s: any) =>
-        isEgreso ? s.rfc_emisor : s.rfc_receptor;
+        s.tipo === 'N'
+            ? s.rfc_receptor
+            : isEgreso ? s.rfc_emisor : s.rfc_receptor;
 
     const toggleFilter = (f: FilterChip) => {
         setActiveFilters(prev => {
