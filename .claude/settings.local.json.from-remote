@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"mysql\\\\|MySQL\\\\|DB_CONNECTION\" sat-api/.env* sat-api/config/database.php sat-api/docker-compose.yml)",
+      "Bash(sshpass -p 'Solomid8' ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no fiscalio@100.123.107.90 \"echo ''=== DOCKER PS ==='' && docker ps && echo ''=== ENV DB ==='' && docker exec api cat /var/www/.env 2>/dev/null | grep -i ''DB_\\\\|database'' && echo ''=== MYSQL CHECK ==='' && docker exec api php -m | grep -i mysql && echo ''=== DB DRIVER ==='' && docker exec api php artisan tinker --execute=''echo DB::connection\\(\\)->getDriverName\\(\\);'' 2>/dev/null\")",
+      "Bash(ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o BatchMode=no fiscalio@100.123.107.90 \"echo connected\")",
+      "Bash(python3 -:*)",
+      "Bash(python /c/Fiscalio/run_ssh.py)"
+    ]
+  }
+}

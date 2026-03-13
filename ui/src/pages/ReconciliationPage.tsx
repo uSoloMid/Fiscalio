@@ -601,6 +601,8 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                         movement={selectedMovement}
                         onClose={() => setSelectedMovement(null)}
                         onReconciled={handleMovementReconciled}
+                        onViewPdf={handleViewPdf}
+                        onDownloadPdf={handleDownloadPdf}
                     />
                 )}
             </div>

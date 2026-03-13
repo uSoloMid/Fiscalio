@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -:*)",
+      "Bash(ssh fiscalio-server \"cd /home/fiscalio/Fiscalio && git checkout -- sat-api/storage sat-api/bootstrap/cache bank_parser/ 2>&1 && git cherry-pick e231ddb 3d83596 2>&1\")",
+      "Bash(ssh fiscalio-server \"cd /home/fiscalio/Fiscalio && git cherry-pick --abort 2>&1 && git checkout -- . 2>&1 && git cherry-pick e231ddb 3d83596 2>&1\")",
+      "Bash(ssh fiscalio-server \"cd /home/fiscalio/Fiscalio && git push origin rescue/bank-reconciliation 2>&1\")",
+      "Bash(ssh fiscalio-server \"cd /home/fiscalio/Fiscalio && git remote get-url origin 2>&1 && ssh -T git@github.com 2>&1 | head -2\")",
+      "Bash(scp /tmp/fiscalio-autodeploy.sh fiscalio-server:/home/fiscalio/fiscalio-autodeploy.sh)",
+      "Bash(ssh fiscalio-server \"chmod +x /home/fiscalio/fiscalio-autodeploy.sh && echo OK\")",
+      "Bash(ssh fiscalio-server \"\\(crontab -l | grep -v fiscalio-autodeploy; echo ''* * * * * /home/fiscalio/fiscalio-autodeploy.sh >> /home/fiscalio/Fiscalio/autodeploy.log 2>&1''\\) | crontab - && crontab -l\")",
+      "Bash(ssh fiscalio-server \"docker exec sat-api-app tail -2000 /var/www/storage/logs/laravel.log\")",
+      "Bash(C:/Fiscalio/.venv/Scripts/pip install pymupdf)",
+      "Bash(C:/Fiscalio/.venv/Scripts/python.exe -c \":*)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
+    ]
+  }
+}
