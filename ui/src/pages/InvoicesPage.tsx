@@ -349,7 +349,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
             const res = await listCfdis({
                 rfc_user: activeRfc,
                 year,
-                month,
+                month: month === 'all' ? undefined : month,
                 tipo: (filterType === 'all' || filterType === 'canceladas') ? undefined : filterType,
                 cfdi_tipo: filterType === 'canceladas' ? undefined : cfdiTipo,
                 status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
@@ -543,14 +543,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
 
     const handlePeriodMonthChange = (m: string) => {
         setMonth(m);
-        localStorage.setItem('active_month', m);
+        if (m !== 'all') localStorage.setItem('active_month', m);
         if (m === 'all') setDay('all'); // no tiene sentido filtrar por día sin mes
     };
     const handlePeriodYearChange = (y: string) => {
         setYear(y);
         localStorage.setItem('active_year', y);
         // Si el mes actual no existe en el nuevo año, seleccionar el primer mes disponible
-        if (availablePeriods.length > 0) {
+        if (availablePeriods.length > 0 && month !== 'all') {
             const available = availablePeriods.filter(p => p.startsWith(y)).map(p => p.split('-')[1]);
             if (available.length > 0 && !available.includes(month)) {
                 setMonth(available[0]);
