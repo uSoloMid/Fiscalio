@@ -44,6 +44,10 @@ export interface Cfdi {
     validacion_efos?: string;
     created_at: string;
     updated_at: string;
+    // Campos nómina (accessors del backend, tipo N)
+    nomina_fecha_final_pago?: string | null;
+    nomina_total_percepciones?: string | null;
+    nomina_total_deducciones?: string | null;
     // Agregados por withSum/withMin en el listado
     pagos_propios_sum_monto_pagado?: number | null;
     pagos_propios_min_fecha_pago?: string | null;

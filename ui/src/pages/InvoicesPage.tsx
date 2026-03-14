@@ -1228,11 +1228,11 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                             <span className="material-symbols-outlined text-base" title="Estado">info</span>
                                                         </ResizableTh>
                                                         <ResizableTh colId="fecha" label="Fecha" sortable align="left" />
-                                                        <ResizableTh colId="rfcNombre" label="RFC / Nombre" align="left" />
-                                                        <ResizableTh colId="concepto" label="Concepto" align="left" />
-                                                        <ResizableTh colId="total" label="Total / Pagado" sortable align="right" />
-                                                        <ResizableTh colId="iva" label="IVA / F.Pago" sortable align="right" />
-                                                        {hasRetenciones && <ResizableTh colId="ret" label="Ret" sortable align="right" />}
+                                                        <ResizableTh colId="rfcNombre" label={cfdiTipo === 'N' ? 'Empleado' : 'RFC / Nombre'} align="left" />
+                                                        <ResizableTh colId="concepto" label={cfdiTipo === 'N' ? 'F. Final Pago' : 'Concepto'} align="left" />
+                                                        <ResizableTh colId="total" label="Total" sortable align="right" />
+                                                        <ResizableTh colId="iva" label={cfdiTipo === 'N' ? 'Percepciones' : 'IVA / F.Pago'} sortable align="right" />
+                                                        {(hasRetenciones || cfdiTipo === 'N') && <ResizableTh colId="ret" label={cfdiTipo === 'N' ? 'Deducciones' : 'Ret'} sortable align="right" />}
                                                         <ResizableTh colId="tipo" label="Tipo" sortable align="center" />
                                                         <ResizableTh colId="met" label="Met" sortable align="center" />
                                                         <ResizableTh colId="estatusSat" label="Estatus SAT" sortable align="center" />
@@ -1294,12 +1294,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                         );
                                                     })()}
                                                 </td>
-                                                {/* Concepto */}
-                                                <td style={{ width: colWidths.concepto, maxWidth: colWidths.concepto }} className="px-3 py-4 text-xs text-gray-500 truncate overflow-hidden" title={cfdi.concepto || ''}>
+                                                {/* Concepto / F.Final Pago para nómina */}
+                                                <td style={{ width: colWidths.concepto, maxWidth: colWidths.concepto }} className="px-3 py-4 text-xs text-gray-500 truncate overflow-hidden" title={cfdi.tipo === 'N' ? (cfdi.nomina_fecha_final_pago || '') : (cfdi.concepto || '')}>
                                                     {cfdi.tipo === 'P' ? (
                                                         <span className="italic text-violet-500 text-[10px] font-medium">Complemento de pago</span>
                                                     ) : cfdi.tipo === 'N' ? (
-                                                        <span className="italic text-teal-500 text-[10px] font-medium">Nómina</span>
+                                                        cfdi.nomina_fecha_final_pago
+                                                            ? <span className="text-xs font-semibold text-teal-700">{cfdi.nomina_fecha_final_pago.substring(0, 10)}</span>
+                                                            : <span className="italic text-teal-500 text-[10px] font-medium">Nómina</span>
                                                     ) : cfdi.concepto || '-'}
                                                 </td>
                                                 {/* Total — para tipo P muestra el monto real del pago */}
@@ -1318,9 +1320,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                         </span>
                                                     )}
                                                 </td>
-                                                {/* IVA — para tipo P muestra la fecha de pago */}
+                                                {/* IVA / Percepciones (nómina) / F.Pago (pago) */}
                                                 <td style={{ width: colWidths.iva }} className="px-3 py-4 whitespace-nowrap text-xs text-right overflow-hidden">
-                                                    {cfdi.tipo === 'P' ? (
+                                                    {cfdi.tipo === 'N' ? (
+                                                        cfdi.nomina_total_percepciones
+                                                            ? <span className="text-teal-700 font-semibold">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(cfdi.nomina_total_percepciones))}</span>
+                                                            : <span className="text-gray-300">—</span>
+                                                    ) : cfdi.tipo === 'P' ? (
                                                         cfdi.pagos_propios_min_fecha_pago ? (
                                                             <span className="text-[10px] font-semibold text-violet-500">
                                                                 {cfdi.pagos_propios_min_fecha_pago.substring(0, 10)}
@@ -1330,9 +1336,15 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                         <span className="text-gray-500">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.iva)}</span>
                                                     ) : <span className="text-gray-300">—</span>}
                                                 </td>
-                                                {hasRetenciones && (
+                                                {(hasRetenciones || cfdiTipo === 'N') && (
                                                     <td style={{ width: colWidths.ret }} className="px-3 py-4 whitespace-nowrap text-xs text-right text-gray-500 overflow-hidden">
-                                                        {cfdi.retenciones && Number(cfdi.retenciones) > 0 ? `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.retenciones)}` : <span className="text-gray-300">—</span>}
+                                                        {cfdi.tipo === 'N' ? (
+                                                            cfdi.nomina_total_deducciones
+                                                                ? <span className="text-red-600 font-semibold">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(cfdi.nomina_total_deducciones))}</span>
+                                                                : <span className="text-gray-300">—</span>
+                                                        ) : (
+                                                            cfdi.retenciones && Number(cfdi.retenciones) > 0 ? `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.retenciones)}` : <span className="text-gray-300">—</span>
+                                                        )}
                                                     </td>
                                                 )}
                                                 {/* Tipo CFDI — badge con color por tipo */}

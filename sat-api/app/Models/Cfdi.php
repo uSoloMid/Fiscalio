@@ -11,6 +11,8 @@ class Cfdi extends Model
 
     protected $table = 'cfdis';
 
+    protected $appends = ['nomina_fecha_final_pago', 'nomina_total_percepciones', 'nomina_total_deducciones'];
+
     protected $fillable = [
         'uuid',
         'serie',
@@ -67,6 +69,25 @@ class Cfdi extends Model
         'retenciones_locales' => 'decimal:2',
         'xml_data' => 'array',
     ];
+    // --- Nómina accessors (extraídos de xml_data, sin columnas extra en BD) ---
+    public function getNominaFechaFinalPagoAttribute(): ?string
+    {
+        if ($this->tipo !== 'N' || !$this->xml_data) return null;
+        return $this->xml_data['cfdi:Comprobante']['cfdi:Complemento']['nomina12:Nomina']['@attributes']['FechaFinalPago'] ?? null;
+    }
+
+    public function getNominaTotalPercepcionesAttribute(): ?string
+    {
+        if ($this->tipo !== 'N' || !$this->xml_data) return null;
+        return $this->xml_data['cfdi:Comprobante']['cfdi:Complemento']['nomina12:Nomina']['@attributes']['TotalPercepciones'] ?? null;
+    }
+
+    public function getNominaTotalDeduccionesAttribute(): ?string
+    {
+        if ($this->tipo !== 'N' || !$this->xml_data) return null;
+        return $this->xml_data['cfdi:Comprobante']['cfdi:Complemento']['nomina12:Nomina']['@attributes']['TotalDeducciones'] ?? null;
+    }
+
     // Payments that reference THIS invoice as the one being paid (uuid_relacionado = this.uuid)
     public function pagosRelacionados()
     {
