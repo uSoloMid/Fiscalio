@@ -67,6 +67,21 @@
         .seal-title { font-weight: bold; display: block; margin-top: 5px; text-transform: uppercase; color: #000; }
 
         .footer { font-size: 7pt; text-align: center; margin-top: 25px; padding-top: 10px; color: #666; border-top: 0.5px solid #eee; }
+
+        /* Nómina sections */
+        .nomina-section { margin-top: 10px; width: 100%; border: 1px solid #000; border-collapse: collapse; }
+        .nomina-section-header { background: #000; color: #fff; text-align: center; font-size: 8.5pt; font-weight: bold; padding: 4px; text-transform: uppercase; }
+        .nomina-two-col { width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 10px; }
+        .nomina-two-col td { vertical-align: top; border: 1px solid #000; padding: 0; width: 50%; }
+        .nomina-half-header { background: #000; color: #fff; text-align: center; font-size: 8.5pt; font-weight: bold; padding: 4px; text-transform: uppercase; }
+        .nomina-row-table { width: 100%; border-collapse: collapse; }
+        .nomina-row-table tr td { padding: 3px 5px; border-bottom: 0.5px solid #ddd; font-size: 7.5pt; vertical-align: top; }
+        .nomina-row-table tr:last-child td { border-bottom: none; }
+        .nomina-label { font-weight: bold; width: 45%; color: #000; }
+        .nomina-value { color: #333; }
+        .nomina-percep-table { width: 100%; border-collapse: collapse; margin-top: 10px; border: 1px solid #000; }
+        .nomina-percep-table th { background: #000; color: #fff; padding: 4px; font-size: 7.5pt; text-transform: uppercase; border: 1px solid #000; }
+        .nomina-percep-table td { padding: 3px 5px; border: 1px solid #000; font-size: 7.5pt; vertical-align: top; }
     </style>
 </head>
 <body>
@@ -88,7 +103,7 @@
                     <span class="issuer-regimen" style="font-size: 6.5pt;">CP {{ $cfdi['lugar_expedicion'] }}</span>
                     
                     <div class="client-section-block">
-                        <span class="client-title uppercase">CLIENTE</span>
+                        <span class="client-title uppercase">{{ $cfdi['tipo_comprobante'] === 'N' ? 'EMPLEADO' : 'CLIENTE' }}</span>
                         <span class="client-name uppercase">{{ $cfdi['receptor']['nombre'] }}</span>
                         <span class="client-details uppercase">{{ $cfdi['receptor']['rfc'] }}</span>
                         <span class="client-details">USO CFDI: {{ $cfdi['receptor']['uso_desc'] }}</span>
@@ -99,7 +114,11 @@
 
                 <!-- Columna Derecha: Información Fiscal -->
                 <td class="meta-column text-right">
-                    <span class="doc-title uppercase">{{ $cfdi['tipo_descripcion'] }} {{ $cfdi['serie'] }}{{ $cfdi['folio'] }}</span>
+                    @if($cfdi['tipo_comprobante'] === 'N')
+                        <span class="doc-title uppercase">RECIBO DE NÓMINA {{ $cfdi['serie'] }}{{ $cfdi['folio'] }}</span>
+                    @else
+                        <span class="doc-title uppercase">{{ $cfdi['tipo_descripcion'] }} {{ $cfdi['serie'] }}{{ $cfdi['folio'] }}</span>
+                    @endif
                     
                     <span class="meta-label">FOLIO FISCAL (UUID)</span>
                     <span class="meta-value uppercase">{{ $cfdi['uuid'] }}</span>
@@ -142,6 +161,146 @@
                 </tr>
             </table>
         @endif
+
+        <!-- ===== NÓMINA SECTIONS ===== -->
+        @if($cfdi['tipo_comprobante'] === 'N' && $cfdi['nomina'])
+        @php $nom = $cfdi['nomina']; $rec = $nom['receptor']; @endphp
+
+        {{-- Tabla dos columnas: EMPLEADO | PAGOS --}}
+        <table class="nomina-two-col">
+            <tr>
+                <td style="padding:0; border-right: 1px solid #000;">
+                    <div class="nomina-half-header">EMPLEADO</div>
+                    <table class="nomina-row-table">
+                        @if($rec)
+                        <tr>
+                            <td class="nomina-label">No. Empleado</td>
+                            <td class="nomina-value">{{ $rec['num_empleado'] }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">CURP</td>
+                            <td class="nomina-value">{{ $rec['curp'] }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">Tipo Contrato</td>
+                            <td class="nomina-value">{{ $rec['tipo_contrato_desc'] }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">Tipo Régimen</td>
+                            <td class="nomina-value">{{ $rec['tipo_regimen_desc'] }}</td>
+                        </tr>
+                        @endif
+                    </table>
+                </td>
+                <td style="padding:0;">
+                    <div class="nomina-half-header">PAGOS</div>
+                    <table class="nomina-row-table">
+                        <tr>
+                            <td class="nomina-label">Tipo Nómina</td>
+                            <td class="nomina-value">{{ $nom['tipo_nomina_desc'] }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">Fecha de Pago</td>
+                            <td class="nomina-value">{{ $nom['fecha_pago'] }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">Fecha Inicial Pago</td>
+                            <td class="nomina-value">{{ $nom['fecha_inicial_pago'] }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">Fecha Final Pago</td>
+                            <td class="nomina-value">{{ $nom['fecha_final_pago'] }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">Núm. Días Pagados</td>
+                            <td class="nomina-value">{{ $nom['num_dias_pagados'] }}</td>
+                        </tr>
+                        @if($rec)
+                        <tr>
+                            <td class="nomina-label">Periodicidad Pago</td>
+                            <td class="nomina-value">{{ $rec['periodicidad_desc'] }}</td>
+                        </tr>
+                        @endif
+                        <tr>
+                            <td class="nomina-label">Total Percepciones</td>
+                            <td class="nomina-value">${{ number_format((float)$nom['total_percepciones'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="nomina-label">Total Deducciones</td>
+                            <td class="nomina-value">${{ number_format((float)$nom['total_deducciones'], 2) }}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+
+        {{-- Tabla PERCEPCIONES --}}
+        @if(count($nom['percepciones']) > 0)
+        <table class="nomina-percep-table">
+            <thead>
+                <tr>
+                    <th colspan="5" style="text-align:center; font-size:8.5pt; padding:5px;">PERCEPCIONES</th>
+                </tr>
+                <tr>
+                    <th style="width:30%;">Concepto</th>
+                    <th style="width:10%; text-align:center;">Clave</th>
+                    <th style="width:30%;">Tipo Percepción</th>
+                    <th style="width:15%; text-align:right;">Importe Exento</th>
+                    <th style="width:15%; text-align:right;">Importe Gravado</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($nom['percepciones'] as $p)
+                <tr>
+                    <td>{{ $p['concepto'] }}</td>
+                    <td style="text-align:center;">{{ $p['clave'] }}</td>
+                    <td>{{ $p['tipo_percepcion'] }}</td>
+                    <td style="text-align:right;">${{ number_format((float)$p['importe_exento'], 2) }}</td>
+                    <td style="text-align:right;">${{ number_format((float)$p['importe_gravado'], 2) }}</td>
+                </tr>
+                @endforeach
+                <tr style="font-weight:bold; border-top: 1px solid #000;">
+                    <td colspan="3" style="text-align:right;">Total</td>
+                    <td style="text-align:right;">${{ number_format(collect($nom['percepciones'])->sum(fn($p) => (float)$p['importe_exento']), 2) }}</td>
+                    <td style="text-align:right;">${{ number_format(collect($nom['percepciones'])->sum(fn($p) => (float)$p['importe_gravado']), 2) }}</td>
+                </tr>
+            </tbody>
+        </table>
+        @endif
+
+        {{-- Tabla DEDUCCIONES --}}
+        @if(count($nom['deducciones']) > 0)
+        <table class="nomina-percep-table">
+            <thead>
+                <tr>
+                    <th colspan="4" style="text-align:center; font-size:8.5pt; padding:5px;">DEDUCCIONES</th>
+                </tr>
+                <tr>
+                    <th style="width:35%;">Concepto</th>
+                    <th style="width:10%; text-align:center;">Clave</th>
+                    <th style="width:35%;">Tipo Deducción</th>
+                    <th style="width:20%; text-align:right;">Importe</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($nom['deducciones'] as $d)
+                <tr>
+                    <td>{{ $d['concepto'] }}</td>
+                    <td style="text-align:center;">{{ $d['clave'] }}</td>
+                    <td>{{ $d['tipo_deduccion'] }}</td>
+                    <td style="text-align:right;">${{ number_format((float)$d['importe'], 2) }}</td>
+                </tr>
+                @endforeach
+                <tr style="font-weight:bold; border-top: 1px solid #000;">
+                    <td colspan="3" style="text-align:right;">Total</td>
+                    <td style="text-align:right;">${{ number_format(collect($nom['deducciones'])->sum(fn($d) => (float)$d['importe']), 2) }}</td>
+                </tr>
+            </tbody>
+        </table>
+        @endif
+
+        @endif
+        {{-- /NÓMINA SECTIONS --}}
 
         <!-- Concepts / Payment Details -->
         @if($cfdi['tipo_comprobante'] === 'P')

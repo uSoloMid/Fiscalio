@@ -128,6 +128,7 @@ class InvoiceController extends Controller
         $xpath->registerNamespace('pago20', 'http://www.sat.gob.mx/Pagos20');
         $xpath->registerNamespace('pago10', 'http://www.sat.gob.mx/Pagos');
         $xpath->registerNamespace('implocal', 'http://www.sat.gob.mx/implocal');
+        $xpath->registerNamespace('nomina12', 'http://www.sat.gob.mx/nomina12');
 
         $root = $dom->documentElement;
         $version = $root->getAttribute('Version');
@@ -451,6 +452,100 @@ class InvoiceController extends Controller
             }
         }
         $data['related_uuids'] = array_unique($relatedUuids);
+
+        // --- Complemento Nómina ---
+        $data['nomina'] = null;
+        if ($data['tipo_comprobante'] === 'N') {
+            $nominaNode = $xpath->query("//nomina12:Nomina")->item(0);
+            if ($nominaNode) {
+                $tipoNominaMap = [
+                    'O' => 'O - Nómina ordinaria',
+                    'E' => 'E - Nómina extraordinaria',
+                ];
+                $periodicidadMap = [
+                    '01' => '01 - Diario',    '02' => '02 - Semanal',    '03' => '03 - Catorcenal',
+                    '04' => '04 - Quincenal', '05' => '05 - Mensual',    '06' => '06 - Bimestral',
+                    '07' => '07 - Unidad obra','08' => '08 - Comisión',  '09' => '09 - Precio alzado',
+                    '10' => '10 - Decenal',   '99' => '99 - Otra periodicidad',
+                ];
+                $tipoContratoMap = [
+                    '01' => 'Tiempo indeterminado', '02' => 'Obra determinada',
+                    '03' => 'Tiempo determinado',   '04' => 'Por temporada',
+                    '05' => 'Revisión',             '06' => 'Eventual del campo',
+                    '07' => 'Construcción',         '08' => 'Confianza',
+                    '09' => 'Honorarios',           '10' => 'Comisionista',
+                    '11' => 'Eventual',             '99' => 'Otro contrato',
+                ];
+                $tipoRegimenMap = [
+                    '02' => 'Sueldos',              '03' => 'Jubilados',
+                    '04' => 'Pensionados',          '05' => 'Asim. Coop. Producción',
+                    '06' => 'Asim. Soc./Asoc. Civiles','07' => 'Asim. Consejos',
+                    '08' => 'Asim. Comisionistas',  '09' => 'Asim. Honorarios',
+                    '10' => 'Asim. Acciones',       '11' => 'Asim. Otros',
+                    '12' => 'Jubilados/Pensionados', '13' => 'Indemnización/Separación',
+                    '99' => 'Otro Régimen',
+                ];
+
+                $tn = $nominaNode->getAttribute('TipoNomina');
+                $nomina = [
+                    'tipo_nomina' => $tn,
+                    'tipo_nomina_desc' => $tipoNominaMap[$tn] ?? $tn,
+                    'fecha_pago'         => $nominaNode->getAttribute('FechaPago'),
+                    'fecha_inicial_pago' => $nominaNode->getAttribute('FechaInicialPago'),
+                    'fecha_final_pago'   => $nominaNode->getAttribute('FechaFinalPago'),
+                    'num_dias_pagados'   => $nominaNode->getAttribute('NumDiasPagados'),
+                    'total_sueldos'      => $nominaNode->getAttribute('TotalSueldos'),
+                    'total_percepciones' => $nominaNode->getAttribute('TotalPercepciones'),
+                    'total_deducciones'  => $nominaNode->getAttribute('TotalDeducciones'),
+                ];
+
+                // Receptor nómina
+                $receptorN = $xpath->query("//nomina12:Receptor")->item(0);
+                if ($receptorN) {
+                    $tc = $receptorN->getAttribute('TipoContrato');
+                    $tr = $receptorN->getAttribute('TipoRegimen');
+                    $per = $receptorN->getAttribute('PeriodicidadPago');
+                    $nomina['receptor'] = [
+                        'num_empleado'      => $receptorN->getAttribute('NumEmpleado'),
+                        'curp'              => $receptorN->getAttribute('Curp'),
+                        'tipo_contrato'     => $tc,
+                        'tipo_contrato_desc'=> $tc . ' - ' . ($tipoContratoMap[$tc] ?? $tc),
+                        'tipo_regimen'      => $tr,
+                        'tipo_regimen_desc' => $tr . ' - ' . ($tipoRegimenMap[$tr] ?? $tr),
+                        'periodicidad_pago' => $per,
+                        'periodicidad_desc' => $periodicidadMap[$per] ?? $per,
+                        'clave_ent_fed'     => $receptorN->getAttribute('ClaveEntFed'),
+                    ];
+                } else {
+                    $nomina['receptor'] = null;
+                }
+
+                // Percepciones
+                $nomina['percepciones'] = [];
+                foreach ($xpath->query("//nomina12:Percepciones/nomina12:Percepcion") as $p) {
+                    $nomina['percepciones'][] = [
+                        'concepto'        => $p->getAttribute('Concepto'),
+                        'clave'           => $p->getAttribute('Clave'),
+                        'tipo_percepcion' => $p->getAttribute('TipoPercepcion'),
+                        'importe_exento'  => $p->getAttribute('ImporteExento'),
+                        'importe_gravado' => $p->getAttribute('ImporteGravado'),
+                    ];
+                }
+
+                // Deducciones
+                $nomina['deducciones'] = [];
+                foreach ($xpath->query("//nomina12:Deducciones/nomina12:Deduccion") as $d) {
+                    $nomina['deducciones'][] = [
+                        'concepto'       => $d->getAttribute('Concepto'),
+                        'clave'          => $d->getAttribute('Clave'),
+                        'tipo_deduccion' => $d->getAttribute('TipoDeduccion'),
+                        'importe'        => $d->getAttribute('Importe'),
+                    ];
+                }
+
+                $data['nomina'] = $nomina;
+            }
+        }
 
         return $data;
     }
