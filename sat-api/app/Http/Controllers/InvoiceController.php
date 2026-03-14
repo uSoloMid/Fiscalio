@@ -68,6 +68,13 @@ class InvoiceController extends Controller
             $query->where('es_cancelado', $request->input('status') === 'cancelados' ? 1 : 0);
         }
 
+        if ($request->filled('day') && $request->input('day') !== 'all') {
+            $day = (int) $request->input('day');
+            if ($day >= 1 && $day <= 31) {
+                $query->whereRaw('DAY(fecha_fiscal) = ?', [$day]);
+            }
+        }
+
         if ($request->filled('reconciliacion')) {
             $val = $request->input('reconciliacion');
             if ($val === 'conciliadas') {
@@ -138,7 +145,9 @@ class InvoiceController extends Controller
                 ->orWhere('name_receptor', 'like', "%$q%")
                 ->orWhere('concepto', 'like', "%$q%")
                 ->orWhere('total', 'like', "%$q%")
-                ->orWhere('fecha_fiscal', 'like', "%$q%");
+                ->orWhere('fecha_fiscal', 'like', "%$q%")
+                ->orWhere('serie', 'like', "%$q%")
+                ->orWhere('folio', 'like', "%$q%");
         })->select('uuid', 'rfc_emisor', 'rfc_receptor', 'name_emisor', 'name_receptor', 'concepto', 'total', 'fecha_fiscal', 'tipo')
           ->orderBy('fecha_fiscal', 'desc')
           ->limit(12)

@@ -14,6 +14,7 @@ import type { Cfdi } from '../models';
 export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, activeValidUntil }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string, activeValidUntil?: string }) => {
     const [year, setYear] = useState(localStorage.getItem('active_year') || new Date().getFullYear().toString());
     const [month, setMonth] = useState(localStorage.getItem('active_month') || (new Date().getMonth() + 1).toString().padStart(2, '0'));
+    const [day, setDay] = useState<string>('all');
     const [filterType, setFilterType] = useState<'all' | 'emitidas' | 'recibidas' | 'canceladas'>('all');
     const [filterReconciliacion, setFilterReconciliacion] = useState<'all' | 'conciliadas' | 'no_conciliadas'>('all');
     const [cfdiTipo, setCfdiTipo] = useState<'I' | 'E' | 'N' | 'P' | 'T' | ''>('I');
@@ -63,7 +64,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
 
     // --- Column widths (persisted) ---
     const defaultColWidths: Record<string, number> = {
-        status: 40, fecha: 96, serieFolio: 48, rfcNombre: 160,
+        status: 40, fecha: 96, serie: 40, folio: 64, rfcNombre: 160,
         concepto: 256, total: 96, iva: 80, ret: 80,
         tipo: 64, met: 64, estatusSat: 128, uuid: 120, conc: 36, actions: 32,
     };
@@ -325,13 +326,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     // Reset page when filters change
     useEffect(() => {
         setPage(1);
-    }, [year, month, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled]);
+    }, [year, month, day, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled]);
 
     useEffect(() => {
         if (!activeRfc) return;
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeRfc, year, month, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled, page]);
+    }, [activeRfc, year, month, day, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled, page]);
 
     useEffect(() => {
         if (selectedUuid) {
@@ -356,6 +357,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                 page: page,
                 pageSize: 10,
                 reconciliacion: filterReconciliacion !== 'all' ? filterReconciliacion : undefined,
+                day: day !== 'all' ? day : undefined,
             });
             if (res && Array.isArray(res.data)) {
                 setData(res.data);
@@ -542,6 +544,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const handlePeriodMonthChange = (m: string) => {
         setMonth(m);
         localStorage.setItem('active_month', m);
+        if (m === 'all') setDay('all'); // no tiene sentido filtrar por día sin mes
     };
     const handlePeriodYearChange = (y: string) => {
         setYear(y);
@@ -840,15 +843,32 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                             </div>
                         </div>
                         {/* Header Filters */}
-                        <div className="flex items-center gap-4 w-full md:w-auto justify-end">
+                        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                            {/* Día selector */}
+                            <div className="relative">
+                                <select
+                                    value={day}
+                                    onChange={e => setDay(e.target.value)}
+                                    disabled={month === 'all'}
+                                    title={month === 'all' ? 'Selecciona un mes para filtrar por día' : 'Filtrar por día del mes'}
+                                    className="appearance-none bg-white border border-gray-200 rounded-xl pl-3 pr-7 py-2 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 cursor-pointer hover:border-gray-300 transition-colors disabled:opacity-40 disabled:cursor-default"
+                                >
+                                    <option value="all">Día</option>
+                                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                                        <option key={d} value={String(d)}>{String(d).padStart(2, '0')}</option>
+                                    ))}
+                                </select>
+                                <span className="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none select-none" style={{ fontSize: 18 }}>expand_more</span>
+                            </div>
                             <MonthYearPicker
                                 monthValue={month}
                                 yearValue={year}
-                                monthOptions={
-                                    availablePeriods.length > 0
+                                monthOptions={[
+                                    { value: 'all', label: 'Todo el año' },
+                                    ...(availablePeriods.length > 0
                                         ? [...new Set(availablePeriods.map(p => p.split('-')[1]))].sort().map(m => ({ value: m, label: MONTH_NUM_LABELS[m] || m }))
-                                        : [{ value: month, label: MONTH_NUM_LABELS[month] || month }]
-                                }
+                                        : Object.entries(MONTH_NUM_LABELS).map(([v, l]) => ({ value: v, label: l })))
+                                ]}
                                 yearOptions={
                                     availablePeriods.length > 0
                                         ? [...new Set(availablePeriods.map(p => p.split('-')[0]))].sort().map(y => ({ value: y, label: y }))
@@ -1283,6 +1303,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                             <span className="material-symbols-outlined text-base" title="Estado">info</span>
                                                         </ResizableTh>
                                                         <ResizableTh colId="fecha" label="Fecha" sortable align="left" />
+                                                        <ResizableTh colId="serie" label="Serie" sortable align="center" />
+                                                        <ResizableTh colId="folio" label="Folio" sortable align="center" />
                                                         <ResizableTh colId="rfcNombre" label={cfdiTipo === 'N' ? 'Empleado' : 'RFC / Nombre'} align="left" />
                                                         <ResizableTh colId="concepto" label={cfdiTipo === 'N' ? 'F. Final Pago' : 'Concepto'} align="left" />
                                                         <ResizableTh colId="total" label="Total" sortable align="right" />
@@ -1334,19 +1356,23 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                 <td style={{ width: colWidths.fecha }} className="px-3 py-4 whitespace-nowrap text-xs font-semibold text-gray-700 overflow-hidden">
                                                     {cfdi.fecha ? cfdi.fecha.substring(0, 10) : '-'}
                                                 </td>
-                                                {/* RFC / Nombre + Folio integrado */}
+                                                {/* Serie */}
+                                                <td style={{ width: colWidths.serie }} className="px-2 py-4 whitespace-nowrap text-center overflow-hidden">
+                                                    <span className="text-[11px] font-black text-gray-800 tracking-wide">{cfdi.serie || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                {/* Folio */}
+                                                <td style={{ width: colWidths.folio }} className="px-2 py-4 whitespace-nowrap text-center overflow-hidden">
+                                                    <span className="text-[11px] font-black text-gray-800">{cfdi.folio || <span className="text-gray-200">—</span>}</span>
+                                                </td>
+                                                {/* RFC / Nombre */}
                                                 <td style={{ width: colWidths.rfcNombre }} className="px-3 py-4 whitespace-nowrap text-xs text-gray-900 font-medium overflow-hidden">
                                                     {(() => {
                                                         const isEmitted = cfdi.rfc_emisor === activeRfc;
                                                         const otherName = isEmitted ? cfdi.name_receptor : cfdi.name_emisor;
                                                         const otherRfc = isEmitted ? cfdi.rfc_receptor : cfdi.rfc_emisor;
-                                                        const serieFolio = (cfdi.serie || '') + (cfdi.folio || '');
                                                         return (
                                                             <div className="flex flex-col">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="font-bold truncate" style={{ maxWidth: colWidths.rfcNombre - 24 }} title={otherName || ''}>{otherName || otherRfc}</span>
-                                                                    {serieFolio && <span className="flex-shrink-0 text-[9px] font-black text-gray-400 bg-gray-100 px-1 rounded">{serieFolio}</span>}
-                                                                </div>
+                                                                <span className="font-bold truncate" style={{ maxWidth: colWidths.rfcNombre }} title={otherName || ''}>{otherName || otherRfc}</span>
                                                                 {otherName && <span className="text-gray-400 font-normal text-[10px]">{otherRfc}</span>}
                                                             </div>
                                                         );
