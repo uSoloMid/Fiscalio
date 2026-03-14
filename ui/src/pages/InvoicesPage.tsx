@@ -60,14 +60,18 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
 
     // --- Column widths (persisted) ---
     const defaultColWidths: Record<string, number> = {
-        status: 40, fecha: 96, serieFolio: 80, rfcNombre: 160,
+        status: 40, fecha: 96, serieFolio: 48, rfcNombre: 160,
         concepto: 256, total: 96, iva: 80, ret: 80,
         tipo: 64, met: 64, estatusSat: 128, uuid: 120, actions: 32,
     };
     const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
         try {
             const saved = localStorage.getItem('invoices_col_widths');
-            return saved ? { ...defaultColWidths, ...JSON.parse(saved) } : defaultColWidths;
+            if (!saved) return defaultColWidths;
+            const parsed = JSON.parse(saved);
+            // Reset serieFolio si viene del default viejo (80) para forzar el nuevo (48)
+            if (parsed.serieFolio === 80) parsed.serieFolio = 48;
+            return { ...defaultColWidths, ...parsed };
         } catch { return defaultColWidths; }
     });
 
@@ -88,7 +92,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         const handleMouseMove = (e: MouseEvent) => {
             if (!resizingRef.current) return;
             const { colId, startX, startWidth } = resizingRef.current;
-            const newWidth = Math.max(40, startWidth + (e.clientX - startX));
+            const newWidth = Math.max(24, startWidth + (e.clientX - startX));
             setColWidths(prev => ({ ...prev, [colId]: newWidth }));
         };
         const handleMouseUp = () => {
@@ -336,7 +340,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                 status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
                 q: debouncedSearch,
                 page: page,
-                pageSize: 25
+                pageSize: 10
             });
             if (res && Array.isArray(res.data)) {
                 setData(res.data);
@@ -1457,7 +1461,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
 
                                     <div className="hidden sm:flex items-center gap-1">
                                         <span className="text-[10px] text-gray-400 font-medium">Mostrando</span>
-                                        <span className="text-[10px] font-bold text-gray-700">{(page - 1) * 25 + 1}-{Math.min(page * 25, totalCount)}</span>
+                                        <span className="text-[10px] font-bold text-gray-700">{(page - 1) * 10 + 1}-{Math.min(page * 10, totalCount)}</span>
                                         <span className="text-[10px] text-gray-400 font-medium">de {totalCount}</span>
                                     </div>
                                 </div>
