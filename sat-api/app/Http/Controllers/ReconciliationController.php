@@ -8,6 +8,8 @@ use App\Models\BankStatement;
 use App\Models\BankMovement;
 use App\Models\Cfdi;
 use App\Models\ReconciliationPattern;
+use App\Models\Business;
+use App\Models\CfdiPayment;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -401,6 +403,158 @@ class ReconciliationController extends Controller
             if ($existing) $existing->increment('confirmed_count');
             else ReconciliationPattern::create(['business_id' => $businessId, 'description_keyword' => $keyword, 'counterpart_rfc' => $counterpartRfc, 'confirmed_count' => 1]);
         });
+    }
+
+    public function pendingReport(Request $request)
+    {
+        $request->validate(['rfc' => 'required|string']);
+
+        $rfc  = strtoupper(trim($request->rfc));
+        $from = $request->query('from'); // 'YYYY-MM-DD' opcional
+        $to   = $request->query('to');   // 'YYYY-MM-DD' opcional
+
+        $business   = Business::where('rfc', $rfc)->firstOrFail();
+        $businessId = $business->id;
+
+        $statementsCount = BankStatement::where('business_id', $businessId)->count();
+
+        // IDs de CFDIs ya vinculados a movimientos bancarios de esta empresa
+        $linkedCfdiIds = BankMovement::whereNotNull('cfdi_id')
+            ->whereHas('statement', fn($q) => $q->where('business_id', $businessId))
+            ->pluck('cfdi_id')->unique()->values()->all();
+        $excludeIds = $linkedCfdiIds ?: [0];
+
+        $cfdiSelect = ['id', 'uuid', 'serie', 'folio', 'fecha', 'rfc_emisor', 'rfc_receptor',
+                       'name_emisor', 'name_receptor', 'total', 'tipo', 'metodo_pago', 'moneda', 'concepto'];
+
+        $applyDate = function ($q) use ($from, $to) {
+            if ($from) $q->where('fecha', '>=', $from);
+            if ($to)   $q->where('fecha', '<=', $to . ' 23:59:59');
+        };
+
+        // ── 1. MOVIMIENTOS SIN CONCILIAR ─────────────────────────────────────
+        $movQ = BankMovement::with('statement:id,bank_name,period,account_number')
+            ->whereNull('cfdi_id')
+            ->whereHas('statement', fn($q) => $q->where('business_id', $businessId));
+        if ($from) $movQ->where('date', '>=', $from);
+        if ($to)   $movQ->where('date', '<=', $to);
+        $movimientos = $movQ->orderBy('date')
+            ->get(['id', 'bank_statement_id', 'date', 'description', 'reference', 'cargo', 'abono', 'confidence']);
+
+        $movsSinConciliar = [
+            'ingresos'       => $movimientos->where('abono', '>', 0)->values(),
+            'egresos'        => $movimientos->where('cargo', '>', 0)->values(),
+            'total_ingresos' => round($movimientos->sum('abono'), 2),
+            'total_egresos'  => round($movimientos->sum('cargo'), 2),
+            'count'          => $movimientos->count(),
+        ];
+
+        // ── 2. PUE SIN BANCO ─────────────────────────────────────────────────
+        $pueQ = Cfdi::select($cfdiSelect)
+            ->where(fn($q) => $q->where('rfc_emisor', $rfc)->orWhere('rfc_receptor', $rfc))
+            ->whereIn('tipo', ['I', 'E'])
+            ->where('metodo_pago', 'PUE')
+            ->where('es_cancelado', 0)
+            ->whereNotIn('id', $excludeIds);
+        $applyDate($pueQ);
+        $pueAll = $pueQ->orderByDesc('fecha')->get();
+
+        $puePorCobrar = $pueAll->filter(fn($c) => $c->rfc_emisor === $rfc && $c->tipo === 'I')->values();
+        $puePorPagar  = $pueAll->filter(fn($c) => $c->rfc_receptor === $rfc && $c->rfc_emisor !== $rfc)->values();
+
+        // Nóminas sin banco (siempre son egresos: el negocio paga a empleados)
+        $nomQ = Cfdi::select($cfdiSelect)
+            ->where('rfc_emisor', $rfc)
+            ->where('tipo', 'N')
+            ->where('es_cancelado', 0)
+            ->whereNotIn('id', $excludeIds);
+        $applyDate($nomQ);
+        $nominas = $nomQ->orderByDesc('fecha')->get();
+
+        $pueSinBanco = [
+            'por_cobrar'        => $puePorCobrar,
+            'por_pagar'         => $puePorPagar,
+            'nominas'           => $nominas,
+            'total_por_cobrar'  => round($puePorCobrar->sum('total'), 2),
+            'total_por_pagar'   => round($puePorPagar->sum('total'), 2),
+            'total_nominas'     => round($nominas->sum('total'), 2),
+            'count'             => $puePorCobrar->count() + $puePorPagar->count() + $nominas->count(),
+        ];
+
+        // ── 3 & 4. PPD: sin REP / parcialmente pagados ───────────────────────
+        $uuidsConPago = CfdiPayment::pluck('uuid_relacionado')->unique()->values()->all();
+        $uuidsConPagoOr = $uuidsConPago ?: ['__none__'];
+
+        $ppdBaseQ = fn() => Cfdi::select($cfdiSelect)
+            ->where(fn($q) => $q->where('rfc_emisor', $rfc)->orWhere('rfc_receptor', $rfc))
+            ->whereIn('tipo', ['I', 'E'])
+            ->where('metodo_pago', 'PPD')
+            ->where('es_cancelado', 0);
+
+        // PPD sin ningún REP
+        $ppdSinRepQ = $ppdBaseQ()->whereNotIn('uuid', $uuidsConPagoOr);
+        $applyDate($ppdSinRepQ);
+        $ppdSinRepAll = $ppdSinRepQ->orderByDesc('fecha')->get();
+
+        $ppdSinRep = [
+            'por_cobrar'        => $ppdSinRepAll->filter(fn($c) => $c->rfc_emisor === $rfc && $c->tipo === 'I')->values(),
+            'por_pagar'         => $ppdSinRepAll->filter(fn($c) => $c->rfc_receptor === $rfc && $c->rfc_emisor !== $rfc)->values(),
+        ];
+        $ppdSinRep['total_por_cobrar'] = round($ppdSinRep['por_cobrar']->sum('total'), 2);
+        $ppdSinRep['total_por_pagar']  = round($ppdSinRep['por_pagar']->sum('total'), 2);
+        $ppdSinRep['count']            = $ppdSinRep['por_cobrar']->count() + $ppdSinRep['por_pagar']->count();
+
+        // PPD con al menos un pago → filtrar los que aún tienen saldo pendiente
+        $ppdConPagoQ = $ppdBaseQ()->whereIn('uuid', $uuidsConPagoOr);
+        $applyDate($ppdConPagoQ);
+        $ppdConPagoAll = $ppdConPagoQ->orderByDesc('fecha')->get();
+
+        $ppdParcialAll = $ppdConPagoAll->filter(function ($cfdi) {
+            $last = CfdiPayment::where('uuid_relacionado', $cfdi->uuid)
+                ->orderByDesc('fecha_pago')->orderByDesc('num_parcialidad')->first();
+            if (!$last) return false;
+            $cfdi->saldo_insoluto      = round((float) $last->saldo_insoluto, 2);
+            $cfdi->ultimo_pago_fecha   = $last->fecha_pago;
+            $cfdi->num_parcialidades   = CfdiPayment::where('uuid_relacionado', $cfdi->uuid)->count();
+            return $last->saldo_insoluto > 0.01;
+        })->values();
+
+        $ppdParciales = [
+            'por_cobrar'             => $ppdParcialAll->filter(fn($c) => $c->rfc_emisor === $rfc && $c->tipo === 'I')->values(),
+            'por_pagar'              => $ppdParcialAll->filter(fn($c) => $c->rfc_receptor === $rfc && $c->rfc_emisor !== $rfc)->values(),
+        ];
+        $ppdParciales['total_saldo_por_cobrar'] = round($ppdParciales['por_cobrar']->sum('saldo_insoluto'), 2);
+        $ppdParciales['total_saldo_por_pagar']  = round($ppdParciales['por_pagar']->sum('saldo_insoluto'), 2);
+        $ppdParciales['count']                  = $ppdParciales['por_cobrar']->count() + $ppdParciales['por_pagar']->count();
+
+        // ── 5. REP SIN BANCO ─────────────────────────────────────────────────
+        $repQ = Cfdi::select($cfdiSelect)
+            ->where(fn($q) => $q->where('rfc_emisor', $rfc)->orWhere('rfc_receptor', $rfc))
+            ->where('tipo', 'P')
+            ->where('es_cancelado', 0)
+            ->whereNotIn('id', $excludeIds);
+        $applyDate($repQ);
+        $repAll = $repQ->orderByDesc('fecha')->get();
+
+        $repSinBanco = [
+            'emitidos'        => $repAll->filter(fn($c) => $c->rfc_emisor === $rfc)->values(),
+            'recibidos'       => $repAll->filter(fn($c) => $c->rfc_receptor === $rfc && $c->rfc_emisor !== $rfc)->values(),
+        ];
+        $repSinBanco['total_emitidos']  = round($repSinBanco['emitidos']->sum('total'), 2);
+        $repSinBanco['total_recibidos'] = round($repSinBanco['recibidos']->sum('total'), 2);
+        $repSinBanco['count']           = $repSinBanco['emitidos']->count() + $repSinBanco['recibidos']->count();
+
+        return response()->json([
+            'rfc'                      => $rfc,
+            'has_statements'           => $statementsCount > 0,
+            'statements_count'         => $statementsCount,
+            'filters'                  => ['from' => $from, 'to' => $to],
+            'movimientos_sin_conciliar' => $movsSinConciliar,
+            'pue_sin_banco'            => $pueSinBanco,
+            'ppd_sin_rep'              => $ppdSinRep,
+            'ppd_parciales'            => $ppdParciales,
+            'rep_sin_banco'            => $repSinBanco,
+        ]);
     }
 
     public function searchCfdis(Request $request)

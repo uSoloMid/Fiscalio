@@ -543,6 +543,15 @@ export async function searchCfdisManual(rfc: string, q: string, direction: 'egre
     return response.json();
 }
 
+export async function getPendingReconciliationReport(rfc: string, from?: string, to?: string): Promise<any> {
+    const params = new URLSearchParams({ rfc });
+    if (from) params.set('from', from);
+    if (to)   params.set('to', to);
+    const response = await authFetch(`${API_BASE_URL}/api/reconciliation/pending-report?${params}`);
+    if (!response.ok) throw new Error('Error al obtener reporte de pendientes');
+    return response.json();
+}
+
 export async function deleteBankStatement(id: number, rfc: string): Promise<void> {
     const response = await authFetch(`${API_BASE_URL}/api/bank-statements/${id}?rfc=${rfc}`, {
         method: 'DELETE'

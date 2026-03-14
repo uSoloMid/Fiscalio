@@ -7,6 +7,7 @@ import { ProvisionalControlPage } from './ProvisionalControlPage';
 import { BankStatementPage } from './BankStatementPage';
 import { ReconciliationPage } from './ReconciliationPage';
 import { SatDocumentsPage } from './SatDocumentsPage';
+import { ReconciliationReportPage } from './ReconciliationReportPage';
 import type { Cfdi } from '../models';
 
 export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, activeValidUntil }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string, activeValidUntil?: string }) => {
@@ -39,7 +40,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [activeRequests, setActiveRequests] = useState<any[]>([]);
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
-    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation' | 'sat-docs'>('invoices');
+    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation' | 'reconciliation-report' | 'sat-docs'>('invoices');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [contabilidadOpen, setContabilidadOpen] = useState(true);
 
@@ -693,8 +694,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                     Pólizas
                                 </button>
                                 <button
-                                    className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 cursor-not-allowed"
-                                    title="Próximamente"
+                                    onClick={() => { setCurrentView('reconciliation-report'); setIsSidebarOpen(false); }}
+                                    className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'reconciliation-report' ? 'active bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
                                 >
                                     <span className="material-symbols-outlined text-lg">analytics</span>
                                     Reportes
@@ -773,6 +774,14 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
             ) : currentView === 'sat-docs' ? (
                 <div className="flex-1 h-screen overflow-hidden">
                     <SatDocumentsPage
+                        activeRfc={activeRfc}
+                        clientName={clientName || activeClientName || activeRfc}
+                        onBack={() => setCurrentView('invoices')}
+                    />
+                </div>
+            ) : currentView === 'reconciliation-report' ? (
+                <div className="flex-1 h-screen overflow-hidden">
+                    <ReconciliationReportPage
                         activeRfc={activeRfc}
                         clientName={clientName || activeClientName || activeRfc}
                         onBack={() => setCurrentView('invoices')}
