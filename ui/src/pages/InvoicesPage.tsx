@@ -1263,8 +1263,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                         {sortedData.map(cfdi => (
                                             <tr
                                                 key={cfdi.uuid}
-                                                onClick={() => setSelectedUuid(cfdi.uuid)}
-                                                className={`group table-row-hover hover:bg-blue-50/40 cursor-pointer transition-colors ${selectedUuid === cfdi.uuid ? 'bg-emerald-50' : cfdi.tipo === 'P' ? 'bg-violet-50/30' : ''}`}
+                                                className={`group table-row-hover hover:bg-blue-50/40 transition-colors ${selectedUuid === cfdi.uuid ? 'bg-emerald-50' : cfdi.tipo === 'P' ? 'bg-violet-50/30' : ''}`}
                                             >
                                                 {/* Estado vigente/cancelado */}
                                                 <td style={{ width: colWidths.status }} className="px-3 py-4 whitespace-nowrap text-center overflow-hidden">
@@ -1834,7 +1833,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                     )}
                                     {pdfPreviewUrl && (
                                         <iframe
-                                            src={pdfPreviewUrl}
+                                            src={`${pdfPreviewUrl}#navpanes=0&pagemode=none`}
                                             className="w-full h-full border-0"
                                             title="Vista previa CFDI"
                                         />
