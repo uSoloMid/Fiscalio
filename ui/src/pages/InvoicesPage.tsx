@@ -359,7 +359,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         }
     };
 
-    const hasSerieFolio = data.some(c => c.serie || c.folio);
+
     const hasRetenciones = data.some(c => c.retenciones && Number(c.retenciones) > 0);
 
     const sortedData = useMemo(() => {
@@ -1228,7 +1228,6 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                             <span className="material-symbols-outlined text-base" title="Estado">info</span>
                                                         </ResizableTh>
                                                         <ResizableTh colId="fecha" label="Fecha" sortable align="left" />
-                                                        {hasSerieFolio && <ResizableTh colId="serieFolio" label="S/F" align="left" />}
                                                         <ResizableTh colId="rfcNombre" label="RFC / Nombre" align="left" />
                                                         <ResizableTh colId="concepto" label="Concepto" align="left" />
                                                         <ResizableTh colId="total" label="Total / Pagado" sortable align="right" />
@@ -1277,20 +1276,19 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                 <td style={{ width: colWidths.fecha }} className="px-3 py-4 whitespace-nowrap text-xs font-semibold text-gray-700 overflow-hidden">
                                                     {cfdi.fecha ? cfdi.fecha.substring(0, 10) : '-'}
                                                 </td>
-                                                {hasSerieFolio && (
-                                                    <td style={{ width: colWidths.serieFolio }} className="px-3 py-4 whitespace-nowrap text-[10px] text-gray-500 font-mono overflow-hidden">
-                                                        {cfdi.serie || ''}{cfdi.folio || ''}
-                                                    </td>
-                                                )}
-                                                {/* RFC / Nombre */}
+                                                {/* RFC / Nombre + Folio integrado */}
                                                 <td style={{ width: colWidths.rfcNombre }} className="px-3 py-4 whitespace-nowrap text-xs text-gray-900 font-medium overflow-hidden">
                                                     {(() => {
                                                         const isEmitted = cfdi.rfc_emisor === activeRfc;
                                                         const otherName = isEmitted ? cfdi.name_receptor : cfdi.name_emisor;
                                                         const otherRfc = isEmitted ? cfdi.rfc_receptor : cfdi.rfc_emisor;
+                                                        const serieFolio = (cfdi.serie || '') + (cfdi.folio || '');
                                                         return (
                                                             <div className="flex flex-col">
-                                                                <span className="font-bold truncate" style={{ maxWidth: colWidths.rfcNombre - 24 }} title={otherName || ''}>{otherName || otherRfc}</span>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="font-bold truncate" style={{ maxWidth: colWidths.rfcNombre - 24 }} title={otherName || ''}>{otherName || otherRfc}</span>
+                                                                    {serieFolio && <span className="flex-shrink-0 text-[9px] font-black text-gray-400 bg-gray-100 px-1 rounded">{serieFolio}</span>}
+                                                                </div>
                                                                 {otherName && <span className="text-gray-400 font-normal text-[10px]">{otherRfc}</span>}
                                                             </div>
                                                         );
