@@ -528,10 +528,11 @@ export async function reconcileMovement(movementId: number, cfdiId: number, conf
     return response.json();
 }
 
-export async function unreconcileMovement(movementId: number): Promise<any> {
-    const response = await authFetch(`${API_BASE_URL}/api/bank-movements/${movementId}/reconcile`, {
-        method: 'DELETE',
-    });
+export async function unreconcileMovement(movementId: number, cfdiId?: number): Promise<any> {
+    const url = cfdiId
+        ? `${API_BASE_URL}/api/bank-movements/${movementId}/reconcile?cfdi_id=${cfdiId}`
+        : `${API_BASE_URL}/api/bank-movements/${movementId}/reconcile`;
+    const response = await authFetch(url, { method: 'DELETE' });
     if (!response.ok) throw new Error('Error al desconciliar movimiento');
     return response.json();
 }

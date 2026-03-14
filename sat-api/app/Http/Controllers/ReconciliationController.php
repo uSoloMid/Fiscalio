@@ -20,15 +20,18 @@ class ReconciliationController extends Controller
         ini_set('memory_limit', '512M');
         set_time_limit(120);
 
-        $statement = BankStatement::with(['movements.cfdi', 'business'])->findOrFail($statementId);
+        $statement = BankStatement::with(['movements.cfdis', 'business'])->findOrFail($statementId);
         $business   = $statement->business;
         $businessRfc = $business->rfc;
         $businessId  = $business->id;
 
         // Collect CFDIs already linked to movements for this business (to exclude from suggestions)
-        $linkedIds = BankMovement::whereNotNull('cfdi_id')
-            ->whereHas('statement', fn($q) => $q->where('business_id', $businessId))
-            ->pluck('cfdi_id')->unique()->all();
+        $linkedIds = DB::table('bank_movement_cfdis')
+            ->join('bank_movements', 'bank_movements.id', '=', 'bank_movement_cfdis.bank_movement_id')
+            ->join('bank_statements', 'bank_statements.id', '=', 'bank_movements.bank_statement_id')
+            ->where('bank_statements.business_id', $businessId)
+            ->pluck('bank_movement_cfdis.cfdi_id')
+            ->unique()->values()->all();
 
         // Also exclude invoices covered by already-linked REPs
         if (!empty($linkedIds)) {
@@ -89,7 +92,7 @@ class ReconciliationController extends Controller
         $result = $movements->map(function ($movement) use ($cfdis, $businessRfc, $businessId, $learnedPatterns, &$stats) {
             $data = $movement->toArray();
 
-            if ($movement->cfdi_id) {
+            if ($movement->cfdis->isNotEmpty()) {
                 $conf = $movement->confidence ?? 'green';
                 $stats[$conf] = ($stats[$conf] ?? 0) + 1;
                 $data['suggestions'] = [];
@@ -127,12 +130,21 @@ class ReconciliationController extends Controller
 
         $movement = BankMovement::with('statement.business')->findOrFail($id);
         $cfdi     = Cfdi::findOrFail($request->cfdi_id);
+        $confidence = $request->confidence ?? 'green';
 
+        // Add to junction table (ignore if already linked)
+        DB::table('bank_movement_cfdis')->insertOrIgnore([
+            'bank_movement_id' => $movement->id,
+            'cfdi_id'          => $request->cfdi_id,
+            'confidence'       => $confidence,
+            'created_at'       => now(),
+        ]);
+
+        // Update movement status fields
         $movement->update([
-            'cfdi_id'       => $request->cfdi_id,
-            'confidence'    => $request->confidence ?? 'green',
             'is_reviewed'   => true,
-            'reconciled_at' => now(),
+            'reconciled_at' => $movement->reconciled_at ?? now(),
+            'confidence'    => $confidence,
         ]);
 
         // Learn from this manual/confirmed reconciliation
@@ -144,21 +156,45 @@ class ReconciliationController extends Controller
 
         return response()->json([
             'success'  => true,
-            'movement' => $movement->fresh()->load('cfdi'),
+            'movement' => $movement->fresh()->load('cfdis'),
         ]);
     }
 
-    public function unreconcile($id)
+    public function unreconcile(Request $request, $id)
     {
         $movement = BankMovement::findOrFail($id);
-        $movement->update([
-            'cfdi_id'       => null,
-            'confidence'    => null,
-            'is_reviewed'   => false,
-            'reconciled_at' => null,
-        ]);
+        $cfdiId   = $request->query('cfdi_id');
 
-        return response()->json(['success' => true]);
+        if ($cfdiId) {
+            // Remove specific CFDI link
+            DB::table('bank_movement_cfdis')
+                ->where('bank_movement_id', $movement->id)
+                ->where('cfdi_id', $cfdiId)
+                ->delete();
+        } else {
+            // Remove all links
+            DB::table('bank_movement_cfdis')
+                ->where('bank_movement_id', $movement->id)
+                ->delete();
+        }
+
+        // If no links remain, reset movement status
+        $remaining = DB::table('bank_movement_cfdis')
+            ->where('bank_movement_id', $movement->id)
+            ->count();
+
+        if ($remaining === 0) {
+            $movement->update([
+                'is_reviewed'   => false,
+                'confidence'    => null,
+                'reconciled_at' => null,
+            ]);
+        }
+
+        return response()->json([
+            'success'  => true,
+            'movement' => $movement->fresh()->load('cfdis'),
+        ]);
     }
 
     private function findMatches(BankMovement $movement, Collection $cfdis, string $businessRfc, array $learnedPatterns): array
@@ -419,9 +455,12 @@ class ReconciliationController extends Controller
         $statementsCount = BankStatement::where('business_id', $businessId)->count();
 
         // IDs de CFDIs ya vinculados a movimientos bancarios de esta empresa
-        $linkedCfdiIds = BankMovement::whereNotNull('cfdi_id')
-            ->whereHas('statement', fn($q) => $q->where('business_id', $businessId))
-            ->pluck('cfdi_id')->unique()->values()->all();
+        $linkedCfdiIds = DB::table('bank_movement_cfdis')
+            ->join('bank_movements', 'bank_movements.id', '=', 'bank_movement_cfdis.bank_movement_id')
+            ->join('bank_statements', 'bank_statements.id', '=', 'bank_movements.bank_statement_id')
+            ->where('bank_statements.business_id', $businessId)
+            ->pluck('bank_movement_cfdis.cfdi_id')
+            ->unique()->values()->all();
         $excludeIds = $linkedCfdiIds ?: [0];
 
         $cfdiSelect = ['id', 'uuid', 'serie', 'folio', 'fecha', 'rfc_emisor', 'rfc_receptor',
@@ -433,8 +472,15 @@ class ReconciliationController extends Controller
         };
 
         // ── 1. MOVIMIENTOS SIN CONCILIAR ─────────────────────────────────────
+        $reconciledMovIds = DB::table('bank_movement_cfdis')
+            ->join('bank_movements', 'bank_movements.id', '=', 'bank_movement_cfdis.bank_movement_id')
+            ->join('bank_statements', 'bank_statements.id', '=', 'bank_movements.bank_statement_id')
+            ->where('bank_statements.business_id', $businessId)
+            ->pluck('bank_movement_cfdis.bank_movement_id')
+            ->unique()->values()->all();
+
         $movQ = BankMovement::with('statement:id,bank_name,period,account_number')
-            ->whereNull('cfdi_id')
+            ->whereNotIn('id', $reconciledMovIds ?: [0])
             ->whereHas('statement', fn($q) => $q->where('business_id', $businessId));
         if ($from) $movQ->where('date', '>=', $from);
         if ($to)   $movQ->where('date', '<=', $to);

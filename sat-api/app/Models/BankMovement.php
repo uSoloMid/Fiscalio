@@ -41,4 +41,16 @@ class BankMovement extends Model
     {
         return $this->belongsTo(Cfdi::class);
     }
+
+    public function cfdis()
+    {
+        return $this->belongsToMany(Cfdi::class, 'bank_movement_cfdis')
+            ->withPivot('confidence', 'created_at')
+            ->orderBy('bank_movement_cfdis.created_at');
+    }
+
+    public function movementCfdis()
+    {
+        return $this->hasMany(BankMovementCfdi::class);
+    }
 }

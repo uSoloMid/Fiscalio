@@ -116,6 +116,7 @@ export interface BankMovement {
     reconciled_at?: string | null;
     is_reviewed: boolean;
     cfdi?: Cfdi | null;
+    cfdis?: Cfdi[];
     suggestions?: ReconciliationSuggestion[];
     _confidence_preview?: ReconciliationConfidence;
 }

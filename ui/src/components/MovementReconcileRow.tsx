@@ -81,7 +81,8 @@ function parseMovementDisplay(description: string, isEgreso: boolean): { main: s
 export function MovementReconcileRow({ movement, isSelected, onSelect, onUnreconciled, onViewPdf, onDownloadPdf, gridTemplate }: Props) {
     const [loadingUnlink, setLoadingUnlink] = useState(false);
 
-    const isReconciled = !!movement.cfdi_id;
+    const linkedCfdis = movement.cfdis ?? (movement.cfdi ? [movement.cfdi] : []);
+    const isReconciled = linkedCfdis.length > 0;
     const suggestions = movement.suggestions ?? [];
     const previewConfidence = movement._confidence_preview ?? suggestions[0]?.confidence;
     const hasSuggestions = suggestions.length > 0;
@@ -104,7 +105,7 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
     const handleUnlink = async () => {
         setLoadingUnlink(true);
         try {
-            await unreconcileMovement(movement.id);
+            await unreconcileMovement(movement.id); // unlink all
             onUnreconciled(movement.id);
         } catch (e) {
             console.error(e);
@@ -120,7 +121,7 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
     const estadoBadge = isReconciled ? (
         <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl whitespace-nowrap uppercase tracking-widest">
             <span className="material-symbols-outlined text-[12px]">check_circle</span>
-            OK
+            {linkedCfdis.length > 1 ? `${linkedCfdis.length} facturas` : 'OK'}
         </span>
     ) : hasSuggestions ? (
         <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-amber-700 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-xl whitespace-nowrap uppercase tracking-widest">
@@ -134,8 +135,8 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
         </span>
     );
 
-    // Reconciled invoice info
-    const cfdi = movement.cfdi;
+    // First linked CFDI for display
+    const cfdi = linkedCfdis[0] ?? movement.cfdi ?? null;
     const counterpartRfc = isEgreso ? cfdi?.rfc_emisor : cfdi?.rfc_receptor;
     const counterpartName = isEgreso ? cfdi?.name_emisor : cfdi?.name_receptor;
 
@@ -143,9 +144,8 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
         <div className={`border-b border-gray-50 last:border-0 border-l-4 transition-colors ${borderColor} ${rowBg}`}>
             <div
                 style={{ gridTemplateColumns: gridTemplate ?? '90px 280px 120px 120px 60px 100px 240px 140px 64px' }}
-                className={`grid gap-0 items-stretch transition-colors ${!isReconciled ? 'cursor-pointer hover:bg-gray-50/60' : 'cursor-default'
-                    }`}
-                onClick={() => !isReconciled && onSelect(movement)}
+                className="grid gap-0 items-stretch transition-colors cursor-pointer hover:bg-gray-50/60"
+                onClick={() => onSelect(movement)}
             >
                 <div className="px-4 py-4 border-r border-gray-50">
                     <p className="text-sm font-black text-gray-800">{day} {month}</p>
@@ -198,7 +198,12 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                     {isReconciled && (
                         <>
                             <p className="text-[10px] font-black text-gray-800 truncate uppercase">{counterpartName || '—'}</p>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{counterpartRfc || '—'}</p>
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                                {counterpartRfc || '—'}
+                                {linkedCfdis.length > 1 && (
+                                    <span className="ml-1 text-emerald-600">+{linkedCfdis.length - 1} más</span>
+                                )}
+                            </p>
                         </>
                     )}
                 </div>
@@ -210,7 +215,7 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                 <div className="px-2 py-4 flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
                     {isReconciled ? (
                         <>
-                            {cfdi?.uuid && (
+                            {linkedCfdis.length === 1 && cfdi?.uuid && (
                                 <>
                                     <button
                                         onClick={() => onViewPdf(cfdi.uuid, counterpartName || cfdi.uuid)}
@@ -219,20 +224,13 @@ export function MovementReconcileRow({ movement, isSelected, onSelect, onUnrecon
                                     >
                                         <span className="material-symbols-outlined text-base">visibility</span>
                                     </button>
-                                    <button
-                                        onClick={() => onDownloadPdf(cfdi.uuid)}
-                                        title="Descargar PDF"
-                                        className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all shadow-sm bg-white border border-gray-100"
-                                    >
-                                        <span className="material-symbols-outlined text-base">download</span>
-                                    </button>
                                 </>
                             )}
                             <button
                                 onClick={handleUnlink}
                                 disabled={loadingUnlink}
                                 className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm bg-white border border-gray-100 ml-1"
-                                title="Desvincular"
+                                title={linkedCfdis.length > 1 ? `Desvincular todas (${linkedCfdis.length})` : 'Desvincular'}
                             >
                                 {loadingUnlink
                                     ? <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
