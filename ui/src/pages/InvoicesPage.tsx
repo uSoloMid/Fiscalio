@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel, createManualRequest, suggestCfdis } from '../services';
+import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel, createManualRequest, suggestCfdis, authFetch } from '../services';
+import { API_BASE_URL } from '../api/config';
 import { AccountsPage } from './AccountsPage';
 import { ProvisionalControlPage } from './ProvisionalControlPage';
 import { BankStatementPage } from './BankStatementPage';
@@ -117,6 +118,34 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [showExportModal, setShowExportModal] = useState(false);
 
     const [isScrapingFiel, setIsScrapingFiel] = useState(false);
+
+    // PDF inline preview modal
+    const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+    const [pdfPreviewTitle, setPdfPreviewTitle] = useState('');
+    const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
+
+    const handlePreviewPdf = async (uuid: string, title: string) => {
+        setPdfPreviewTitle(title);
+        setPdfPreviewLoading(true);
+        setPdfPreviewUrl(null);
+        try {
+            const response = await authFetch(`${API_BASE_URL}/api/cfdis/${uuid}/pdf?inline=1`);
+            if (!response.ok) throw new Error('Error al cargar PDF');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            setPdfPreviewUrl(url);
+        } catch {
+            alert('No se pudo abrir el PDF');
+        } finally {
+            setPdfPreviewLoading(false);
+        }
+    };
+
+    const handleClosePdfPreview = () => {
+        if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+        setPdfPreviewUrl(null);
+        setPdfPreviewTitle('');
+    };
 
     const [showManualRequestModal, setShowManualRequestModal] = useState(false);
     const [manualRequest, setManualRequest] = useState({
@@ -307,7 +336,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                 status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
                 q: debouncedSearch,
                 page: page,
-                pageSize: 50
+                pageSize: 25
             });
             if (res && Array.isArray(res.data)) {
                 setData(res.data);
@@ -1162,7 +1191,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                             )}
 
                             <div className="flex-1 overflow-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
+                                <table className="min-w-full divide-y divide-gray-300">
                                     <thead className="bg-gray-50 sticky top-0 z-20">
                                         <tr>
                                             {/* Helper: ResizableTh renders a header cell with sort+resize */}
@@ -1198,8 +1227,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                         {hasSerieFolio && <ResizableTh colId="serieFolio" label="S/F" align="left" />}
                                                         <ResizableTh colId="rfcNombre" label="RFC / Nombre" align="left" />
                                                         <ResizableTh colId="concepto" label="Concepto" align="left" />
-                                                        <ResizableTh colId="total" label="Total" sortable align="right" />
-                                                        <ResizableTh colId="iva" label="IVA" sortable align="right" />
+                                                        <ResizableTh colId="total" label="Total / Pagado" sortable align="right" />
+                                                        <ResizableTh colId="iva" label="IVA / F.Pago" sortable align="right" />
                                                         {hasRetenciones && <ResizableTh colId="ret" label="Ret" sortable align="right" />}
                                                         <ResizableTh colId="tipo" label="Tipo" sortable align="center" />
                                                         <ResizableTh colId="met" label="Met" sortable align="center" />
@@ -1211,7 +1240,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                             })()}
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white divide-y divide-gray-200">
+                                    <tbody className="bg-white divide-y divide-gray-300">
                                         {loading && (
                                             <tr>
                                                 <td colSpan={11} className="text-center py-4 text-gray-500">Cargando facturas...</td>
@@ -1231,24 +1260,27 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                             <tr
                                                 key={cfdi.uuid}
                                                 onClick={() => setSelectedUuid(cfdi.uuid)}
-                                                className={`table-row-hover hover:bg-gray-50 cursor-pointer transition-colors ${selectedUuid === cfdi.uuid ? 'bg-emerald-50' : ''}`}
+                                                className={`group table-row-hover hover:bg-blue-50/40 cursor-pointer transition-colors ${selectedUuid === cfdi.uuid ? 'bg-emerald-50' : cfdi.tipo === 'P' ? 'bg-violet-50/30' : ''}`}
                                             >
-                                                <td style={{ width: colWidths.status }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
+                                                {/* Estado vigente/cancelado */}
+                                                <td style={{ width: colWidths.status }} className="px-3 py-4 whitespace-nowrap text-center overflow-hidden">
                                                     {cfdi.es_cancelado ? (
                                                         <span className="material-symbols-outlined text-red-500 text-lg">cancel</span>
                                                     ) : (
                                                         <span className="material-symbols-outlined text-emerald-500 text-lg">check_circle</span>
                                                     )}
                                                 </td>
-                                                <td style={{ width: colWidths.fecha }} className="px-3 py-3 whitespace-nowrap text-xs text-gray-900 overflow-hidden">
+                                                {/* Fecha */}
+                                                <td style={{ width: colWidths.fecha }} className="px-3 py-4 whitespace-nowrap text-xs font-semibold text-gray-700 overflow-hidden">
                                                     {cfdi.fecha ? cfdi.fecha.substring(0, 10) : '-'}
                                                 </td>
                                                 {hasSerieFolio && (
-                                                    <td style={{ width: colWidths.serieFolio }} className="px-3 py-3 whitespace-nowrap text-[10px] text-gray-500 font-mono overflow-hidden">
+                                                    <td style={{ width: colWidths.serieFolio }} className="px-3 py-4 whitespace-nowrap text-[10px] text-gray-500 font-mono overflow-hidden">
                                                         {cfdi.serie || ''}{cfdi.folio || ''}
                                                     </td>
                                                 )}
-                                                <td style={{ width: colWidths.rfcNombre }} className="px-3 py-3 whitespace-nowrap text-xs text-gray-900 font-medium overflow-hidden">
+                                                {/* RFC / Nombre */}
+                                                <td style={{ width: colWidths.rfcNombre }} className="px-3 py-4 whitespace-nowrap text-xs text-gray-900 font-medium overflow-hidden">
                                                     {(() => {
                                                         const isEmitted = cfdi.rfc_emisor === activeRfc;
                                                         const otherName = isEmitted ? cfdi.name_receptor : cfdi.name_emisor;
@@ -1256,47 +1288,116 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                         return (
                                                             <div className="flex flex-col">
                                                                 <span className="font-bold truncate" style={{ maxWidth: colWidths.rfcNombre - 24 }} title={otherName || ''}>{otherName || otherRfc}</span>
-                                                                {otherName && <span className="text-gray-500 font-normal text-[10px]">{otherRfc}</span>}
+                                                                {otherName && <span className="text-gray-400 font-normal text-[10px]">{otherRfc}</span>}
                                                             </div>
                                                         );
                                                     })()}
                                                 </td>
-                                                <td style={{ width: colWidths.concepto, maxWidth: colWidths.concepto }} className="px-3 py-3 text-xs text-gray-600 truncate overflow-hidden" title={cfdi.concepto || ''}>
-                                                    {cfdi.concepto || '-'}
+                                                {/* Concepto */}
+                                                <td style={{ width: colWidths.concepto, maxWidth: colWidths.concepto }} className="px-3 py-4 text-xs text-gray-500 truncate overflow-hidden" title={cfdi.concepto || ''}>
+                                                    {cfdi.tipo === 'P' ? (
+                                                        <span className="italic text-violet-500 text-[10px] font-medium">Complemento de pago</span>
+                                                    ) : cfdi.tipo === 'N' ? (
+                                                        <span className="italic text-teal-500 text-[10px] font-medium">Nómina</span>
+                                                    ) : cfdi.concepto || '-'}
                                                 </td>
-                                                <td style={{ width: colWidths.total }} className="px-3 py-3 whitespace-nowrap text-xs text-right font-medium text-gray-900 overflow-hidden">
-                                                    ${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.total)}
+                                                {/* Total — para tipo P muestra el monto real del pago */}
+                                                <td style={{ width: colWidths.total }} className="px-3 py-4 whitespace-nowrap text-right overflow-hidden">
+                                                    {cfdi.tipo === 'P' ? (
+                                                        cfdi.pagos_propios_sum_monto_pagado ? (
+                                                            <span className="text-sm font-black text-violet-700">
+                                                                ${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(cfdi.pagos_propios_sum_monto_pagado))}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] text-violet-400 italic font-medium">REP</span>
+                                                        )
+                                                    ) : (
+                                                        <span className="text-sm font-black text-gray-900">
+                                                            ${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.total)}
+                                                        </span>
+                                                    )}
                                                 </td>
-                                                <td style={{ width: colWidths.iva }} className="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-600 overflow-hidden">
-                                                    {cfdi.iva ? `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.iva)}` : '-'}
+                                                {/* IVA — para tipo P muestra la fecha de pago */}
+                                                <td style={{ width: colWidths.iva }} className="px-3 py-4 whitespace-nowrap text-xs text-right overflow-hidden">
+                                                    {cfdi.tipo === 'P' ? (
+                                                        cfdi.pagos_propios_min_fecha_pago ? (
+                                                            <span className="text-[10px] font-semibold text-violet-500">
+                                                                {cfdi.pagos_propios_min_fecha_pago.substring(0, 10)}
+                                                            </span>
+                                                        ) : <span className="text-gray-300">—</span>
+                                                    ) : cfdi.iva ? (
+                                                        <span className="text-gray-500">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.iva)}</span>
+                                                    ) : <span className="text-gray-300">—</span>}
                                                 </td>
                                                 {hasRetenciones && (
-                                                    <td style={{ width: colWidths.ret }} className="px-3 py-3 whitespace-nowrap text-xs text-right text-gray-600 overflow-hidden">
-                                                        {cfdi.retenciones && Number(cfdi.retenciones) > 0 ? `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.retenciones)}` : '-'}
+                                                    <td style={{ width: colWidths.ret }} className="px-3 py-4 whitespace-nowrap text-xs text-right text-gray-500 overflow-hidden">
+                                                        {cfdi.retenciones && Number(cfdi.retenciones) > 0 ? `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(cfdi.retenciones)}` : <span className="text-gray-300">—</span>}
                                                     </td>
                                                 )}
-                                                <td style={{ width: colWidths.tipo }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
-                                                    <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600 font-medium">{cfdi.tipo}</span>
-                                                </td>
-                                                <td style={{ width: colWidths.met }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${cfdi.metodo_pago === 'PUE' ? 'bg-blue-50 text-blue-600' : cfdi.metodo_pago === 'PPD' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500'}`}>
-                                                        {cfdi.metodo_pago || '-'}
+                                                {/* Tipo CFDI — badge con color por tipo */}
+                                                <td style={{ width: colWidths.tipo }} className="px-3 py-4 whitespace-nowrap text-center overflow-hidden">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                                        cfdi.tipo === 'I' ? 'bg-blue-50 text-blue-700' :
+                                                        cfdi.tipo === 'E' ? 'bg-red-50 text-red-700' :
+                                                        cfdi.tipo === 'P' ? 'bg-violet-100 text-violet-700' :
+                                                        cfdi.tipo === 'N' ? 'bg-teal-50 text-teal-700' :
+                                                        'bg-gray-100 text-gray-600'
+                                                    }`}>
+                                                        {cfdi.tipo === 'P' ? 'REP' : cfdi.tipo}
                                                     </span>
                                                 </td>
-                                                <td style={{ width: colWidths.estatusSat }} className="px-3 py-3 whitespace-nowrap text-center overflow-hidden">
+                                                {/* Método de pago */}
+                                                <td style={{ width: colWidths.met }} className="px-3 py-4 whitespace-nowrap text-center overflow-hidden">
+                                                    {cfdi.tipo === 'P' ? (
+                                                        <span className="text-gray-300 text-xs">—</span>
+                                                    ) : (
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${cfdi.metodo_pago === 'PUE' ? 'bg-blue-50 text-blue-600' : cfdi.metodo_pago === 'PPD' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-gray-500'}`}>
+                                                            {cfdi.metodo_pago || '-'}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                {/* Estatus SAT */}
+                                                <td style={{ width: colWidths.estatusSat }} className="px-3 py-4 whitespace-nowrap text-center overflow-hidden">
                                                     <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${cfdi.estado_sat === 'Vigente' ? 'bg-emerald-100 text-emerald-700' :
                                                         cfdi.estado_sat === 'Cancelado' ? 'bg-red-100 text-red-700' :
                                                             cfdi.estado_sat === 'No Encontrado' ? 'bg-amber-100 text-amber-700' :
-                                                                'bg-gray-100 text-gray-600'
+                                                                'bg-gray-100 text-gray-500'
                                                         }`}>
                                                         {cfdi.estado_sat || 'Sin verificar'}
                                                     </span>
                                                 </td>
-                                                <td style={{ width: colWidths.uuid }} className="px-3 py-3 whitespace-nowrap text-xs text-gray-400 font-mono overflow-hidden">
-                                                    {cfdi.uuid}
+                                                {/* UUID truncado — primeros 8 chars, full en tooltip */}
+                                                <td style={{ width: colWidths.uuid }} className="px-3 py-4 whitespace-nowrap overflow-hidden" title={cfdi.uuid}>
+                                                    <span className="text-[10px] text-gray-400 font-mono">{cfdi.uuid.substring(0, 8)}…</span>
                                                 </td>
-                                                <td style={{ width: colWidths.actions }} className="px-1 py-3 whitespace-nowrap text-right overflow-hidden">
-                                                    <span className="material-symbols-outlined text-lg text-gray-400">chevron_right</span>
+                                                {/* Botones de acción — visibles al hover de la fila */}
+                                                <td style={{ width: 96, minWidth: 96 }} className="px-2 py-4 whitespace-nowrap text-right overflow-hidden">
+                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {/* Ojo: preview PDF inline */}
+                                                        <button
+                                                            title="Ver PDF"
+                                                            onClick={e => { e.stopPropagation(); handlePreviewPdf(cfdi.uuid, (() => { const isE = cfdi.rfc_emisor === activeRfc; return (isE ? cfdi.name_receptor : cfdi.name_emisor) || cfdi.uuid; })()); }}
+                                                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base">visibility</span>
+                                                        </button>
+                                                        {/* Descarga XML */}
+                                                        <button
+                                                            title="Descargar XML"
+                                                            onClick={e => { e.stopPropagation(); exportCfdiXml(cfdi.uuid); }}
+                                                            className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-all"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base">code</span>
+                                                        </button>
+                                                        {/* Abrir panel lateral */}
+                                                        <button
+                                                            title="Abrir detalle"
+                                                            onClick={e => { e.stopPropagation(); setSelectedUuid(cfdi.uuid); }}
+                                                            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-all"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base">side_navigation</span>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -1356,7 +1457,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
 
                                     <div className="hidden sm:flex items-center gap-1">
                                         <span className="text-[10px] text-gray-400 font-medium">Mostrando</span>
-                                        <span className="text-[10px] font-bold text-gray-700">{(page - 1) * 50 + 1}-{Math.min(page * 50, totalCount)}</span>
+                                        <span className="text-[10px] font-bold text-gray-700">{(page - 1) * 25 + 1}-{Math.min(page * 25, totalCount)}</span>
                                         <span className="text-[10px] text-gray-400 font-medium">de {totalCount}</span>
                                     </div>
                                 </div>
@@ -1378,7 +1479,12 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                 />
 
                                 <div className="h-14 flex items-center justify-between px-5 border-b border-gray-100 flex-shrink-0">
-                                    <h3 className="font-semibold text-gray-800 uppercase text-xs tracking-widest">Detalle de Factura</h3>
+                                    <h3 className="font-semibold text-gray-800 uppercase text-xs tracking-widest">
+                                        {selectedCfdi?.tipo === 'P' ? 'Complemento de Pago' :
+                                         selectedCfdi?.tipo === 'N' ? 'Recibo de Nómina' :
+                                         selectedCfdi?.tipo === 'E' ? 'Nota de Crédito / Egreso' :
+                                         'Detalle de CFDI'}
+                                    </h3>
                                     <button onClick={() => setSelectedUuid(null)} className="text-gray-400 hover:text-gray-600">
                                         <span className="material-symbols-outlined">close</span>
                                     </button>
@@ -1392,171 +1498,290 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                     )}
                                     {!drawerLoading && selectedCfdi && (
                                         <>
-                                            {/* Header: Name, RFC, UUID */}
-                                            <div className="space-y-1">
-                                                <h4 className="font-black text-gray-900 text-lg leading-tight uppercase">
+                                            {/* ── HEADER COMÚN ── */}
+                                            <div className="space-y-1.5">
+                                                {/* Tipo badge */}
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider ${
+                                                        selectedCfdi.tipo === 'P' ? 'bg-violet-100 text-violet-700 border border-violet-200' :
+                                                        selectedCfdi.tipo === 'N' ? 'bg-teal-50 text-teal-700 border border-teal-100' :
+                                                        selectedCfdi.tipo === 'I' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                                        selectedCfdi.tipo === 'E' ? 'bg-red-50 text-red-700 border border-red-100' :
+                                                        'bg-gray-100 text-gray-600 border border-gray-200'
+                                                    }`}>
+                                                        {selectedCfdi.tipo === 'P' ? 'Complemento de Pago (REP)' :
+                                                         selectedCfdi.tipo === 'I' ? 'Ingreso' :
+                                                         selectedCfdi.tipo === 'E' ? 'Egreso / Nota de Crédito' :
+                                                         selectedCfdi.tipo === 'N' ? 'Nómina' :
+                                                         selectedCfdi.tipo === 'T' ? 'Traslado' : selectedCfdi.tipo}
+                                                    </span>
+                                                    <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${selectedCfdi.estado_sat === 'Vigente' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : selectedCfdi.estado_sat === 'Cancelado' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>
+                                                        {selectedCfdi.estado_sat || 'Sin verificar'}
+                                                    </span>
+                                                    <div className="flex-1" />
+                                                    <button onClick={handleRefreshStatus} disabled={satStatusUpdating} className="p-1.5 bg-gray-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors border border-gray-100" title="Verificar en SAT">
+                                                        <span className={`material-symbols-outlined text-sm ${satStatusUpdating ? 'animate-spin' : ''}`}>sync</span>
+                                                    </button>
+                                                </div>
+                                                <h4 className="font-black text-gray-900 text-base leading-tight">
                                                     {(() => {
                                                         const isEmitted = selectedCfdi.rfc_emisor === activeRfc;
                                                         return isEmitted ? selectedCfdi.name_receptor : selectedCfdi.name_emisor;
                                                     })() || 'Razón Social no disponible'}
                                                 </h4>
                                                 <div className="flex flex-col gap-0.5">
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">
-                                                        {(() => {
-                                                            const isEmitted = selectedCfdi.rfc_emisor === activeRfc;
-                                                            return isEmitted ? selectedCfdi.rfc_receptor : selectedCfdi.rfc_emisor;
-                                                        })()}
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                                        {(() => { const isE = selectedCfdi.rfc_emisor === activeRfc; return isE ? selectedCfdi.rfc_receptor : selectedCfdi.rfc_emisor; })()}
                                                     </span>
-                                                    <span className="text-[10px] font-medium text-gray-300 font-mono break-all leading-none">{selectedCfdi.uuid}</span>
+                                                    <span className="text-[9px] font-medium text-gray-300 font-mono break-all">{selectedCfdi.uuid}</span>
                                                 </div>
+                                                <p className="text-[10px] text-gray-500">
+                                                    <span className="font-bold">Emisión:</span> {selectedCfdi.fecha?.substring(0, 10)}
+                                                    {selectedCfdi.serie && <><span className="mx-2 text-gray-300">|</span><span className="font-bold">S/F:</span> {selectedCfdi.serie}{selectedCfdi.folio}</>}
+                                                </p>
                                             </div>
 
-                                            {/* Status Row: SAT & Method */}
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${selectedCfdi.estado_sat === 'Vigente' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                                                    {selectedCfdi.estado_sat || 'Sin Verificar'}
-                                                </span>
-                                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider ${selectedCfdi.metodo_pago === 'PUE' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
-                                                    {selectedCfdi.metodo_pago || 'Metodo -'}
-                                                </span>
-                                                <div className="flex-1"></div>
-                                                <button
-                                                    onClick={handleRefreshStatus}
-                                                    disabled={satStatusUpdating}
-                                                    className="p-1.5 bg-gray-50 text-gray-400 hover:text-blue-600 rounded-lg transition-colors border border-gray-100"
-                                                    title="Verificar en SAT"
-                                                >
-                                                    <span className={`material-symbols-outlined text-sm ${satStatusUpdating ? 'animate-spin' : ''}`}>sync</span>
+                                            {/* ── BOTONES DE ACCIÓN (comunes) ── */}
+                                            <div className="grid grid-cols-4 gap-2">
+                                                <button onClick={() => handlePreviewPdf(selectedCfdi.uuid, (() => { const isE = selectedCfdi.rfc_emisor === activeRfc; return (isE ? selectedCfdi.name_receptor : selectedCfdi.name_emisor) || selectedCfdi.uuid; })())} className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-red-50 hover:border-red-100 group transition-all">
+                                                    <span className="material-symbols-outlined text-gray-400 group-hover:text-red-500 text-lg">visibility</span>
+                                                    <span className="text-[8px] font-bold text-gray-400 group-hover:text-red-600 uppercase mt-1">Ver</span>
                                                 </button>
-                                            </div>
-
-                                            {/* Action Buttons: PDF, XML, ZIP */}
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <button
-                                                    onClick={() => exportCfdiPdf(selectedCfdi.uuid)}
-                                                    className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-red-50 hover:border-red-100 group transition-all"
-                                                >
-                                                    <span className="material-symbols-outlined text-gray-400 group-hover:text-red-500 text-lg">picture_as_pdf</span>
-                                                    <span className="text-[8px] font-bold text-gray-400 group-hover:text-red-600 uppercase mt-1">PDF</span>
+                                                <button onClick={() => exportCfdiPdf(selectedCfdi.uuid)} className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-orange-50 hover:border-orange-100 group transition-all">
+                                                    <span className="material-symbols-outlined text-gray-400 group-hover:text-orange-500 text-lg">picture_as_pdf</span>
+                                                    <span className="text-[8px] font-bold text-gray-400 group-hover:text-orange-600 uppercase mt-1">PDF</span>
                                                 </button>
-                                                <button
-                                                    onClick={() => exportCfdiXml(selectedCfdi.uuid)}
-                                                    className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-blue-50 hover:border-blue-100 group transition-all"
-                                                >
+                                                <button onClick={() => exportCfdiXml(selectedCfdi.uuid)} className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-blue-50 hover:border-blue-100 group transition-all">
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-blue-500 text-lg">code</span>
                                                     <span className="text-[8px] font-bold text-gray-400 group-hover:text-blue-600 uppercase mt-1">XML</span>
                                                 </button>
-                                                <button
-                                                    onClick={() => exportCfdiZip(selectedCfdi.uuid)}
-                                                    className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 group transition-all"
-                                                >
+                                                <button onClick={() => exportCfdiZip(selectedCfdi.uuid)} className="flex flex-col items-center justify-center p-2 rounded-xl border border-gray-100 bg-white hover:bg-gray-50 group transition-all">
                                                     <span className="material-symbols-outlined text-gray-400 group-hover:text-gray-600 text-lg">inventory_2</span>
                                                     <span className="text-[8px] font-bold text-gray-400 group-hover:text-gray-600 uppercase mt-1">ZIP</span>
                                                 </button>
                                             </div>
 
-                                            {/* Financials List */}
-                                            <div className="bg-gray-50/50 rounded-2xl p-4 space-y-3">
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-400 font-bold uppercase tracking-wider">Subtotal</span>
-                                                    <span className="text-gray-600 font-black">
-                                                        ${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.subtotal) || 0)}
-                                                    </span>
-                                                </div>
-                                                {selectedCfdi.descuento && Number(selectedCfdi.descuento) > 0 && (
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-gray-400 font-bold uppercase tracking-wider">Descuento</span>
-                                                        <span className="text-gray-600 font-black">-${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.descuento))}</span>
+                                            {/* ══ TIPO P — COMPLEMENTO DE PAGO ══ */}
+                                            {selectedCfdi.tipo === 'P' && (
+                                                <>
+                                                    <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 space-y-3">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="material-symbols-outlined text-violet-500 text-base">payments</span>
+                                                            <h5 className="text-[10px] font-black text-violet-700 uppercase tracking-widest">Complemento de Pago</h5>
+                                                        </div>
+                                                        <p className="text-[10px] text-violet-600 leading-relaxed">
+                                                            Este CFDI es un <strong>Recibo Electrónico de Pago (REP)</strong>. Los montos reales están en el complemento Pagos 2.0 dentro del XML — el total del encabezado es $1.00 por diseño del SAT.
+                                                        </p>
+                                                        <div className="grid grid-cols-2 gap-3 pt-1">
+                                                            <div>
+                                                                <span className="text-[8px] font-bold text-violet-400 uppercase tracking-widest block">Emisor (quien paga)</span>
+                                                                <p className="text-[10px] font-bold text-gray-700 truncate">{selectedCfdi.name_emisor || selectedCfdi.rfc_emisor}</p>
+                                                                <p className="text-[9px] text-gray-400 font-mono">{selectedCfdi.rfc_emisor}</p>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-[8px] font-bold text-violet-400 uppercase tracking-widest block">Receptor (cobrador)</span>
+                                                                <p className="text-[10px] font-bold text-gray-700 truncate">{selectedCfdi.name_receptor || selectedCfdi.rfc_receptor}</p>
+                                                                <p className="text-[9px] text-gray-400 font-mono">{selectedCfdi.rfc_receptor}</p>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                )}
-                                                <div className="flex justify-between items-center text-xs">
-                                                    <span className="text-gray-400 font-bold uppercase tracking-wider">IVA (16%)</span>
-                                                    <span className="text-gray-600 font-black">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.iva) || 0)}</span>
-                                                </div>
-                                                {selectedCfdi.retenciones && Number(selectedCfdi.retenciones) > 0 && (
-                                                    <div className="flex justify-between items-center text-xs">
-                                                        <span className="text-red-400 font-bold uppercase tracking-wider">Retenciones</span>
-                                                        <span className="text-red-600 font-black">-${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.retenciones))}</span>
+
+                                                    {/* Pagos detallados */}
+                                                    {selectedCfdi.pagos_propios && selectedCfdi.pagos_propios.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest">Pagos registrados ({selectedCfdi.pagos_propios.length})</p>
+                                                            {selectedCfdi.pagos_propios.map((p, i) => (
+                                                                <div key={i} className="bg-white border border-violet-100 rounded-xl p-3 space-y-2">
+                                                                    <div className="flex justify-between items-start">
+                                                                        <div>
+                                                                            <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest">Fecha de pago</p>
+                                                                            <p className="text-sm font-black text-violet-800">{p.fecha_pago?.toString().substring(0, 10)}</p>
+                                                                        </div>
+                                                                        <div className="text-right">
+                                                                            <p className="text-[9px] font-bold text-violet-400 uppercase tracking-widest">Monto pagado</p>
+                                                                            <p className="text-lg font-black text-violet-900">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(p.monto_pagado))}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="grid grid-cols-3 gap-2 pt-1 border-t border-violet-50">
+                                                                        {p.num_parcialidad && (
+                                                                            <div>
+                                                                                <p className="text-[8px] text-violet-300 font-bold uppercase">Parcialidad</p>
+                                                                                <p className="text-[10px] font-black text-gray-600">{p.num_parcialidad}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        {p.saldo_anterior && Number(p.saldo_anterior) > 0 && (
+                                                                            <div>
+                                                                                <p className="text-[8px] text-violet-300 font-bold uppercase">Saldo ant.</p>
+                                                                                <p className="text-[10px] font-black text-gray-600">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(p.saldo_anterior))}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        {p.saldo_insoluto !== undefined && (
+                                                                            <div>
+                                                                                <p className="text-[8px] text-violet-300 font-bold uppercase">Saldo pend.</p>
+                                                                                <p className={`text-[10px] font-black ${Number(p.saldo_insoluto) === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                                                    {Number(p.saldo_insoluto) === 0 ? 'Liquidado' : `$${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(p.saldo_insoluto))}`}
+                                                                                </p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-[9px] text-gray-400 font-mono truncate" title={p.uuid_relacionado}>
+                                                                        Doc. rel: {p.uuid_relacionado.substring(0, 8)}…
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-gray-50/60 border border-gray-100 rounded-2xl p-4 space-y-2 text-xs">
+                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Datos del CFDI</p>
+                                                            <div className="flex justify-between"><span className="text-gray-400 font-medium">Fecha de emisión</span><span className="font-bold text-gray-700">{selectedCfdi.fecha?.substring(0, 10)}</span></div>
+                                                            <div className="flex justify-between"><span className="text-gray-400 font-medium">Moneda</span><span className="font-bold text-gray-700">{selectedCfdi.moneda || 'MXN'}</span></div>
+                                                            <p className="text-[9px] text-violet-500 font-bold pt-1">Sin pagos registrados aún. Descarga el XML para ver el complemento completo.</p>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+
+                                            {/* ══ TIPO N — NÓMINA ══ */}
+                                            {selectedCfdi.tipo === 'N' && (
+                                                <>
+                                                    <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 space-y-3">
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="material-symbols-outlined text-teal-500 text-base">badge</span>
+                                                            <h5 className="text-[10px] font-black text-teal-700 uppercase tracking-widest">Recibo de Nómina</h5>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div>
+                                                                <span className="text-[8px] font-bold text-teal-400 uppercase tracking-widest block">Empleador</span>
+                                                                <p className="text-[10px] font-bold text-gray-700 truncate">{selectedCfdi.name_emisor || selectedCfdi.rfc_emisor}</p>
+                                                                <p className="text-[9px] text-gray-400 font-mono">{selectedCfdi.rfc_emisor}</p>
+                                                            </div>
+                                                            <div>
+                                                                <span className="text-[8px] font-bold text-teal-400 uppercase tracking-widest block">Empleado</span>
+                                                                <p className="text-[10px] font-bold text-gray-700 truncate">{selectedCfdi.name_receptor || selectedCfdi.rfc_receptor}</p>
+                                                                <p className="text-[9px] text-gray-400 font-mono">{selectedCfdi.rfc_receptor}</p>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                )}
-                                                <div className="h-px bg-gray-100 my-1"></div>
-                                                <div className="flex justify-between items-center">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] text-gray-900 font-black uppercase tracking-widest">Total</span>
-                                                        <span className="text-[8px] font-bold text-gray-400">{selectedCfdi.moneda || 'MXN'} {selectedCfdi.tipo_cambio && selectedCfdi.tipo_cambio > 1 ? `(TC: ${selectedCfdi.tipo_cambio})` : ''}</span>
+                                                    {/* Financials para nómina */}
+                                                    <div className="bg-gray-50/50 rounded-2xl p-4 space-y-3">
+                                                        {Number(selectedCfdi.subtotal) > 0 && (
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="text-gray-400 font-bold uppercase tracking-wider">Percepciones</span>
+                                                                <span className="font-black text-gray-700">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.subtotal))}</span>
+                                                            </div>
+                                                        )}
+                                                        {Number(selectedCfdi.retenciones) > 0 && (
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="text-red-400 font-bold uppercase tracking-wider">Retenciones/ISR</span>
+                                                                <span className="font-black text-red-600">-${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.retenciones))}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="h-px bg-gray-100" />
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Neto a pagar</span>
+                                                            <span className="text-lg font-black text-gray-900">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.total))}</span>
+                                                        </div>
                                                     </div>
-                                                    <span className="text-lg text-gray-900 font-black tracking-tight">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.total))}</span>
-                                                </div>
-                                            </div>
+                                                </>
+                                            )}
 
-                                            {/* Info Adicional */}
-                                            <div className="grid grid-cols-2 gap-4 bg-white border border-gray-100 rounded-2xl p-4">
-                                                <div className="space-y-1">
-                                                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Forma de Pago</span>
-                                                    <p className="text-[10px] font-black text-gray-700">{selectedCfdi.forma_pago || '01'} - Efectivo</p>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Uso CFDI</span>
-                                                    <p className="text-[10px] font-black text-gray-700">{selectedCfdi.uso_cfdi || 'G03'} - Gastos en gral.</p>
-                                                </div>
-                                            </div>
-
-                                            {/* Accounting Classification */}
-                                            <div className="space-y-4">
-                                                <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Clasificación Contable</h5>
-
-                                                <div className="space-y-1">
-                                                    <label className="text-[9px] font-bold text-gray-400 uppercase ml-1">Categoría de Gasto</label>
-                                                    <div className="relative group">
-                                                        <select className="w-full appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/10 cursor-pointer">
-                                                            <option>Sin categoría</option>
-                                                            <option>Gastos Generales</option>
-                                                            <option>Arrendamientos</option>
-                                                            <option>Honorarios</option>
-                                                            <option>Viáticos</option>
-                                                        </select>
-                                                        <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm group-hover:text-gray-600">expand_more</span>
+                                            {/* ══ TIPOS I / E / T — FACTURAS NORMALES ══ */}
+                                            {(selectedCfdi.tipo === 'I' || selectedCfdi.tipo === 'E' || selectedCfdi.tipo === 'T' || !selectedCfdi.tipo) && (
+                                                <>
+                                                    {/* Método pago */}
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${selectedCfdi.metodo_pago === 'PUE' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                                                            {selectedCfdi.metodo_pago || '—'}
+                                                        </span>
+                                                        {selectedCfdi.forma_pago && (
+                                                            <span className="text-[10px] text-gray-500 font-medium">Forma: <b>{selectedCfdi.forma_pago}</b></span>
+                                                        )}
+                                                        {selectedCfdi.uso_cfdi && (
+                                                            <span className="text-[10px] text-gray-400">Uso: <b>{selectedCfdi.uso_cfdi}</b></span>
+                                                        )}
                                                     </div>
-                                                </div>
 
-                                                <div className="space-y-1">
-                                                    <label className="text-[9px] font-bold text-gray-400 uppercase ml-1">Cuenta Contable</label>
-                                                    <div className="relative group">
-                                                        <select className="w-full appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/10 cursor-pointer">
-                                                            <option>Sin cuenta</option>
-                                                            <option>602-01 Gastos de Venta</option>
-                                                            <option>603-01 Gastos de Administración</option>
-                                                        </select>
-                                                        <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm group-hover:text-gray-600">expand_more</span>
+                                                    {/* Financials */}
+                                                    <div className="bg-gray-50/50 rounded-2xl p-4 space-y-3">
+                                                        {Number(selectedCfdi.subtotal) > 0 && (
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="text-gray-400 font-bold uppercase tracking-wider">Subtotal</span>
+                                                                <span className="text-gray-600 font-black">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.subtotal))}</span>
+                                                            </div>
+                                                        )}
+                                                        {selectedCfdi.descuento && Number(selectedCfdi.descuento) > 0 && (
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="text-gray-400 font-bold uppercase tracking-wider">Descuento</span>
+                                                                <span className="text-gray-600 font-black">-${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.descuento))}</span>
+                                                            </div>
+                                                        )}
+                                                        {Number(selectedCfdi.iva) > 0 && (
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="text-gray-400 font-bold uppercase tracking-wider">IVA (16%)</span>
+                                                                <span className="text-gray-600 font-black">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.iva))}</span>
+                                                            </div>
+                                                        )}
+                                                        {selectedCfdi.retenciones && Number(selectedCfdi.retenciones) > 0 && (
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="text-red-400 font-bold uppercase tracking-wider">Retenciones</span>
+                                                                <span className="text-red-600 font-black">-${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.retenciones))}</span>
+                                                            </div>
+                                                        )}
+                                                        <div className="h-px bg-gray-200 my-1"></div>
+                                                        <div className="flex justify-between items-center">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[10px] text-gray-900 font-black uppercase tracking-widest">Total</span>
+                                                                <span className="text-[8px] font-bold text-gray-400">{selectedCfdi.moneda || 'MXN'}{selectedCfdi.tipo_cambio && selectedCfdi.tipo_cambio > 1 ? ` · TC: ${selectedCfdi.tipo_cambio}` : ''}</span>
+                                                            </div>
+                                                            <span className="text-xl text-gray-900 font-black tracking-tight">${new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2 }).format(Number(selectedCfdi.total))}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
 
-                                                <label className="flex items-center gap-3 cursor-pointer group">
-                                                    <div className="relative flex items-center justify-center">
-                                                        <input type="checkbox" className="peer appearance-none w-5 h-5 border border-gray-200 rounded-lg bg-white checked:bg-gray-900 checked:border-gray-900 transition-all cursor-pointer" />
-                                                        <span className="material-symbols-outlined absolute text-white text-sm scale-0 peer-checked:scale-100 transition-all pointer-events-none">check</span>
+                                                    {/* Concepto */}
+                                                    {selectedCfdi.concepto && (
+                                                        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                                                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Concepto</span>
+                                                            <p className="text-xs text-gray-700 leading-relaxed">{selectedCfdi.concepto}</p>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Clasificación Contable */}
+                                                    <div className="space-y-4">
+                                                        <h5 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Clasificación Contable</h5>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[9px] font-bold text-gray-400 uppercase ml-1">Categoría de Gasto</label>
+                                                            <div className="relative group">
+                                                                <select className="w-full appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/10 cursor-pointer">
+                                                                    <option>Sin categoría</option>
+                                                                    <option>Gastos Generales</option>
+                                                                    <option>Arrendamientos</option>
+                                                                    <option>Honorarios</option>
+                                                                    <option>Viáticos</option>
+                                                                </select>
+                                                                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm group-hover:text-gray-600">expand_more</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[9px] font-bold text-gray-400 uppercase ml-1">Cuenta Contable</label>
+                                                            <div className="relative group">
+                                                                <select className="w-full appearance-none bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/10 cursor-pointer">
+                                                                    <option>Sin cuenta</option>
+                                                                    <option>602-01 Gastos de Venta</option>
+                                                                    <option>603-01 Gastos de Administración</option>
+                                                                </select>
+                                                                <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm group-hover:text-gray-600">expand_more</span>
+                                                            </div>
+                                                        </div>
+                                                        <label className="flex items-center gap-3 cursor-pointer group">
+                                                            <div className="relative flex items-center justify-center">
+                                                                <input type="checkbox" className="peer appearance-none w-5 h-5 border border-gray-200 rounded-lg bg-white checked:bg-gray-900 checked:border-gray-900 transition-all cursor-pointer" />
+                                                                <span className="material-symbols-outlined absolute text-white text-sm scale-0 peer-checked:scale-100 transition-all pointer-events-none">check</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-bold text-gray-500 group-hover:text-gray-700 transition-colors uppercase select-none">Recordar para este proveedor</span>
+                                                        </label>
                                                     </div>
-                                                    <span className="text-[10px] font-bold text-gray-500 group-hover:text-gray-700 transition-colors uppercase select-none">Recordar para este proveedor</span>
-                                                </label>
-                                            </div>
-
-                                            {/* Errors Section */}
-                                            <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4">
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <span className="material-symbols-outlined text-red-500 text-sm">warning</span>
-                                                    <h5 className="text-[10px] font-black text-red-600 uppercase tracking-widest">Avisos y Errores</h5>
-                                                </div>
-                                                <ul className="space-y-2">
-                                                    <li className="flex gap-2 text-[10px] text-red-500 font-medium">
-                                                        <span className="w-1 h-1 rounded-full bg-red-400 mt-1.5 shrink-0"></span>
-                                                        <span>Factura PPD sin complemento de pago asociado detectado.</span>
-                                                    </li>
-                                                    <li className="flex gap-2 text-[10px] text-red-500 font-medium">
-                                                        <span className="w-1 h-1 rounded-full bg-red-400 mt-1.5 shrink-0"></span>
-                                                        <span>El RFC emisor no coincide con los patrones de gasto habituales.</span>
-                                                    </li>
-                                                </ul>
-                                            </div>
+                                                </>
+                                            )}
 
                                             {/* Fixed Footer Spacer */}
                                             <div className="h-16"></div>
@@ -1575,6 +1800,45 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                             </div>
                         )}
                     </div>
+
+                    {/* PDF Inline Preview Modal */}
+                    {(pdfPreviewLoading || pdfPreviewUrl) && (
+                        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClosePdfPreview}></div>
+                            <div className="relative w-full max-w-4xl h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+                                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <span className="material-symbols-outlined text-red-500 text-xl flex-shrink-0">picture_as_pdf</span>
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-gray-900 truncate">{pdfPreviewTitle}</p>
+                                            <p className="text-[10px] text-gray-400 uppercase tracking-widest">Vista previa del CFDI</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleClosePdfPreview}
+                                        className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all flex-shrink-0"
+                                    >
+                                        <span className="material-symbols-outlined">close</span>
+                                    </button>
+                                </div>
+                                <div className="flex-1 relative">
+                                    {pdfPreviewLoading && (
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white">
+                                            <div className="w-10 h-10 border-4 border-gray-100 border-t-red-500 rounded-full animate-spin"></div>
+                                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cargando PDF...</p>
+                                        </div>
+                                    )}
+                                    {pdfPreviewUrl && (
+                                        <iframe
+                                            src={pdfPreviewUrl}
+                                            className="w-full h-full border-0"
+                                            title="Vista previa CFDI"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Verification Summary Modal */}
                     {verificationSummary && (

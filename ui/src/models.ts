@@ -1,3 +1,16 @@
+export interface CfdiPagoPropio {
+    id: number;
+    uuid_pago: string;
+    uuid_relacionado: string;
+    fecha_pago: string;
+    monto_pagado: string | number;
+    num_parcialidad?: number;
+    saldo_anterior?: string | number;
+    saldo_insoluto?: string | number;
+    moneda_pago?: string;
+    tipo_cambio_pago?: number;
+}
+
 export interface Cfdi {
     id: number;
     uuid: string;
@@ -31,6 +44,11 @@ export interface Cfdi {
     validacion_efos?: string;
     created_at: string;
     updated_at: string;
+    // Agregados por withSum/withMin en el listado
+    pagos_propios_sum_monto_pagado?: number | null;
+    pagos_propios_min_fecha_pago?: string | null;
+    // Agregados por with('pagosPropios') en el show
+    pagos_propios?: CfdiPagoPropio[];
 }
 
 export interface CfdiPagination {

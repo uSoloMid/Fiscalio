@@ -74,6 +74,8 @@ class InvoiceController extends Controller
     {
         $query = $this->buildCfdiQuery($request);
         $query->orderBy('fecha_fiscal', 'desc');
+        $query->withSum('pagosPropios', 'monto_pagado')
+              ->withMin('pagosPropios', 'fecha_pago');
         $pageSize = min((int) $request->input('pageSize', 50), 200);
         return response()->json($query->paginate($pageSize));
     }
@@ -478,7 +480,10 @@ class InvoiceController extends Controller
 
     public function showCfdi($uuid)
     {
-        return response()->json(['metadata' => Cfdi::where('uuid', $uuid)->firstOrFail(), 'xml_url' => url("api/cfdis/$uuid/xml")]);
+        $cfdi = Cfdi::where('uuid', $uuid)
+            ->with('pagosPropios')
+            ->firstOrFail();
+        return response()->json(['metadata' => $cfdi, 'xml_url' => url("api/cfdis/$uuid/xml")]);
     }
 
     public function downloadXml($uuid)
