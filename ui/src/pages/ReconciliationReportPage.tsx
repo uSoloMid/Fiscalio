@@ -311,12 +311,12 @@ export const ReconciliationReportPage = ({
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                     <label className="text-xs text-gray-500">Desde</label>
                     <input
-                        type="date" value={from} onChange={e => setFrom(e.target.value)}
+                        type="month" value={from} onChange={e => setFrom(e.target.value ? e.target.value + '-01' : '')}
                         className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
                     />
                     <label className="text-xs text-gray-500">Hasta</label>
                     <input
-                        type="date" value={to} onChange={e => setTo(e.target.value)}
+                        type="month" value={to ? to.slice(0, 7) : ''} onChange={e => setTo(e.target.value ? e.target.value + '-31' : '')}
                         className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
                     />
                     <button
