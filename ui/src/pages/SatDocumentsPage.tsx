@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { MonthYearPicker, MONTH_NUM_LABELS } from '../components/MonthYearPicker';
 import { listSatDocuments, triggerScraperFiel, authFetch } from '../services';
 import { API_BASE_URL } from '../api/config';
 
@@ -254,20 +255,32 @@ export function SatDocumentsPage({ activeRfc, clientName, onBack }: Props) {
 
                 <div className="max-w-3xl mx-auto flex flex-col gap-6">
                     {/* Month filter */}
-                    {availableMonths.length > 0 && (
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Periodo:</span>
-                            {availableMonths.map(m => (
-                                <button
-                                    key={m}
-                                    onClick={() => setSelectedMonth(m)}
-                                    className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all capitalize ${selectedMonth === m ? 'bg-gray-900 text-white shadow-md' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                                >
-                                    {monthLabel(m)}
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                    {availableMonths.length > 0 && (() => {
+                        const [selYear, selMon] = selectedMonth ? selectedMonth.split('-') : ['', ''];
+                        const uniqueYears = [...new Set(availableMonths.map(m => m.split('-')[0]))].sort().reverse();
+                        const uniqueMonths = [...new Set(availableMonths.map(m => m.split('-')[1]))].sort();
+                        return (
+                            <MonthYearPicker
+                                monthValue={selMon}
+                                yearValue={selYear}
+                                monthOptions={uniqueMonths.map(m => ({ value: m, label: MONTH_NUM_LABELS[m] || m }))}
+                                yearOptions={uniqueYears.map(y => ({ value: y, label: y }))}
+                                onMonthChange={(m) => {
+                                    const key = `${selYear}-${m}`;
+                                    if (availableMonths.includes(key)) setSelectedMonth(key);
+                                }}
+                                onYearChange={(y) => {
+                                    const key = `${y}-${selMon}`;
+                                    if (availableMonths.includes(key)) {
+                                        setSelectedMonth(key);
+                                    } else {
+                                        const first = availableMonths.find(m => m.startsWith(y));
+                                        if (first) setSelectedMonth(first);
+                                    }
+                                }}
+                            />
+                        );
+                    })()}
 
                     {/* CSF section */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">

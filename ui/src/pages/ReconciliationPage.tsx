@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MonthYearPicker, MONTH_ABBR_LABELS } from '../components/MonthYearPicker';
 import { listBankStatements, getReconciliationSuggestions, reconcileMovement, authFetch } from '../services';
 import { API_BASE_URL } from '../api/config';
 import { MovementReconcileRow } from '../components/MovementReconcileRow';
@@ -306,22 +307,20 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                                 <option value="all">Bancos</option>
                                 {uniqueBanks.map(b => <option key={b} value={b}>{b}</option>)}
                             </select>
-                            <select
-                                value={monthFilter}
-                                onChange={e => setMonthFilter(e.target.value)}
-                                className="text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
-                            >
-                                <option value="all">Mes</option>
-                                {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-                            </select>
-                            <select
-                                value={yearFilter}
-                                onChange={e => setYearFilter(e.target.value)}
-                                className="text-[10px] font-black bg-white border border-gray-100 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase tracking-widest"
-                            >
-                                <option value="all">Año</option>
-                                {uniqueYears.map(y => <option key={y} value={y}>{y}</option>)}
-                            </select>
+                            <MonthYearPicker
+                                monthValue={monthFilter}
+                                yearValue={yearFilter}
+                                monthOptions={[
+                                    { value: 'all', label: 'Mes' },
+                                    ...uniqueMonths.map(m => ({ value: m, label: MONTH_ABBR_LABELS[m] || m })),
+                                ]}
+                                yearOptions={[
+                                    { value: 'all', label: 'Año' },
+                                    ...uniqueYears.map(y => ({ value: y, label: y })),
+                                ]}
+                                onMonthChange={setMonthFilter}
+                                onYearChange={setYearFilter}
+                            />
                         </div>
                     </div>
 

@@ -5,6 +5,36 @@
 
 ---
 
+## 2026-03-13 — Unificación selector mes/año (`MonthYearPicker`)
+
+**Commit estable:** pendiente
+
+Creado componente `ui/src/components/MonthYearPicker.tsx` con dos `<select>` estilizados de forma consistente (ícono calendario, bordes `rounded-xl`, focus `emerald`). Reemplazado en todos los módulos:
+- **InvoicesPage** — select único YYYY-MM → MonthYearPicker derivando opciones de `availablePeriods`
+- **ProvisionalControlPage** — 2 selects separados → MonthYearPicker con rango 2022–actualYear
+- **BankStatementPage** — selects mes abreviado/año → MonthYearPicker con `MONTH_ABBR_LABELS`
+- **ReconciliationPage** — igual que BankStatementPage
+- **SatDocumentsPage** — pills de mes → MonthYearPicker derivando opciones de `availableMonths`
+
+Exporta helpers: `allMonthOptions`, `yearRangeOptions`, `MONTH_NUM_LABELS`, `MONTH_ABBR_LABELS`.
+
+---
+
+## 2026-03-14 — Reporte de pendientes de conciliación
+
+**Commit estable:** `41abbff`
+
+Nuevo módulo accesible desde **Contabilidad → Reportes** con 5 secciones:
+- **Movimientos sin CFDI** — abonos/cargos bancarios sin conciliar
+- **PUE sin banco** — facturas PUE no vinculadas (por cobrar, por pagar, nóminas separadas)
+- **PPD sin REP** — facturas PPD sin ningún complemento de pago emitido
+- **PPD con saldo pendiente** — PPD con pagos parciales; muestra saldo insoluto, parcialidades y fecha último pago
+- **REP sin banco** — complementos de pago emitidos/recibidos sin movimiento bancario
+
+Filtrable por rango de fechas. Incluye aviso si no hay estados de cuenta cargados para el RFC.
+
+---
+
 ## 2026-03-13 — Conciliaciones: facturas ya vinculadas, nómina, asignación manual
 
 **Commit estable:** pendiente

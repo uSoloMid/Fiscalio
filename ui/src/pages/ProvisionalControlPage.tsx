@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MonthYearPicker, MONTH_NAMES_ES, yearRangeOptions } from '../components/MonthYearPicker';
 import {
     getProvisionalSummary,
     getBucketDetails,
@@ -225,10 +226,8 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
         return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val);
     };
 
-    const months = [
-        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-    ];
+    const monthOptions = MONTH_NAMES_ES.map((name, i) => ({ value: String(i + 1), label: name }));
+    const yearOptions = yearRangeOptions(2022, new Date().getFullYear() + 1);
 
     if (view === 'ppd_issued') return <PpdExplorer rfc={activeRfc} year={period.year} month={period.month} tipo="issued" onBack={() => setView('summary')} />;
     if (view === 'ppd_received') return <PpdExplorer rfc={activeRfc} year={period.year} month={period.month} tipo="received" onBack={() => setView('summary')} />;
@@ -305,28 +304,22 @@ export function ProvisionalControlPage({ activeRfc, clientName, onBack, initialY
                         </svg>
                         <span className="text-sm font-black uppercase tracking-tight">Excel</span>
                     </button>
-                    <select
-                        value={period.month}
-                        onChange={(e) => {
-                            const m = parseInt(e.target.value);
-                            setPeriod({ ...period, month: m });
-                            onPeriodChange(period.year, m);
+                    <MonthYearPicker
+                        monthValue={String(period.month)}
+                        yearValue={String(period.year)}
+                        monthOptions={monthOptions}
+                        yearOptions={yearOptions}
+                        onMonthChange={(m) => {
+                            const mi = parseInt(m);
+                            setPeriod({ ...period, month: mi });
+                            onPeriodChange(period.year, mi);
                         }}
-                        className="bg-gray-50 border-none rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    >
-                        {months.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
-                    </select>
-                    <select
-                        value={period.year}
-                        onChange={(e) => {
-                            const y = parseInt(e.target.value);
-                            setPeriod({ ...period, year: y });
-                            onPeriodChange(y, period.month);
+                        onYearChange={(y) => {
+                            const yi = parseInt(y);
+                            setPeriod({ ...period, year: yi });
+                            onPeriodChange(yi, period.month);
                         }}
-                        className="bg-gray-50 border-none rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-emerald-500/20"
-                    >
-                        {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                    />
                 </div>
             </header>
 

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { MonthYearPicker, MONTH_NUM_LABELS } from '../components/MonthYearPicker';
 import { listCfdis, getCfdi, refreshCfdiStatus, getPeriods, startSync, verifyStatus, getActiveRequests, exportInvoicesZip, downloadProvisionalXmlZip, exportCfdisExcel, logout, exportCfdiPdf, exportCfdiXml, exportCfdiZip, uploadCfdis, triggerScraperFiel, createManualRequest, suggestCfdis, authFetch } from '../services';
 import { API_BASE_URL } from '../api/config';
 import { AccountsPage } from './AccountsPage';
@@ -525,15 +526,20 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         if (onBack) onBack();
     };
 
-    const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const val = e.target.value;
-        if (val) {
-            const y = val.substring(0, 4);
-            const m = val.substring(5, 7);
-            setYear(y);
-            setMonth(m);
-            localStorage.setItem('active_year', y);
-            localStorage.setItem('active_month', m);
+    const handlePeriodMonthChange = (m: string) => {
+        setMonth(m);
+        localStorage.setItem('active_month', m);
+    };
+    const handlePeriodYearChange = (y: string) => {
+        setYear(y);
+        localStorage.setItem('active_year', y);
+        // Si el mes actual no existe en el nuevo año, seleccionar el primer mes disponible
+        if (availablePeriods.length > 0) {
+            const available = availablePeriods.filter(p => p.startsWith(y)).map(p => p.split('-')[1]);
+            if (available.length > 0 && !available.includes(month)) {
+                setMonth(available[0]);
+                localStorage.setItem('active_month', available[0]);
+            }
         }
     };
 
@@ -822,22 +828,22 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                         </div>
                         {/* Header Filters */}
                         <div className="flex items-center gap-4 w-full md:w-auto justify-end">
-                            <div className="relative w-full md:w-auto">
-                                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none text-lg">calendar_month</span>
-                                <select
-                                    className="appearance-none border border-gray-200 rounded-lg pl-9 pr-8 py-2 text-sm bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow cursor-pointer w-full md:min-w-[140px]"
-                                    value={`${year}-${month}`}
-                                    onChange={handlePeriodChange}
-                                >
-                                    {availablePeriods.length === 0 && (
-                                        <option value={`${year}-${month}`}>{year}-{month}</option>
-                                    )}
-                                    {availablePeriods.map(p => (
-                                        <option key={p} value={p}>{p}</option>
-                                    ))}
-                                </select>
-                                <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm">expand_more</span>
-                            </div>
+                            <MonthYearPicker
+                                monthValue={month}
+                                yearValue={year}
+                                monthOptions={
+                                    availablePeriods.length > 0
+                                        ? [...new Set(availablePeriods.map(p => p.split('-')[1]))].sort().map(m => ({ value: m, label: MONTH_NUM_LABELS[m] || m }))
+                                        : [{ value: month, label: MONTH_NUM_LABELS[month] || month }]
+                                }
+                                yearOptions={
+                                    availablePeriods.length > 0
+                                        ? [...new Set(availablePeriods.map(p => p.split('-')[0]))].sort().map(y => ({ value: y, label: y }))
+                                        : [{ value: year, label: year }]
+                                }
+                                onMonthChange={handlePeriodMonthChange}
+                                onYearChange={handlePeriodYearChange}
+                            />
                         </div>
                     </header>
 
