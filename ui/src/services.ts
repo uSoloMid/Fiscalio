@@ -57,6 +57,7 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
     if (params.status) query.append('status', params.status);
     if (params.cfdi_tipo) query.append('cfdi_tipo', params.cfdi_tipo);
     if (params.pageSize) query.append('pageSize', params.pageSize.toString());
+    if (params.reconciliacion) query.append('reconciliacion', params.reconciliacion);
 
     const response = await authFetch(`${API_BASE_URL}/api/cfdis?${query.toString()}`);
     if (!response.ok) {

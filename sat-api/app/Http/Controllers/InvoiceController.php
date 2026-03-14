@@ -6,6 +6,7 @@ use App\Models\Cfdi;
 use App\Models\SatRequest;
 use App\Models\Business;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -67,6 +68,19 @@ class InvoiceController extends Controller
             $query->where('es_cancelado', $request->input('status') === 'cancelados' ? 1 : 0);
         }
 
+        if ($request->filled('reconciliacion')) {
+            $val = $request->input('reconciliacion');
+            if ($val === 'conciliadas') {
+                $query->whereExists(function ($q) {
+                    $q->select(DB::raw(1))->from('bank_movement_cfdis')->whereColumn('cfdi_id', 'cfdis.id');
+                });
+            } elseif ($val === 'no_conciliadas') {
+                $query->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))->from('bank_movement_cfdis')->whereColumn('cfdi_id', 'cfdis.id');
+                });
+            }
+        }
+
         return $query;
     }
 
@@ -76,6 +90,33 @@ class InvoiceController extends Controller
         $query->orderBy('fecha_fiscal', 'desc');
         $query->withSum('pagosPropios', 'monto_pagado')
               ->withMin('pagosPropios', 'fecha_pago');
+
+        // Subqueries for reconciliation info (first linked bank movement)
+        $query->addSelect([
+            'reconciliation_movement_date' => DB::table('bank_movement_cfdis as bmc')
+                ->select('bm.date')
+                ->join('bank_movements as bm', 'bm.id', '=', 'bmc.bank_movement_id')
+                ->whereColumn('bmc.cfdi_id', 'cfdis.id')
+                ->orderBy('bmc.created_at')
+                ->limit(1),
+            'reconciliation_description' => DB::table('bank_movement_cfdis as bmc')
+                ->select(DB::raw("SUBSTR(bm.description, 1, 70)"))
+                ->join('bank_movements as bm', 'bm.id', '=', 'bmc.bank_movement_id')
+                ->whereColumn('bmc.cfdi_id', 'cfdis.id')
+                ->orderBy('bmc.created_at')
+                ->limit(1),
+            'reconciliation_confidence' => DB::table('bank_movement_cfdis as bmc')
+                ->select('bmc.confidence')
+                ->whereColumn('bmc.cfdi_id', 'cfdis.id')
+                ->orderBy('bmc.created_at')
+                ->limit(1),
+            'reconciliation_at' => DB::table('bank_movement_cfdis as bmc')
+                ->select('bmc.created_at')
+                ->whereColumn('bmc.cfdi_id', 'cfdis.id')
+                ->orderBy('bmc.created_at')
+                ->limit(1),
+        ]);
+
         $pageSize = min((int) $request->input('pageSize', 50), 200);
         return response()->json($query->paginate($pageSize));
     }

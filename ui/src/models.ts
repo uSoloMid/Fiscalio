@@ -53,6 +53,11 @@ export interface Cfdi {
     pagos_propios_min_fecha_pago?: string | null;
     // Agregados por with('pagosPropios') en el show
     pagos_propios?: CfdiPagoPropio[];
+    // Conciliación bancaria
+    reconciliation_movement_date?: string | null;
+    reconciliation_description?: string | null;
+    reconciliation_confidence?: 'green' | 'yellow' | 'red' | 'black' | null;
+    reconciliation_at?: string | null;
 }
 
 export interface CfdiPagination {

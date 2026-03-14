@@ -5,6 +5,14 @@
 
 ---
 
+## Conciliación multi-CFDI — 1 depósito → N facturas
+**Commit:** `1877fbd`
+
+Nueva tabla junction `bank_movement_cfdis` reemplaza la relación 1:1 de `bank_movements.cfdi_id`. Permite vincular múltiples facturas a un mismo movimiento bancario. El sidebar muestra la lista de CFDIs vinculados con desvincular individual, y siempre muestra sugerencias para agregar más. La fila en la tabla muestra "+N más" cuando hay múltiples facturas y siempre es clickeable. El backend migra automáticamente los datos existentes al hacer `migrate`.
+
+
+---
+
 ## 2026-03-13 — Unificación selector mes/año (`MonthYearPicker`)
 
 **Commit estable:** pendiente

@@ -15,6 +15,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [year, setYear] = useState(localStorage.getItem('active_year') || new Date().getFullYear().toString());
     const [month, setMonth] = useState(localStorage.getItem('active_month') || (new Date().getMonth() + 1).toString().padStart(2, '0'));
     const [filterType, setFilterType] = useState<'all' | 'emitidas' | 'recibidas' | 'canceladas'>('all');
+    const [filterReconciliacion, setFilterReconciliacion] = useState<'all' | 'conciliadas' | 'no_conciliadas'>('all');
     const [cfdiTipo, setCfdiTipo] = useState<'I' | 'E' | 'N' | 'P' | 'T' | ''>('I');
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -64,7 +65,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const defaultColWidths: Record<string, number> = {
         status: 40, fecha: 96, serieFolio: 48, rfcNombre: 160,
         concepto: 256, total: 96, iva: 80, ret: 80,
-        tipo: 64, met: 64, estatusSat: 128, uuid: 120, actions: 32,
+        tipo: 64, met: 64, estatusSat: 128, uuid: 120, conc: 36, actions: 32,
     };
     const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
         try {
@@ -124,6 +125,9 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [showExportModal, setShowExportModal] = useState(false);
 
     const [isScrapingFiel, setIsScrapingFiel] = useState(false);
+
+    // Reconciliation popover
+    const [reconcPopover, setReconcPopover] = useState<{ uuid: string; x: number; y: number } | null>(null);
 
     // PDF inline preview modal
     const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
@@ -310,16 +314,24 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
+    // Close reconciliation popover on outside click
+    useEffect(() => {
+        if (!reconcPopover) return;
+        const handler = () => setReconcPopover(null);
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [reconcPopover]);
+
     // Reset page when filters change
     useEffect(() => {
         setPage(1);
-    }, [year, month, filterType, debouncedSearch, cfdiTipo, showCancelled]);
+    }, [year, month, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled]);
 
     useEffect(() => {
         if (!activeRfc) return;
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeRfc, year, month, filterType, debouncedSearch, cfdiTipo, showCancelled, page]);
+    }, [activeRfc, year, month, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled, page]);
 
     useEffect(() => {
         if (selectedUuid) {
@@ -342,7 +354,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                 status: filterType === 'canceladas' ? 'cancelados' : (showCancelled ? undefined : 'activos'),
                 q: debouncedSearch,
                 page: page,
-                pageSize: 10
+                pageSize: 10,
+                reconciliacion: filterReconciliacion !== 'all' ? filterReconciliacion : undefined,
             });
             if (res && Array.isArray(res.data)) {
                 setData(res.data);
@@ -1055,6 +1068,33 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                 )}
                             </div>
 
+                            <div className="h-6 w-px bg-gray-200 mx-2 flex-shrink-0"></div>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setFilterReconciliacion('all')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black rounded-xl uppercase tracking-widest transition-all ${filterReconciliacion === 'all' ? 'bg-gray-900 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200 hover:border-gray-300'}`}
+                                    title="Todas las facturas"
+                                >
+                                    <span className="material-symbols-outlined text-sm">account_balance</span>
+                                </button>
+                                <button
+                                    onClick={() => setFilterReconciliacion('conciliadas')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black rounded-xl uppercase tracking-widest transition-all ${filterReconciliacion === 'conciliadas' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200 hover:border-gray-300'}`}
+                                    title="Solo facturas conciliadas con banco"
+                                >
+                                    <span className="material-symbols-outlined text-sm">check_circle</span>
+                                    Conciliadas
+                                </button>
+                                <button
+                                    onClick={() => setFilterReconciliacion('no_conciliadas')}
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black rounded-xl uppercase tracking-widest transition-all ${filterReconciliacion === 'no_conciliadas' ? 'bg-amber-500 text-white shadow-md' : 'bg-white text-gray-400 border border-gray-200 hover:border-gray-300'}`}
+                                    title="Facturas sin conciliar con banco"
+                                >
+                                    <span className="material-symbols-outlined text-sm">radio_button_unchecked</span>
+                                    Sin conciliar
+                                </button>
+                            </div>
+
                             <div className="flex-1"></div>
 
                             <div className="flex items-center gap-3">
@@ -1252,6 +1292,9 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                         <ResizableTh colId="met" label="Met" sortable align="center" />
                                                         <ResizableTh colId="estatusSat" label="Estatus SAT" sortable align="center" />
                                                         <ResizableTh colId="uuid" label="UUID" align="left" />
+                                                        <ResizableTh colId="conc" align="center">
+                                                            <span className="material-symbols-outlined text-sm text-gray-400" title="Conciliado con banco">account_balance</span>
+                                                        </ResizableTh>
                                                         <th style={{ width: colWidths.actions, minWidth: colWidths.actions }} className="px-1"></th>
                                                     </>
                                                 );
@@ -1397,6 +1440,24 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                 {/* UUID truncado — primeros 8 chars, full en tooltip */}
                                                 <td style={{ width: colWidths.uuid }} className="px-3 py-4 whitespace-nowrap overflow-hidden" title={cfdi.uuid}>
                                                     <span className="text-[10px] text-gray-400 font-mono">{cfdi.uuid.substring(0, 8)}…</span>
+                                                </td>
+                                                {/* Conciliación bancaria */}
+                                                <td style={{ width: colWidths.conc }} className="px-1 py-4 text-center">
+                                                    {cfdi.reconciliation_movement_date ? (
+                                                        <button
+                                                            onClick={e => {
+                                                                e.stopPropagation();
+                                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                                setReconcPopover(prev => prev?.uuid === cfdi.uuid ? null : { uuid: cfdi.uuid, x: rect.left, y: rect.bottom + 4 });
+                                                            }}
+                                                            className="w-6 h-6 flex items-center justify-center mx-auto rounded-lg hover:bg-emerald-50 transition-all"
+                                                            title="Conciliado — clic para detalles"
+                                                        >
+                                                            <span className="material-symbols-outlined text-base text-emerald-500">account_balance</span>
+                                                        </button>
+                                                    ) : (
+                                                        <span className="material-symbols-outlined text-base text-gray-200" title="Sin conciliar">account_balance</span>
+                                                    )}
                                                 </td>
                                                 {/* Botones de acción — visibles al hover de la fila */}
                                                 <td style={{ width: 96, minWidth: 96 }} className="px-2 py-4 whitespace-nowrap text-right overflow-hidden">
@@ -1828,6 +1889,56 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                             </div>
                         )}
                     </div>
+
+                    {/* Reconciliation Popover */}
+                    {reconcPopover && (() => {
+                        const cfdi = data.find(c => c.uuid === reconcPopover.uuid);
+                        if (!cfdi?.reconciliation_movement_date) return null;
+                        const conf = cfdi.reconciliation_confidence;
+                        const confColor = conf === 'green' ? 'text-emerald-600' : conf === 'yellow' ? 'text-amber-500' : 'text-red-500';
+                        const confLabel = conf === 'green' ? 'Alta' : conf === 'yellow' ? 'Media' : 'Baja';
+                        return (
+                            <div
+                                style={{ position: 'fixed', top: reconcPopover.y, left: Math.min(reconcPopover.x, window.innerWidth - 264), zIndex: 9999 }}
+                                className="w-64 bg-white border border-gray-200 rounded-2xl shadow-2xl p-4"
+                                onClick={e => e.stopPropagation()}
+                            >
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="material-symbols-outlined text-emerald-500 text-base">account_balance</span>
+                                    <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Conciliada con Banco</span>
+                                    <button onClick={() => setReconcPopover(null)} className="ml-auto text-gray-300 hover:text-gray-500">
+                                        <span className="material-symbols-outlined text-base">close</span>
+                                    </button>
+                                </div>
+                                <div className="space-y-2">
+                                    <div>
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Fecha Movimiento</p>
+                                        <p className="text-xs font-bold text-gray-800 mt-0.5">{cfdi.reconciliation_movement_date}</p>
+                                    </div>
+                                    {cfdi.reconciliation_description && (
+                                        <div>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Descripción</p>
+                                            <p className="text-[10px] font-medium text-gray-600 mt-0.5 leading-snug">{cfdi.reconciliation_description}</p>
+                                        </div>
+                                    )}
+                                    {cfdi.reconciliation_at && (
+                                        <div>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Conciliado el</p>
+                                            <p className="text-xs font-bold text-gray-800 mt-0.5">{cfdi.reconciliation_at.substring(0, 10)}</p>
+                                        </div>
+                                    )}
+                                    {conf && (
+                                        <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100">
+                                            <span className={`material-symbols-outlined text-base ${confColor}`}>
+                                                {conf === 'green' ? 'verified' : conf === 'yellow' ? 'info' : 'warning'}
+                                            </span>
+                                            <span className={`text-[10px] font-black uppercase ${confColor}`}>Confianza {confLabel}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* PDF Inline Preview Modal */}
                     {(pdfPreviewLoading || pdfPreviewUrl) && (
