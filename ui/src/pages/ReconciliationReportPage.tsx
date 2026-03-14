@@ -263,6 +263,20 @@ export const ReconciliationReportPage = ({
     const [data, setData]       = useState<ReportData | null>(null);
     const [from, setFrom]       = useState('');
     const [to, setTo]           = useState('');
+    const [selectedMonth, setSelectedMonth] = useState('');
+
+    const handleMonthChange = (val: string) => {
+        setSelectedMonth(val);
+        if (val) {
+            const [y, m] = val.split('-').map(Number);
+            const lastDay = new Date(y, m, 0).getDate();
+            setFrom(`${val}-01`);
+            setTo(`${val}-${String(lastDay).padStart(2, '0')}`);
+        } else {
+            setFrom('');
+            setTo('');
+        }
+    };
 
     // Secciones abiertas/cerradas
     const [open, setOpen] = useState<Record<string, boolean>>({
@@ -309,14 +323,26 @@ export const ReconciliationReportPage = ({
 
                 {/* Filtros de fecha + botón cargar */}
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <label className="text-xs text-gray-500">Desde</label>
+                    {/* Selector rápido por mes */}
                     <input
-                        type="month" value={from} onChange={e => setFrom(e.target.value ? e.target.value + '-01' : '')}
+                        type="month" value={selectedMonth}
+                        onChange={e => handleMonthChange(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-400 font-medium"
+                        title="Selecciona un mes para rellenar el rango automáticamente"
+                    />
+                    {/* Separador */}
+                    <span className="text-gray-300 text-sm">|</span>
+                    {/* Rango específico editable */}
+                    <label className="text-xs text-gray-400">Desde</label>
+                    <input
+                        type="date" value={from}
+                        onChange={e => { setFrom(e.target.value); setSelectedMonth(''); }}
                         className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
                     />
-                    <label className="text-xs text-gray-500">Hasta</label>
+                    <label className="text-xs text-gray-400">Hasta</label>
                     <input
-                        type="month" value={to ? to.slice(0, 7) : ''} onChange={e => setTo(e.target.value ? e.target.value + '-31' : '')}
+                        type="date" value={to}
+                        onChange={e => { setTo(e.target.value); setSelectedMonth(''); }}
                         className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
                     />
                     <button
