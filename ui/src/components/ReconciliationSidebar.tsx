@@ -23,7 +23,7 @@ const formatDate = (dateStr: string) => {
 
 type FilterChip = 'monto' | 'fecha' | 'rfc';
 
-export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconciled, onViewPdf, onDownloadPdf }: Props) {
+export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconciled, onViewPdf }: Props) {
     const [search, setSearch] = useState('');
     const [activeFilters, setActiveFilters] = useState<Set<FilterChip>>(new Set(['monto']));
     const [loadingId, setLoadingId] = useState<number | null>(null);

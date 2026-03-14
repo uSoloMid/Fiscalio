@@ -78,7 +78,7 @@ function parseMovementDisplay(description: string, isEgreso: boolean): { main: s
     return { main: d.length > 38 ? d.slice(0, 38).trimEnd() + '…' : d };
 }
 
-export function MovementReconcileRow({ movement, isSelected, onSelect, onUnreconciled, onViewPdf, onDownloadPdf, gridTemplate }: Props) {
+export function MovementReconcileRow({ movement, isSelected, onSelect, onUnreconciled, onViewPdf, gridTemplate }: Props) {
     const [loadingUnlink, setLoadingUnlink] = useState(false);
 
     const linkedCfdis = movement.cfdis ?? (movement.cfdi ? [movement.cfdi] : []);
