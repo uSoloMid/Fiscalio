@@ -5,6 +5,16 @@
 
 ---
 
+## Feature: Módulo de pólizas contables CONTPAQi — `da629bf`
+
+- Migraciones: 6 tablas (poliza_templates, poliza_template_lines, rfc_account_maps, bank_account_maps, polizas, poliza_lines)
+- Backend: PolizaGeneratorService (genera desde movimiento o CFDI, resuelve cuentas por RFC/banco), PolizaExportService (TXT ancho fijo P/M/AD, Windows-1252), PolizaController, PolizaTemplateController
+- Frontend: PolizasPage con listado, generador por plantilla, dialog para asignar cuentas faltantes (RFC/banco), exportar TXT
+- Nav item Pólizas activo en InvoicesPage (Contabilidad > Pólizas)
+- Plantillas iniciales pendientes de seedear: "Provisión de Venta" (Diario) y "Cobro" (Ingreso)
+
+---
+
 ## Fix conciliación: filtro pendiente + monto REP — `a05ea80`
 
 - Filtro "pendiente" usaba `cfdi_id` pero el backend usa junction table `bank_movement_cfdis` → nunca se marcaba como conciliado tras búsqueda manual. Corregido a `cfdis.length > 0 || cfdi_id`.
