@@ -60,6 +60,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
             setSortDir('asc');
             return field;
         });
+        setPage(1);
     }, []);
 
     // --- Column widths (persisted) ---
@@ -332,7 +333,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
         if (!activeRfc) return;
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeRfc, year, month, day, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled, page]);
+    }, [activeRfc, year, month, day, filterType, filterReconciliacion, debouncedSearch, cfdiTipo, showCancelled, page, sortField, sortDir]);
 
     useEffect(() => {
         if (selectedUuid) {
@@ -358,6 +359,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                 pageSize: 10,
                 reconciliacion: filterReconciliacion !== 'all' ? filterReconciliacion : undefined,
                 day: day !== 'all' ? day : undefined,
+                sort_by: sortField ? ({ fecha: 'fecha_fiscal', total: 'total', folio: 'folio', serie: 'serie', iva: 'iva', ret: 'retenciones' } as Record<string,string>)[sortField] ?? 'fecha_fiscal' : undefined,
+                sort_dir: sortField ? sortDir : undefined,
             });
             if (res && Array.isArray(res.data)) {
                 setData(res.data);
@@ -379,19 +382,6 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
 
     const hasRetenciones = data.some(c => c.retenciones && Number(c.retenciones) > 0);
 
-    const sortedData = useMemo(() => {
-        if (!sortField) return data;
-        return [...data].sort((a: any, b: any) => {
-            let av = a[sortField];
-            let bv = b[sortField];
-            if (['total', 'iva', 'retenciones', 'subtotal'].includes(sortField)) {
-                return sortDir === 'asc' ? (Number(av) || 0) - (Number(bv) || 0) : (Number(bv) || 0) - (Number(av) || 0);
-            }
-            av = String(av ?? '').toLowerCase();
-            bv = String(bv ?? '').toLowerCase();
-            return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-        });
-    }, [data, sortField, sortDir]);
 
     const loadCfdiDetail = async (uuid: string) => {
         setDrawerLoading(true);
@@ -1339,7 +1329,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                                 </td>
                                             </tr>
                                         )}
-                                        {sortedData.map(cfdi => (
+                                        {data.map(cfdi => (
                                             <tr
                                                 key={cfdi.uuid}
                                                 className={`group table-row-hover hover:bg-blue-50/40 transition-colors ${selectedUuid === cfdi.uuid ? 'bg-emerald-50' : cfdi.tipo === 'P' ? 'bg-violet-50/30' : ''}`}

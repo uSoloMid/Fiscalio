@@ -59,6 +59,8 @@ export async function listCfdis(params: any): Promise<CfdiPagination> {
     if (params.pageSize) query.append('pageSize', params.pageSize.toString());
     if (params.reconciliacion) query.append('reconciliacion', params.reconciliacion);
     if (params.day && params.day !== 'all') query.append('day', params.day);
+    if (params.sort_by) query.append('sort_by', params.sort_by);
+    if (params.sort_dir) query.append('sort_dir', params.sort_dir);
 
     const response = await authFetch(`${API_BASE_URL}/api/cfdis?${query.toString()}`);
     if (!response.ok) {

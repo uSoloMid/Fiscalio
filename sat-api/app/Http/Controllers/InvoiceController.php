@@ -94,7 +94,10 @@ class InvoiceController extends Controller
     public function indexCfdis(Request $request)
     {
         $query = $this->buildCfdiQuery($request);
-        $query->orderBy('fecha_fiscal', 'desc');
+        $allowed = ['fecha_fiscal', 'total', 'folio', 'serie', 'iva', 'retenciones', 'rfc_emisor', 'rfc_receptor', 'name_emisor', 'name_receptor'];
+        $sortBy  = in_array($request->input('sort_by'), $allowed) ? $request->input('sort_by') : 'fecha_fiscal';
+        $sortDir = $request->input('sort_dir') === 'asc' ? 'asc' : 'desc';
+        $query->orderBy($sortBy, $sortDir);
         $query->withSum('pagosPropios', 'monto_pagado')
               ->withMin('pagosPropios', 'fecha_pago');
 
