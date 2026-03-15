@@ -5,6 +5,16 @@
 
 ---
 
+## Fix conciliación: filtro pendiente + monto REP — `a05ea80`
+
+- Filtro "pendiente" usaba `cfdi_id` pero el backend usa junction table `bank_movement_cfdis` → nunca se marcaba como conciliado tras búsqueda manual. Corregido a `cfdis.length > 0 || cfdi_id`.
+- `BankStatementController.reconciled_count` corregido para contar por `bank_movement_cfdis`.
+- `ReconciliationController`: carga `pagosPropios` al responder suggest/reconcile.
+- Sidebar: REPs mostraban monto $0 (SAT siempre pone total=0 en complementos de pago). Ahora suma `pagos_propios.monto_pagado` (nodo de pago del XML).
+
+
+---
+
 ## Conciliación multi-CFDI — 1 depósito → N facturas
 **Commit:** `1877fbd`
 

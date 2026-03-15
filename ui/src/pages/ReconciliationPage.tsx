@@ -145,6 +145,19 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         });
     };
 
+    // Updates movement in-place without closing the sidebar (used when adding CFDIs manually)
+    const handleMovementUpdated = (updated: BankMovement) => {
+        setSelectedMovement(updated);
+        setReconciliationData(prev => {
+            if (!prev) return prev;
+            const prev_ = prev.movements.find(m => m.id === updated.id);
+            const wasReconciled = !!prev_?.cfdi_id || (prev_?.cfdis?.length ?? 0) > 0;
+            if (!wasReconciled) adjustReconciledCount(+1);
+            const movements = prev.movements.map(m => m.id === updated.id ? { ...updated, suggestions: m.suggestions } : m);
+            return { movements, stats: computeStats(movements) };
+        });
+    };
+
     const handleMovementUnreconciled = (movementId: number) => {
         adjustReconciledCount(-1);
         setReconciliationData(prev => {
@@ -603,6 +616,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
                         activeRfc={activeRfc}
                         onClose={() => setSelectedMovement(null)}
                         onReconciled={handleMovementReconciled}
+                        onMovementUpdated={handleMovementUpdated}
                         onViewPdf={handleViewPdf}
                         onDownloadPdf={handleDownloadPdf}
                     />

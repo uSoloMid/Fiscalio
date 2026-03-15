@@ -7,6 +7,7 @@ interface Props {
     activeRfc: string;
     onClose: () => void;
     onReconciled: (updated: BankMovement) => void;
+    onMovementUpdated?: (updated: BankMovement) => void;
     onViewPdf: (uuid: string, title: string) => void;
     onDownloadPdf: (uuid: string) => void;
 }
@@ -23,7 +24,7 @@ const formatDate = (dateStr: string) => {
 
 type FilterChip = 'monto' | 'fecha' | 'rfc';
 
-export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconciled, onViewPdf }: Props) {
+export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconciled, onMovementUpdated, onViewPdf }: Props) {
     const [search, setSearch] = useState('');
     const [activeFilters, setActiveFilters] = useState<Set<FilterChip>>(new Set(['monto']));
     const [loadingId, setLoadingId] = useState<number | null>(null);
@@ -49,6 +50,12 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
             ? s.rfc_receptor
             : isEgreso ? s.rfc_emisor : s.rfc_receptor;
 
+    // For REPs total=0 in SAT; real amount is in pagos_propios
+    const getEffectiveTotal = (c: Cfdi) =>
+        c.tipo === 'P' && c.pagos_propios?.length
+            ? c.pagos_propios.reduce((s, p) => s + parseFloat(String(p.monto_pagado)), 0)
+            : (c.total ?? 0);
+
     const toggleFilter = (f: FilterChip) => {
         setActiveFilters(prev => {
             const next = new Set(prev);
@@ -67,7 +74,6 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
             setManualLoading(true);
             try {
                 const res = await searchCfdisManual(activeRfc, manualQuery.trim(), isEgreso ? 'egreso' : 'ingreso');
-                // Filter out already linked CFDIs
                 const linkedIds = new Set(linkedCfdis.map(c => c.id));
                 setManualResults((res.cfdis ?? []).filter((c: any) => !linkedIds.has(c.id)));
             } catch {
@@ -83,9 +89,14 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
         setLoadingId(cfdi.id);
         try {
             const res = await reconcileMovement(movement.id, cfdi.id, 'red');
-            onReconciled({ ...res.movement, suggestions: movement.suggestions });
-            // Remove from manual results since it's now linked
+            const updated = { ...res.movement, suggestions: movement.suggestions };
             setManualResults(prev => prev.filter(c => c.id !== cfdi.id));
+            // Keep sidebar open so user can add more invoices
+            if (onMovementUpdated) {
+                onMovementUpdated(updated);
+            } else {
+                onReconciled(updated);
+            }
         } catch (e) {
             console.error(e);
             alert('Error al conciliar. Revisa la consola.');
@@ -111,7 +122,12 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
         setUnlinkingId(cfdiId);
         try {
             const res = await unreconcileMovement(movement.id, cfdiId);
-            onReconciled({ ...res.movement, suggestions: movement.suggestions });
+            const updated = { ...res.movement, suggestions: movement.suggestions };
+            if (onMovementUpdated) {
+                onMovementUpdated(updated);
+            } else {
+                onReconciled(updated);
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -152,15 +168,10 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
         filtered = [...filtered].sort((a, b) => a.days_diff - b.days_diff);
     }
 
-    // For REPs (tipo P), total in DB is always 0; actual amount is in pagos_propios
-    const getEffectiveTotal = (c: Cfdi) =>
-        c.tipo === 'P' && c.pagos_propios?.length
-            ? c.pagos_propios.reduce((s, p) => s + parseFloat(String(p.monto_pagado)), 0)
-            : (c.total ?? 0);
-
-    // Totals
+    // Totals & difference
     const linkedTotal = linkedCfdis.reduce((sum, c) => sum + getEffectiveTotal(c), 0);
     const diff = amount - linkedTotal;
+    const isBalanced = Math.abs(diff) < 0.05;
 
     return (
         <div className="w-[420px] flex-shrink-0 bg-white border-l border-gray-100 flex flex-col h-full overflow-hidden shadow-2xl">
@@ -188,11 +199,6 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
                     </p>
                     <p className="text-sm font-black text-gray-900 mt-1">
                         {isEgreso ? '-' : '+'}{fmt(amount)}
-                        {hasLinked && (
-                            <span className={`ml-2 text-xs font-bold ${Math.abs(diff) < 0.05 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                {Math.abs(diff) < 0.05 ? '✓ Cuadrado' : `Diferencia: ${fmt(diff)}`}
-                            </span>
-                        )}
                     </p>
                 </div>
             </div>
@@ -206,7 +212,7 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
                         </span>
                         <span className="text-[10px] font-black text-gray-500">{fmt(linkedTotal)}</span>
                     </div>
-                    <div className="space-y-2 max-h-52 overflow-y-auto scrollbar-hide">
+                    <div className="space-y-2 max-h-44 overflow-y-auto scrollbar-hide">
                         {linkedCfdis.map(cfdi => {
                             const name = counterpart(cfdi) || '—';
                             const rfc = counterpartRfc(cfdi) || '—';
@@ -241,6 +247,26 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
                                 </div>
                             );
                         })}
+                    </div>
+
+                    {/* Difference panel */}
+                    <div className={`mt-3 p-3 rounded-xl border flex items-center gap-3 ${isBalanced
+                        ? 'bg-emerald-50 border-emerald-200'
+                        : 'bg-amber-50 border-amber-200'}`}
+                    >
+                        <span className={`material-symbols-outlined text-xl flex-shrink-0 ${isBalanced ? 'text-emerald-500' : 'text-amber-500'}`}>
+                            {isBalanced ? 'check_circle' : 'calculate'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                            <p className={`text-[10px] font-black uppercase tracking-widest ${isBalanced ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                {isBalanced ? 'Monto cuadrado' : 'Diferencia pendiente'}
+                            </p>
+                            {!isBalanced && (
+                                <p className="text-xs font-black text-gray-900 mt-0.5 tabular-nums">
+                                    {fmt(amount)} – {fmt(linkedTotal)} = <span className="text-amber-600">{fmt(diff)}</span>
+                                </p>
+                            )}
+                        </div>
                     </div>
 
                     <div className="mt-3 border-t border-gray-100 pt-3">
@@ -483,8 +509,31 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
                         className="flex items-center gap-2 mx-auto px-6 py-3 bg-white border border-gray-200 rounded-2xl text-[11px] font-black text-gray-500 hover:border-gray-300 transition-all uppercase tracking-widest"
                     >
                         <span className="material-symbols-outlined text-lg">arrow_back</span>
-                        Volver a sugerencias
+                        Volver
                     </button>
+                ) : hasLinked ? (
+                    /* When invoices are already linked: show Confirm button + option for manual search */
+                    <div className="flex flex-col gap-2">
+                        <button
+                            onClick={onClose}
+                            className={`flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-black text-[12px] uppercase tracking-widest transition-all active:scale-[0.98] shadow-sm ${isBalanced
+                                ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-100'
+                                : 'bg-gray-800 hover:bg-gray-900 text-white shadow-gray-200'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-base">
+                                {isBalanced ? 'check_circle' : 'done_all'}
+                            </span>
+                            {isBalanced ? 'Confirmar — Listo' : 'Marcar como completada'}
+                        </button>
+                        <button
+                            onClick={() => setIsManualMode(true)}
+                            className="flex items-center gap-2 mx-auto px-4 py-2 rounded-xl text-[10px] font-black text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-all uppercase tracking-widest"
+                        >
+                            <span className="material-symbols-outlined text-sm">manage_search</span>
+                            Agregar otra factura manualmente
+                        </button>
+                    </div>
                 ) : (
                     <div className="text-center">
                         <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] mb-3">¿No encuentras la factura?</p>
@@ -493,7 +542,7 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
                             className="flex items-center gap-2 mx-auto px-6 py-3 bg-white border border-amber-200 rounded-2xl text-[11px] font-black text-amber-600 hover:text-amber-700 hover:border-amber-300 hover:shadow-lg hover:shadow-amber-50 transition-all uppercase tracking-widest"
                         >
                             <span className="material-symbols-outlined text-lg">manage_search</span>
-                            {hasLinked ? 'Búsqueda manual' : 'Asignar manualmente'}
+                            Asignar manualmente
                         </button>
                     </div>
                 )}
