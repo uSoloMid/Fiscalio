@@ -20,7 +20,7 @@ class ReconciliationController extends Controller
         ini_set('memory_limit', '512M');
         set_time_limit(120);
 
-        $statement = BankStatement::with(['movements.cfdis', 'business'])->findOrFail($statementId);
+        $statement = BankStatement::with(['movements.cfdis.pagosPropios', 'business'])->findOrFail($statementId);
         $business   = $statement->business;
         $businessRfc = $business->rfc;
         $businessId  = $business->id;
@@ -156,7 +156,7 @@ class ReconciliationController extends Controller
 
         return response()->json([
             'success'  => true,
-            'movement' => $movement->fresh()->load('cfdis'),
+            'movement' => $movement->fresh()->load('cfdis.pagosPropios'),
         ]);
     }
 
@@ -193,7 +193,7 @@ class ReconciliationController extends Controller
 
         return response()->json([
             'success'  => true,
-            'movement' => $movement->fresh()->load('cfdis'),
+            'movement' => $movement->fresh()->load('cfdis.pagosPropios'),
         ]);
     }
 

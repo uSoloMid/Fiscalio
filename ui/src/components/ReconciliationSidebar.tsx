@@ -152,8 +152,14 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
         filtered = [...filtered].sort((a, b) => a.days_diff - b.days_diff);
     }
 
+    // For REPs (tipo P), total in DB is always 0; actual amount is in pagos_propios
+    const getEffectiveTotal = (c: Cfdi) =>
+        c.tipo === 'P' && c.pagos_propios?.length
+            ? c.pagos_propios.reduce((s, p) => s + parseFloat(String(p.monto_pagado)), 0)
+            : (c.total ?? 0);
+
     // Totals
-    const linkedTotal = linkedCfdis.reduce((sum, c) => sum + (c.total ?? 0), 0);
+    const linkedTotal = linkedCfdis.reduce((sum, c) => sum + getEffectiveTotal(c), 0);
     const diff = amount - linkedTotal;
 
     return (
@@ -211,7 +217,7 @@ export function ReconciliationSidebar({ movement, activeRfc, onClose, onReconcil
                                         <p className="text-[10px] font-black text-gray-800 truncate uppercase">{name}</p>
                                         <p className="text-[9px] font-bold text-gray-400 uppercase">{rfc} · {formatDate(cfdi.fecha)}</p>
                                     </div>
-                                    <p className="text-xs font-black text-gray-800 tabular-nums flex-shrink-0">{fmt(cfdi.total)}</p>
+                                    <p className="text-xs font-black text-gray-800 tabular-nums flex-shrink-0">{fmt(getEffectiveTotal(cfdi))}</p>
                                     <div className="flex gap-1 flex-shrink-0">
                                         <button
                                             onClick={() => onViewPdf(cfdi.uuid, name)}

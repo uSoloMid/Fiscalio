@@ -204,7 +204,11 @@ class BankStatementController extends Controller
 
         return BankStatement::where('business_id', $business->id)
             ->withCount('movements')
-            ->withCount(['movements as reconciled_count' => fn($q) => $q->whereNotNull('cfdi_id')])
+            ->withCount(['movements as reconciled_count' => fn($q) => $q->whereExists(
+                fn($sub) => $sub->select(DB::raw(1))
+                    ->from('bank_movement_cfdis')
+                    ->whereColumn('bank_movement_cfdis.bank_movement_id', 'bank_movements.id')
+            )])
             ->orderBy('created_at', 'desc')
             ->get();
     }

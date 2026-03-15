@@ -137,7 +137,8 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
         setSelectedMovement(null);
         setReconciliationData(prev => {
             if (!prev) return prev;
-            const wasReconciled = prev.movements.find(m => m.id === updated.id)?.cfdi_id;
+            const prev_ = prev.movements.find(m => m.id === updated.id);
+            const wasReconciled = !!prev_?.cfdi_id || (prev_?.cfdis?.length ?? 0) > 0;
             if (!wasReconciled) adjustReconciledCount(+1);
             const movements = prev.movements.map(m => m.id === updated.id ? { ...updated, suggestions: [] } : m);
             return { movements, stats: computeStats(movements) };
@@ -225,7 +226,7 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
     const computeStats = (movements: BankMovement[]): ReconciliationStats => {
         const stats: ReconciliationStats = { total: movements.length, green: 0, yellow: 0, red: 0, unmatched: 0 };
         movements.forEach(m => {
-            if (m.cfdi_id) {
+            if (m.cfdi_id || (m.cfdis?.length ?? 0) > 0) {
                 const c = m.confidence ?? 'green';
                 if (c in stats) (stats as any)[c]++;
             } else if ((m.suggestions?.length ?? 0) === 0) {
@@ -259,13 +260,14 @@ export function ReconciliationPage({ activeRfc, clientName, onBack }: Props) {
 
     const allMovements = reconciliationData?.movements ?? [];
     const totalCount = allMovements.length;
-    const reconciledCount = allMovements.filter(m => !!m.cfdi_id).length;
+    const isReconciled = (m: BankMovement) => !!m.cfdi_id || (m.cfdis?.length ?? 0) > 0;
+    const reconciledCount = allMovements.filter(isReconciled).length;
     const pendingCount = totalCount - reconciledCount;
     const progressPct = totalCount > 0 ? Math.round((reconciledCount / totalCount) * 100) : 0;
 
     const filteredMovements = allMovements.filter(m => {
-        if (filter === 'pending') return !m.cfdi_id;
-        if (filter === 'reconciled') return !!m.cfdi_id;
+        if (filter === 'pending') return !isReconciled(m);
+        if (filter === 'reconciled') return isReconciled(m);
         return true;
     });
 
