@@ -9,6 +9,7 @@ import { BankStatementPage } from './BankStatementPage';
 import { ReconciliationPage } from './ReconciliationPage';
 import { SatDocumentsPage } from './SatDocumentsPage';
 import { ReconciliationReportPage } from './ReconciliationReportPage';
+import { PolizasPage } from './PolizasPage';
 import type { Cfdi } from '../models';
 
 export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, activeValidUntil }: { activeRfc: string, onBack?: () => void, clientName?: string, initialSyncAt?: string, activeValidUntil?: string }) => {
@@ -43,7 +44,7 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
     const [activeRequests, setActiveRequests] = useState<any[]>([]);
     const [drawerWidth, setDrawerWidth] = useState(360);
     const [isResizing, setIsResizing] = useState(false);
-    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation' | 'reconciliation-report' | 'sat-docs'>('invoices');
+    const [currentView, setCurrentView] = useState<'invoices' | 'accounts' | 'provisional' | 'banks' | 'reconciliation' | 'reconciliation-report' | 'sat-docs' | 'polizas'>('invoices');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [contabilidadOpen, setContabilidadOpen] = useState(true);
 
@@ -699,8 +700,8 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                                     Conciliaciones
                                 </button>
                                 <button
-                                    className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-300 cursor-not-allowed"
-                                    title="Próximamente"
+                                    onClick={() => { setCurrentView('polizas'); setIsSidebarOpen(false); }}
+                                    className={`nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${currentView === 'polizas' ? 'active bg-emerald-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
                                 >
                                     <span className="material-symbols-outlined text-lg">description</span>
                                     Pólizas
@@ -797,6 +798,13 @@ export const InvoicesPage = ({ activeRfc, onBack, clientName, initialSyncAt, act
                         activeRfc={activeRfc}
                         clientName={clientName || activeClientName || activeRfc}
                         onBack={() => setCurrentView('invoices')}
+                    />
+                </div>
+            ) : currentView === 'polizas' ? (
+                <div className="flex-1 h-screen overflow-hidden">
+                    <PolizasPage
+                        activeRfc={activeRfc}
+                        clientName={clientName || activeClientName || activeRfc}
                     />
                 </div>
             ) : (

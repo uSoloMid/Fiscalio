@@ -679,3 +679,105 @@ export async function syncUserBusinesses(userId: number, businessIds: number[]):
     if (!response.ok) throw new Error('Error al asignar clientes');
     return response.json();
 }
+
+// ── Pólizas ──────────────────────────────────────────────────────────────────
+
+export async function listPolizas(params: {
+    rfc: string; year?: number; month?: number; status?: string; page?: number;
+}): Promise<any> {
+    const q = new URLSearchParams({ rfc: params.rfc });
+    if (params.year)   q.set('year', String(params.year));
+    if (params.month)  q.set('month', String(params.month));
+    if (params.status) q.set('status', params.status);
+    if (params.page)   q.set('page', String(params.page));
+    const res = await authFetch(`/api/polizas?${q}`);
+    if (!res.ok) throw new Error('Error al listar pólizas');
+    return res.json();
+}
+
+export async function preCheckPolizas(rfc: string, items: any[]): Promise<any> {
+    const res = await authFetch('/api/polizas/pre-check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc, items }),
+    });
+    if (!res.ok) throw new Error('Error en pre-check');
+    return res.json();
+}
+
+export async function generatePolizas(rfc: string, items: any[]): Promise<any> {
+    const res = await authFetch('/api/polizas/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc, items }),
+    });
+    if (!res.ok) throw new Error('Error al generar pólizas');
+    return res.json();
+}
+
+export async function exportPolizas(rfc: string, polizaIds: number[]): Promise<Blob> {
+    const res = await authFetch('/api/polizas/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc, poliza_ids: polizaIds }),
+    });
+    if (!res.ok) throw new Error('Error al exportar pólizas');
+    return res.blob();
+}
+
+export async function deletePoliza(rfc: string, id: number): Promise<void> {
+    const res = await authFetch(`/api/polizas/${id}?rfc=${encodeURIComponent(rfc)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Error al eliminar póliza');
+}
+
+export async function listPolizaTemplates(rfc: string): Promise<any[]> {
+    const res = await authFetch(`/api/poliza-templates?rfc=${encodeURIComponent(rfc)}`);
+    if (!res.ok) throw new Error('Error al cargar plantillas');
+    return res.json();
+}
+
+export async function createPolizaTemplate(rfc: string, data: any): Promise<any> {
+    const res = await authFetch('/api/poliza-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc, ...data }),
+    });
+    if (!res.ok) throw new Error('Error al crear plantilla');
+    return res.json();
+}
+
+export async function getRfcMaps(rfc: string): Promise<any[]> {
+    const res = await authFetch(`/api/polizas/rfc-maps?rfc=${encodeURIComponent(rfc)}`);
+    if (!res.ok) throw new Error('Error al cargar mapas RFC');
+    return res.json();
+}
+
+export async function saveRfcMap(rfc: string, rfcMap: {
+    rfc: string; nombre?: string; account_id: number;
+}): Promise<any> {
+    const res = await authFetch('/api/polizas/rfc-maps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc, rfc_map: rfcMap }),
+    });
+    if (!res.ok) throw new Error('Error al guardar mapa RFC');
+    return res.json();
+}
+
+export async function getBankMaps(rfc: string): Promise<any[]> {
+    const res = await authFetch(`/api/polizas/bank-maps?rfc=${encodeURIComponent(rfc)}`);
+    if (!res.ok) throw new Error('Error al cargar mapas banco');
+    return res.json();
+}
+
+export async function saveBankMap(rfc: string, bankMap: {
+    bank_statement_id?: number; bank_name?: string; account_number?: string; account_id: number;
+}): Promise<any> {
+    const res = await authFetch('/api/polizas/bank-maps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfc, bank_map: bankMap }),
+    });
+    if (!res.ok) throw new Error('Error al guardar mapa banco');
+    return res.json();
+}

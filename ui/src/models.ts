@@ -185,3 +185,85 @@ export interface SatRequest {
     updated_at: string;
     next_retry_at?: string;
 }
+
+// ── Pólizas ──────────────────────────────────────────────────────────────────
+
+export interface PolizaTemplateLine {
+    id: number;
+    template_id: number;
+    sort_order: number;
+    tipo_movto: 0 | 1;             // 0=Cargo, 1=Abono
+    account_source: 'fixed' | 'rfc_cliente' | 'rfc_proveedor' | 'banco';
+    account_id?: number | null;
+    account?: Account;
+    importe_source: string;
+    concepto_line?: string | null;
+    is_optional: boolean;
+}
+
+export interface PolizaTemplate {
+    id: number;
+    business_id: number;
+    name: string;
+    tipo_poliza: 1 | 2 | 3;        // 1=Ingreso, 2=Egreso, 3=Diario
+    concepto_template?: string | null;
+    trigger_type: 'cfdi' | 'movement';
+    cfdi_tipo?: string | null;
+    cfdi_role?: 'emisor' | 'receptor' | null;
+    movement_direction?: 'cargo' | 'abono' | null;
+    lines: PolizaTemplateLine[];
+}
+
+export interface PolizaLine {
+    id: number;
+    poliza_id: number;
+    sort_order: number;
+    account_id: number;
+    account?: Account;
+    tipo_movto: 0 | 1;
+    importe: number;
+    concepto?: string | null;
+    uuid_cfdi?: string | null;
+}
+
+export interface Poliza {
+    id: number;
+    business_id: number;
+    bank_movement_id?: number | null;
+    cfdi_id?: number | null;
+    template_id?: number | null;
+    template?: { id: number; name: string };
+    tipo_poliza: 1 | 2 | 3;
+    numero: number;
+    fecha: string;
+    concepto: string;
+    status: 'draft' | 'exported';
+    exported_at?: string | null;
+    lines: PolizaLine[];
+    created_at: string;
+    updated_at: string;
+}
+
+export interface RfcAccountMap {
+    id: number;
+    business_id: number;
+    rfc: string;
+    nombre?: string | null;
+    account_id: number;
+    account?: Account;
+}
+
+export interface BankAccountMap {
+    id: number;
+    business_id: number;
+    bank_statement_id?: number | null;
+    bank_name?: string | null;
+    account_number?: string | null;
+    account_id: number;
+    account?: Account;
+}
+
+export interface MissingAccounts {
+    missing_rfcs: { rfc: string; nombre: string }[];
+    missing_banks: { bank_name: string; account_number: string; statement_id: number }[];
+}

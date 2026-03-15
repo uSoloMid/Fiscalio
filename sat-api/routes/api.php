@@ -135,6 +135,22 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class , 'reconcile']);
         Route::delete('/bank-movements/{id}/reconcile', [\App\Http\Controllers\ReconciliationController::class , 'unreconcile']);
 
+        // Pólizas contables (CONTPAQi)
+        Route::get('/polizas', [\App\Http\Controllers\PolizaController::class, 'index']);
+        Route::post('/polizas/pre-check', [\App\Http\Controllers\PolizaController::class, 'preCheck']);
+        Route::post('/polizas/generate', [\App\Http\Controllers\PolizaController::class, 'generate']);
+        Route::post('/polizas/export', [\App\Http\Controllers\PolizaController::class, 'export']);
+        Route::delete('/polizas/{id}', [\App\Http\Controllers\PolizaController::class, 'destroy']);
+        Route::get('/polizas/rfc-maps', [\App\Http\Controllers\PolizaController::class, 'getRfcMaps']);
+        Route::post('/polizas/rfc-maps', [\App\Http\Controllers\PolizaController::class, 'saveRfcMap']);
+        Route::get('/polizas/bank-maps', [\App\Http\Controllers\PolizaController::class, 'getBankMaps']);
+        Route::post('/polizas/bank-maps', [\App\Http\Controllers\PolizaController::class, 'saveBankMap']);
+
+        Route::get('/poliza-templates', [\App\Http\Controllers\PolizaTemplateController::class, 'index']);
+        Route::post('/poliza-templates', [\App\Http\Controllers\PolizaTemplateController::class, 'store']);
+        Route::put('/poliza-templates/{id}', [\App\Http\Controllers\PolizaTemplateController::class, 'update']);
+        Route::delete('/poliza-templates/{id}', [\App\Http\Controllers\PolizaTemplateController::class, 'destroy']);
+
         // SAT Documents (CSF + Opinión 32-D)
         Route::get('/sat-documents/missing', [\App\Http\Controllers\SatDocumentController::class , 'missing']);
         Route::get('/sat-documents', [\App\Http\Controllers\SatDocumentController::class , 'index']);
